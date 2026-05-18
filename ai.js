@@ -23,24 +23,39 @@ function addToWardrobe(item) {
 }
 
 // ── Gemini: Kleidungsstück analysieren ───────────────────────────────────────
-async function analyzeClothingWithGemini(base64, mimeType) {
+async function _callGeminiAPI(body) {
   const key = getGeminiKey();
-  if (!key || key === 'your_gemini_api_key_here') {
-    throw new Error('Kein Gemini API-Key konfiguriert. Trage deinen Key in die .env-Datei ein.');
+  // Lokal: direkt mit Key aufrufen
+  if (key && key !== 'your_gemini_api_key_here') {
+    const res = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    );
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.error?.message || 'Gemini Fehler: ' + res.status);
+    }
+    return res.json();
   }
+  // Produktion: über Vercel Proxy aufrufen (Key bleibt sicher auf Server)
+  const res = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body: body, model: 'gemini-2.5-flash' })
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData?.error || 'Gemini Proxy Fehler: ' + res.status);
+  }
+  return res.json();
+}
+
+async function analyzeClothingWithGemini(base64, mimeType) {
   const prompt = 'Du bist ein Mode-Experte. Analysiere das Kleidungsstück auf diesem Bild und antworte NUR mit einem validen JSON-Objekt (kein Markdown, keine Erklärung, kein Text außerhalb des JSON):\n{\n  "name": "Name des Kleidungsstücks auf Deutsch",\n  "brand": "Marke falls erkennbar, sonst leerer String",\n  "type": "Kategorie auf Deutsch (z.B. Top, Hose, Kleid, Schuh, Accessoire, Jacke)",\n  "color": "Hauptfarbe auf Deutsch",\n  "colorHex": "Hex-Farbcode der Hauptfarbe",\n  "season": "Saison auf Deutsch (Sommer | Winter | Frühling | Ganzjährig)",\n  "seasonClass": "s-sommer | s-winter | s-fruhjahr | s-ganzjahrig",\n  "style": "Stil auf Deutsch (z.B. Casual, Business, Sportlich, Elegant)",\n  "emoji": "Ein einzelnes passendes Emoji"\n}';
   const body = {
     contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }]
   };
-  const res = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-  );
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData?.error?.message || 'Gemini Fehler: ' + res.status);
-  }
-  const data = await res.json();
+  const data = await _callGeminiAPI(body);
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const jsonStr = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   try { return JSON.parse(jsonStr); }
@@ -50,32 +65,43 @@ async function analyzeClothingWithGemini(base64, mimeType) {
 // ── Remove.bg: Hintergrund entfernen ─────────────────────────────────────────
 async function removeBackground(base64, mimeType) {
   const key = getRemoveBgKey();
-  if (!key || key === 'your_removebg_api_key_here') return 'data:' + mimeType + ';base64,' + base64;
-  const byteStr = atob(base64);
-  const bytes = new Uint8Array(byteStr.length);
-  for (let i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i);
-  const blob = new Blob([bytes], { type: mimeType });
-  const formData = new FormData();
-  formData.append('image_file', blob, 'clothing.jpg');
-  formData.append('size', 'auto');
-  const res = await fetch('https://api.remove.bg/v1.0/removebg', {
-    method: 'POST', headers: { 'X-Api-Key': key }, body: formData
-  });
-  if (!res.ok) return 'data:' + mimeType + ';base64,' + base64;
-  const resultBlob = await res.blob();
-  return new Promise(function(resolve) {
-    const reader = new FileReader();
-    reader.onload = function(e) { resolve(e.target.result); };
-    reader.readAsDataURL(resultBlob);
-  });
+  // Lokal: direkt mit Key aufrufen
+  if (key && key !== 'your_removebg_api_key_here') {
+    const byteStr = atob(base64);
+    const bytes = new Uint8Array(byteStr.length);
+    for (let i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mimeType });
+    const formData = new FormData();
+    formData.append('image_file', blob, 'clothing.jpg');
+    formData.append('size', 'auto');
+    const res = await fetch('https://api.remove.bg/v1.0/removebg', {
+      method: 'POST', headers: { 'X-Api-Key': key }, body: formData
+    });
+    if (!res.ok) return 'data:' + mimeType + ';base64,' + base64;
+    const resultBlob = await res.blob();
+    return new Promise(function(resolve) {
+      const reader = new FileReader();
+      reader.onload = function(e) { resolve(e.target.result); };
+      reader.readAsDataURL(resultBlob);
+    });
+  }
+  // Produktion: über Vercel Proxy
+  try {
+    const res = await fetch('/api/removebg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64: base64, mimeType: mimeType })
+    });
+    const data = await res.json();
+    if (data.skipped || !data.base64) return 'data:' + mimeType + ';base64,' + base64;
+    return 'data:' + (data.mimeType || 'image/png') + ';base64,' + data.base64;
+  } catch (e) {
+    return 'data:' + mimeType + ';base64,' + base64;
+  }
 }
 
 // ── Gemini: Outfits generieren ────────────────────────────────────────────────
 async function generateOutfitsWithGemini(description, inspoContext, inspoImageBase64, inspoImageMime) {
-  const key = getGeminiKey();
-  if (!key || key === 'your_gemini_api_key_here') {
-    throw new Error('Kein Gemini API-Key konfiguriert. Trage deinen Key in die .env-Datei ein.');
-  }
   const staticItems = [
     { name: 'Weißes T-Shirt', type: 'Top', emoji: '👕', color: 'Weiß', season: 'Sommer' },
     { name: 'Jeans', type: 'Hose', emoji: '👖', color: 'Blau', season: 'Ganzjährig' },
@@ -99,15 +125,7 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
   const parts = [{ text: prompt }];
   if (inspoImageBase64 && inspoImageMime) parts.push({ inline_data: { mime_type: inspoImageMime, data: inspoImageBase64 } });
   const body = { contents: [{ parts: parts }] };
-  const res = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-  );
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData?.error?.message || 'Gemini Fehler: ' + res.status);
-  }
-  const data = await res.json();
+  const data = await _callGeminiAPI(body);
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const jsonStr = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   try { return JSON.parse(jsonStr); }
