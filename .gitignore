@@ -3,3 +3,4 @@ node_modules/
 ios/
 android/
 dist/
+# env.js wird committed (leere Fallback-Version für GitHub Pages)
