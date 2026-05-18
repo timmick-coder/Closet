@@ -1,0 +1,2370 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>StyleSync</title>
+  <script src="/env.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --bg: #F7F3FF;
+      --card: #FFFFFF;
+      --purple: #6B47FF;
+      --purple-mid: #8B6FFF;
+      --purple-light: #EDE9FF;
+      --purple-border: #D8CFFF;
+      --text: #18181B;
+      --text2: #9090A0;
+      --shadow: 0 2px 12px rgba(107,71,255,0.07);
+    }
+
+    html, body {
+      height: 100%; background: #1a0a2e;
+      display: flex; justify-content: center; align-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    #phone {
+      width: 390px; height: 844px;
+      background: var(--bg);
+      border-radius: 44px; overflow: hidden;
+      display: flex; flex-direction: column;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(255,255,255,0.1);
+    }
+
+    .status-bar {
+      height: 44px; background: transparent;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 24px 0; flex-shrink: 0; z-index: 10;
+    }
+    .status-time { font-size: 15px; font-weight: 600; color: var(--text); }
+    .status-icons { display: flex; gap: 5px; align-items: center; }
+    .status-icons svg { width: 16px; height: 16px; fill: var(--text); }
+
+    #app { flex: 1; overflow: hidden; position: relative; }
+
+    .screen {
+      position: absolute; inset: 0;
+      display: none; flex-direction: column;
+      background: var(--bg);
+      animation: fadeIn 0.2s ease;
+    }
+    .screen.active { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    .scroll-content {
+      flex: 1; overflow-y: auto; scrollbar-width: none; padding-bottom: 12px;
+    }
+    .scroll-content::-webkit-scrollbar { display: none; }
+
+    /* ── BOTTOM NAV ── */
+    .bottom-nav {
+      height: 80px; background: var(--card);
+      display: flex; align-items: center; justify-content: space-around;
+      border-top: 1px solid #EEE8FF; flex-shrink: 0;
+      padding-bottom: 6px; position: relative; z-index: 100;
+    }
+    .nav-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      gap: 4px; cursor: pointer; padding: 8px 0;
+      border: none; background: none;
+    }
+    .nav-item svg { width: 24px; height: 24px; stroke: var(--text2); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: stroke 0.2s; }
+    .nav-label { font-size: 10px; font-weight: 600; color: var(--text2); transition: color 0.2s; }
+    .nav-item.active svg { stroke: var(--purple); }
+    .nav-item.active .nav-label { color: var(--purple); }
+
+    .nav-center { position: relative; margin-top: -22px; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+    .nav-center-circle {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--purple);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 20px rgba(107,71,255,0.4);
+      transition: transform 0.15s;
+    }
+    .nav-center-circle:active { transform: scale(0.93); }
+    .nav-center-circle svg { width: 26px; height: 26px; stroke: white; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .nav-center .nav-label { color: var(--purple); font-weight: 700; }
+
+    /* ── SHARED ── */
+    .screen-header {
+      padding: 16px 20px 10px;
+      display: flex; align-items: flex-start; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .header-icon-btn {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: var(--card); border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: var(--shadow);
+    }
+    .header-icon-btn svg { width: 20px; height: 20px; stroke: var(--purple); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+    .big-title { font-size: 28px; font-weight: 800; color: var(--text); line-height: 1.15; }
+    .big-sub { font-size: 14px; font-weight: 700; color: var(--purple); margin-top: 2px; }
+    .big-sub-gray { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+    .section-label {
+      font-size: 17px; font-weight: 800; color: var(--text);
+      padding: 0 20px 12px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .section-link { font-size: 13px; font-weight: 600; color: var(--purple); }
+
+    /* ── CATEGORY CHIPS ── */
+    .chip-row { display: flex; gap: 10px; padding: 0 20px 14px; overflow-x: auto; scrollbar-width: none; }
+    .chip-row::-webkit-scrollbar { display: none; }
+    .chip {
+      flex-shrink: 0; padding: 9px 18px; border-radius: 24px;
+      font-size: 13px; font-weight: 700; cursor: pointer; border: 1.5px solid var(--purple-border);
+      background: var(--card); color: var(--text2); transition: all 0.18s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .chip.active { background: var(--purple); color: white; border-color: var(--purple); }
+
+    /* ── SEARCH BAR ── */
+    .search-wrap { padding: 0 20px 14px; display: flex; gap: 10px; }
+    .search-box {
+      flex: 1; background: var(--card); border-radius: 14px;
+      padding: 11px 16px 11px 42px; border: 1.5px solid var(--purple-border);
+      font-size: 14px; color: var(--text2);
+      position: relative; box-shadow: var(--shadow);
+    }
+    .search-wrap-inner { flex: 1; position: relative; }
+    .search-wrap-inner svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke: var(--text2); fill: none; stroke-width: 2; stroke-linecap: round; }
+    .search-input { width: 100%; border: 1.5px solid var(--purple-border); border-radius: 14px; padding: 11px 40px 11px 40px; font-size: 14px; color: var(--text); background: var(--card); outline: none; box-shadow: var(--shadow); transition: border-color 0.15s; box-sizing: border-box; }
+    .search-input:focus { border-color: var(--purple); }
+    .search-input::placeholder { color: var(--text2); }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke: var(--text2); fill: none; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+    .search-clear-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 50%; background: var(--text2); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; }
+    .search-clear-btn svg { width: 12px; height: 12px; stroke: white; fill: none; stroke-width: 2.5; stroke-linecap: round; }
+
+    /* ─────────────── SCHRANK ─────────────── */
+    .plus-btn {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--purple); border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 18px rgba(107,71,255,0.35);
+      flex-shrink: 0;
+    }
+    .plus-btn svg { width: 24px; height: 24px; stroke: white; fill: none; stroke-width: 2.5; stroke-linecap: round; }
+
+    .clothes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 0 16px; }
+    .cloth-card {
+      background: var(--card); border-radius: 18px; padding: 14px 8px 12px;
+      text-align: center; box-shadow: var(--shadow); cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .cloth-card:active { transform: scale(0.96); }
+    .cloth-icon {
+      width: 68px; height: 68px; border-radius: 50%;
+      background: var(--bg); display: flex; align-items: center;
+      justify-content: center; margin: 0 auto 10px; font-size: 34px;
+    }
+    .cloth-name { font-size: 12px; font-weight: 800; color: var(--text); margin-bottom: 5px; line-height: 1.2; }
+    .cloth-color-row { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 6px; }
+    .color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .cloth-color-name { font-size: 11px; color: var(--text2); font-weight: 500; }
+    .season-tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
+    .s-sommer { background: #FFF3E0; color: #E65100; }
+    .s-winter { background: #EDE7F6; color: #5C35D1; }
+    .s-ganzjahrig { background: #E0F7F4; color: #00796B; }
+    .s-fruhjahr { background: #FFF9C4; color: #F9A825; }
+
+    /* ─────────────── SCANNEN ─────────────── */
+    .scan-drop-zone {
+      margin: 0 20px 20px;
+      border: 2px dashed var(--purple-mid);
+      border-radius: 20px; padding: 32px 20px;
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      background: rgba(107,71,255,0.03); cursor: pointer;
+    }
+    .scan-img-circle {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: var(--purple-light);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .scan-img-circle svg { width: 32px; height: 32px; stroke: var(--purple); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .scan-drop-title { font-size: 18px; font-weight: 800; color: var(--text); text-align: center; }
+    .scan-drop-sub { font-size: 13px; color: var(--text2); text-align: center; }
+
+    .scan-action-row { display: flex; gap: 12px; padding: 0 20px 20px; }
+    .scan-action-btn {
+      flex: 1; height: 52px; border-radius: 16px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: transform 0.15s;
+    }
+    .scan-action-btn:active { transform: scale(0.97); }
+    .scan-action-btn svg { width: 20px; height: 20px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .scan-btn-primary { background: var(--purple); color: white; border: none; }
+    .scan-btn-primary svg { stroke: white; }
+    .scan-btn-secondary { background: var(--card); color: var(--purple); border: 2px solid var(--purple); }
+    .scan-btn-secondary svg { stroke: var(--purple); }
+
+    .tips-section { padding: 0 20px; }
+    .tips-header { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 14px; }
+    .tip-card {
+      background: var(--card); border-radius: 16px; padding: 14px;
+      margin-bottom: 10px; display: flex; align-items: flex-start; gap: 14px;
+      box-shadow: var(--shadow);
+    }
+    .tip-icon-box { width: 42px; height: 42px; border-radius: 12px; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .tip-content {}
+    .tip-title { font-size: 14px; font-weight: 800; color: var(--text); margin-bottom: 3px; }
+    .tip-body { font-size: 12px; color: var(--text2); line-height: 1.5; }
+
+    /* ─────────────── KI STYLING ─────────────── */
+    .ki-header { padding: 16px 20px 14px; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+    .ki-header-icon { width: 52px; height: 52px; border-radius: 16px; background: var(--purple-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .ki-header-icon svg { width: 26px; height: 26px; stroke: var(--purple); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* Ordner */
+    .ordner-section { padding: 0 20px 16px; }
+    .ordner-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .ordner-label { font-size: 16px; font-weight: 800; color: var(--text); }
+    .ordner-add-btn {
+      display: flex; align-items: center; gap: 5px;
+      background: var(--purple-light); color: var(--purple);
+      border: none; border-radius: 20px; padding: 7px 14px;
+      font-size: 12px; font-weight: 800; cursor: pointer;
+    }
+    .ordner-add-btn svg { width: 14px; height: 14px; stroke: var(--purple); fill: none; stroke-width: 2.5; stroke-linecap: round; }
+    .ordner-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .ordner-card {
+      background: var(--card); border-radius: 18px; overflow: hidden;
+      box-shadow: var(--shadow); cursor: pointer; transition: transform 0.15s;
+    }
+    .ordner-card:active { transform: scale(0.97); }
+    .ordner-preview {
+      height: 90px; display: grid; grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr; gap: 2px;
+    }
+    .ordner-preview-cell { display: flex; align-items: center; justify-content: center; font-size: 22px; background: var(--bg); }
+    .ordner-preview-cell:first-child { border-radius: 0; }
+    .ordner-info { padding: 10px 12px 12px; }
+    .ordner-name { font-size: 13px; font-weight: 800; color: var(--text); }
+    .ordner-count { font-size: 11px; color: var(--text2); margin-top: 2px; font-weight: 500; }
+    .ordner-new {
+      background: var(--card); border-radius: 18px;
+      box-shadow: var(--shadow); cursor: pointer;
+      border: 2px dashed var(--purple-border);
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 8px; min-height: 140px;
+      transition: border-color 0.2s;
+    }
+    .ordner-new:active { border-color: var(--purple); }
+    .ordner-new-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--purple-light); display: flex; align-items: center; justify-content: center; }
+    .ordner-new-icon svg { width: 18px; height: 18px; stroke: var(--purple); fill: none; stroke-width: 2.5; stroke-linecap: round; }
+    .ordner-new-label { font-size: 12px; font-weight: 700; color: var(--text2); }
+
+    /* Modal */
+    .modal-overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.35);
+      display: none; align-items: flex-end; z-index: 200;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-sheet {
+      width: 100%; background: var(--card);
+      border-radius: 24px 24px 0 0; padding: 24px 20px 32px;
+    }
+    .modal-handle { width: 40px; height: 4px; border-radius: 2px; background: #ddd; margin: 0 auto 20px; }
+    .modal-title { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 16px; }
+    .modal-input {
+      width: 100%; border: 1.5px solid var(--purple-border); border-radius: 14px;
+      padding: 13px 16px; font-size: 15px; color: var(--text); outline: none;
+      background: var(--bg); margin-bottom: 16px;
+    }
+    .modal-input:focus { border-color: var(--purple); }
+    .modal-emoji-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .modal-emoji {
+      width: 42px; height: 42px; border-radius: 12px; background: var(--bg);
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+      cursor: pointer; border: 2px solid transparent; transition: all 0.15s;
+    }
+    .modal-emoji.selected { border-color: var(--purple); background: var(--purple-light); }
+    .modal-confirm {
+      width: 100%; height: 52px; border-radius: 16px; background: var(--purple);
+      border: none; color: white; font-size: 15px; font-weight: 800; cursor: pointer;
+    }
+
+    /* KI Generator Modal */
+    .ki-modal-overlay {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.4);
+      display: none; align-items: flex-end; z-index: 200;
+    }
+    .ki-modal-overlay.open { display: flex; }
+    .ki-modal-sheet {
+      width: 100%; background: var(--card);
+      border-radius: 24px 24px 0 0; padding: 8px 20px 32px;
+      max-height: 92%; overflow-y: auto; scrollbar-width: none;
+    }
+    .ki-modal-sheet::-webkit-scrollbar { display: none; }
+    .ki-modal-handle { width: 40px; height: 4px; border-radius: 2px; background: #ddd; margin: 12px auto 20px; }
+    .ki-modal-title { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+    .ki-modal-sub { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
+
+    .ki-input-label { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .ki-textarea {
+      width: 100%; border: 1.5px solid var(--purple-border); border-radius: 14px;
+      padding: 13px 14px; font-size: 14px; color: var(--text);
+      background: var(--bg); outline: none; resize: none; height: 90px;
+      font-family: inherit; line-height: 1.5; margin-bottom: 16px;
+    }
+    .ki-textarea:focus { border-color: var(--purple); }
+    .ki-textarea::placeholder { color: var(--text2); }
+
+    .ki-img-upload {
+      border: 2px dashed var(--purple-border); border-radius: 14px;
+      padding: 18px; display: flex; align-items: center; gap: 14px;
+      cursor: pointer; margin-bottom: 20px; background: var(--bg);
+      transition: border-color 0.2s;
+    }
+    .ki-img-upload:active { border-color: var(--purple); }
+    .ki-img-icon { width: 46px; height: 46px; border-radius: 12px; background: var(--purple-light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .ki-img-icon svg { width: 22px; height: 22px; stroke: var(--purple); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .ki-img-text .ki-img-title { font-size: 14px; font-weight: 700; color: var(--text); }
+    .ki-img-text .ki-img-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+    .ki-img-preview { position: relative; margin-bottom: 20px; }
+    .ki-img-preview img { width: 100%; height: 120px; object-fit: cover; border-radius: 14px; display: block; }
+    .ki-img-remove { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.5); border: none; color: white; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .ki-img-preview-wrap { display: none; }
+    .ki-img-preview-wrap.has-image { display: block; }
+    .ki-img-upload-wrap.has-image { display: none; }
+
+    .ki-source-btn {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg); border: 1.5px solid var(--purple-border);
+      border-radius: 14px; padding: 12px 14px; cursor: pointer;
+      margin-bottom: 8px; transition: all 0.18s;
+    }
+    .ki-source-btn.selected { background: var(--purple-light); border-color: var(--purple); }
+    .ki-source-left { display: flex; align-items: center; gap: 10px; }
+    .ki-source-icon { font-size: 22px; }
+    .ki-source-name { font-size: 13px; font-weight: 800; color: var(--text); }
+    .ki-source-btn.selected .ki-source-name { color: var(--purple); }
+    .ki-source-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
+    .ki-source-arrow { font-size: 18px; color: var(--text2); transition: transform 0.2s; }
+    .ki-source-arrow.open { transform: rotate(90deg); }
+
+    .ki-ordner-dropdown { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; padding-left: 8px; }
+
+    .ki-ordner-row { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; margin-bottom: 16px; }
+    .ki-ordner-row::-webkit-scrollbar { display: none; }
+    .ki-ordner-chip {
+      flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+      background: var(--bg); border: 1.5px solid var(--purple-border);
+      border-radius: 10px; padding: 6px 10px; cursor: pointer;
+      transition: all 0.18s;
+    }
+    .ki-ordner-chip.selected { background: var(--purple-light); border-color: var(--purple); }
+    .ki-ordner-chip-emoji { font-size: 18px; }
+    .ki-ordner-chip-info {}
+    .ki-ordner-chip-name { font-size: 12px; font-weight: 800; color: var(--text); }
+    .ki-ordner-chip-count { font-size: 10px; color: var(--text2); margin-top: 1px; }
+    .ki-ordner-chip.selected .ki-ordner-chip-name { color: var(--purple); }
+
+    .ki-divider { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .ki-divider-line { flex: 1; height: 1px; background: var(--purple-border); }
+    .ki-divider-text { font-size: 11px; font-weight: 700; color: var(--text2); white-space: nowrap; }
+
+    .ki-generate-confirm {
+      width: 100%; height: 54px; border-radius: 16px; background: var(--purple);
+      border: none; color: white; font-size: 16px; font-weight: 800; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 6px 18px rgba(107,71,255,0.3); transition: transform 0.15s;
+    }
+    .ki-generate-confirm:active { transform: scale(0.97); }
+    .ki-generate-confirm svg { width: 18px; height: 18px; stroke: white; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .generate-btn {
+      margin: 16px 20px 4px;
+      height: 56px; border-radius: 18px;
+      background: linear-gradient(135deg, #6B47FF 0%, #C84B9E 100%);
+      border: none; color: white;
+      font-size: 16px; font-weight: 800; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      box-shadow: 0 8px 24px rgba(107,71,255,0.35);
+      width: calc(100% - 40px);
+      transition: transform 0.15s, box-shadow 0.15s;
+      letter-spacing: 0.01em;
+    }
+    .generate-btn:active { transform: scale(0.97); box-shadow: 0 4px 14px rgba(107,71,255,0.25); }
+    .generate-btn svg { width: 20px; height: 20px; stroke: white; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .generate-btn-more { margin:8px 20px 16px; height:50px; border-radius:18px; background:var(--bg); border:2px solid var(--purple-border); color:var(--purple); font-size:15px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; width:calc(100% - 40px); transition:transform 0.15s; }
+    .generate-btn-more:active { transform:scale(0.97); }
+    .generate-btn-more svg { width:18px; height:18px; stroke:var(--purple); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+    .outfit-cards { padding: 0 20px; }
+    .outfit-card-ki {
+      background: var(--card); border-radius: 20px; padding: 16px;
+      margin-bottom: 14px; box-shadow: var(--shadow);
+    }
+    .outfit-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+    .outfit-card-name { font-size: 17px; font-weight: 800; color: var(--text); }
+    .outfit-card-style { font-size: 13px; font-weight: 600; color: var(--purple); margin-top: 2px; }
+    .match-badge { background: #DCFCE7; color: #15803D; font-size: 12px; font-weight: 800; padding: 5px 12px; border-radius: 20px; white-space: nowrap; }
+    .outfit-items-row { display: flex; gap: 16px; margin-bottom: 14px; }
+    .outfit-item-ki { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .outfit-item-circle {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: var(--bg); display: flex; align-items: center;
+      justify-content: center; font-size: 30px;
+    }
+    .outfit-item-circle.highlighted { background: #DDD8FF; }
+    .outfit-item-label { font-size: 11px; font-weight: 600; color: var(--text2); text-align: center; }
+    .outfit-card-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid #F0EBFF; }
+    .outfit-weather { font-size: 12px; color: var(--text2); font-weight: 500; }
+    .outfit-footer-btns { display: flex; align-items: center; gap: 10px; }
+    .icon-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--bg); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .icon-btn svg { width: 17px; height: 17px; stroke: var(--text2); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .anziehen-btn { background: var(--purple-light); color: var(--purple); border: none; border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+    /* ─────────────── FREUNDE ─────────────── */
+    .freunde-header { padding: 16px 20px 12px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .search-friend-btn { width: 42px; height: 42px; border-radius: 50%; background: var(--card); border: 1.5px solid var(--purple-border); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); font-size: 20px; }
+
+    /* ── Profil-Suche Panel ── */
+    .friend-search-panel { position:absolute; inset:0; z-index:350; background:var(--bg); transform:translateX(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); display:flex; flex-direction:column; overflow:hidden; }
+    .friend-search-panel.active { transform:translateX(0); }
+    .friend-search-header { display:flex; align-items:center; gap:10px; padding:12px 16px; background:var(--card); border-bottom:1px solid var(--purple-border); flex-shrink:0; }
+    .friend-search-back { background:none; border:none; font-size:22px; cursor:pointer; color:var(--text); padding:4px; line-height:1; flex-shrink:0; }
+    .friend-search-input-wrap { flex:1; display:flex; align-items:center; background:var(--bg); border:1.5px solid var(--purple-border); border-radius:12px; padding:0 10px; gap:6px; }
+    .friend-search-icon { font-size:16px; color:var(--text2); }
+    .friend-search-input { flex:1; border:none; background:none; font-size:15px; font-weight:600; color:var(--text); outline:none; padding:10px 0; }
+    .friend-search-input::placeholder { color:var(--text2); font-weight:500; }
+    .friend-search-clear { background:none; border:none; font-size:16px; cursor:pointer; color:var(--text2); padding:4px; line-height:1; display:none; }
+    .friend-search-clear.show { display:block; }
+    .friend-search-results { flex:1; overflow-y:auto; scrollbar-width:none; padding:12px 16px; }
+    .friend-search-results::-webkit-scrollbar { display:none; }
+    .friend-search-empty { padding:48px 20px; text-align:center; }
+    .friend-search-empty-icon { font-size:40px; margin-bottom:10px; }
+    .friend-search-empty-title { font-size:15px; font-weight:800; color:var(--text); margin-bottom:4px; }
+    .friend-search-empty-sub { font-size:13px; color:var(--text2); }
+    .friend-search-placeholder { padding:48px 20px; text-align:center; color:var(--text2); font-size:14px; font-weight:600; }
+    .search-result-card { display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--card); border-radius:18px; margin-bottom:10px; cursor:pointer; transition:transform 0.15s; }
+    .search-result-card:active { transform:scale(0.98); }
+    .search-result-avatar { width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; border:2px solid rgba(107,71,255,0.15); }
+    .search-result-info { flex:1; min-width:0; }
+    .search-result-name { font-size:15px; font-weight:800; color:var(--text); }
+    .search-result-handle { font-size:12px; color:var(--text2); margin-top:1px; }
+    .search-result-followers { font-size:11px; color:var(--text2); margin-top:3px; font-weight:600; }
+    .search-follow-btn { flex-shrink:0; height:34px; padding:0 14px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer; border:none; white-space:nowrap; }
+    .search-follow-btn.not-following { background:var(--purple); color:white; }
+    .search-follow-btn.following { background:var(--card); color:var(--text2); border:1.5px solid var(--purple-border); }
+    .search-follow-btn.friends { background:#DCFCE7; color:#16A34A; border:1.5px solid #86EFAC; }
+
+    .tab-row { display: flex; gap: 10px; padding: 0 20px 14px; flex-shrink: 0; }
+    .tab-pill {
+      padding: 9px 24px; border-radius: 24px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      border: 1.5px solid var(--purple-border);
+      background: var(--card); color: var(--text2);
+      transition: all 0.18s;
+    }
+    .tab-pill.active { background: var(--purple); color: white; border-color: var(--purple); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Post card new design */
+    .post-card-new {
+      background: var(--card); border-radius: 20px;
+      margin: 0 16px 14px; padding: 16px;
+      box-shadow: var(--shadow); position: relative;
+    }
+    .post-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .post-avatar-wrap { position: relative; flex-shrink: 0; }
+    .post-avatar-new {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: #FFE0B2; display: flex; align-items: center;
+      justify-content: center; font-size: 22px;
+    }
+    .avatar-badge {
+      position: absolute; bottom: -1px; right: -1px;
+      width: 17px; height: 17px; border-radius: 50%;
+      background: var(--card); display: flex; align-items: center;
+      justify-content: center; font-size: 9px;
+      border: 1.5px solid var(--bg);
+    }
+    .post-meta { flex: 1; }
+    .post-name-new { font-size: 14px; font-weight: 800; color: var(--text); }
+    .post-time-new { font-size: 12px; color: var(--text2); margin-top: 1px; }
+    .feed-follow-btn { flex-shrink:0; height:30px; padding:0 11px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer; border:none; white-space:nowrap; transition:all 0.15s; }
+    .feed-follow-btn.not-following { background:var(--purple); color:white; }
+    .feed-follow-btn.following { background:var(--bg); color:var(--text2); border:1.5px solid var(--purple-border); }
+    .feed-follow-btn.friends { background:#DCFCE7; color:#16A34A; border:1.5px solid #86EFAC; }
+    .post-more-btn { flex-shrink:0; background:none; border:none; font-size:19px; color:var(--text2); cursor:pointer; padding:2px 6px; line-height:1; border-radius:8px; letter-spacing:1px; }
+    .post-more-menu { position:absolute; right:14px; top:52px; background:white; border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,0.18); overflow:hidden; z-index:50; min-width:170px; display:none; }
+    .post-more-menu.show { display:block; }
+    .post-more-item { display:flex; align-items:center; gap:10px; padding:13px 16px; font-size:14px; font-weight:700; color:var(--text); cursor:pointer; border:none; background:none; width:100%; text-align:left; border-bottom:1px solid #F5F3FF; }
+    .post-more-item:last-child { border-bottom:none; }
+    .post-more-item:active { background:var(--purple-light); }
+    .post-more-item.danger { color:#E53935; }
+
+    .post-title-new { font-size: 17px; font-weight: 800; color: var(--text); margin-bottom: 10px; }
+
+    .outfit-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .outfit-chip-item {
+      display: flex; align-items: center; gap: 5px;
+      background: var(--bg); border-radius: 20px;
+      padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--text);
+    }
+    .outfit-chip-item span:first-child { font-size: 15px; }
+
+    /* AI match box new */
+    .ai-match-new {
+      background: var(--purple-light); border-radius: 14px;
+      padding: 12px; margin-bottom: 12px;
+    }
+    .ai-match-new-header {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 800; color: var(--purple);
+      margin-bottom: 10px;
+    }
+    .ai-match-new-header svg { width: 15px; height: 15px; stroke: var(--purple); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .ai-match-new-items { display: flex; gap: 10px; }
+    .ai-match-new-item {
+      flex: 1; background: var(--card); border-radius: 12px;
+      padding: 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .ai-match-emoji { font-size: 20px; flex-shrink: 0; }
+    .ai-match-text {}
+    .ai-match-name-new { font-size: 12px; font-weight: 800; color: var(--purple); line-height: 1.2; }
+    .ai-match-outfit-new { font-size: 10px; color: var(--text2); margin-top: 2px; }
+
+    .post-actions-new { display: flex; align-items: center; gap: 14px; padding-top: 4px; }
+    .post-act { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: var(--text2); cursor: pointer; background: none; border: none; }
+    .post-act svg { width: 18px; height: 18px; stroke: var(--text2); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .inspo-btn {
+      margin-left: auto; background: var(--purple-light);
+      color: var(--purple); border: 1.5px solid var(--purple-border);
+      border-radius: 20px; padding: 7px 14px;
+      font-size: 12px; font-weight: 800; cursor: pointer;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .inspo-btn.saved { background:var(--purple); color:white; border-color:var(--purple); }
+    .inspo-badge { display:inline-flex; align-items:center; gap:3px; background:#FFF3CD; color:#856404; border-radius:10px; padding:2px 7px; font-size:10px; font-weight:800; flex-shrink:0; }
+    .inspo-from { font-size:10px; font-weight:700; color:#856404; margin-top:2px; }
+    .inspo-detail-banner { background:#FFF9E6; border:1.5px solid #FFE083; border-radius:14px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; }
+    .inspo-detail-avatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+    .inspo-detail-info { flex:1; }
+    .inspo-detail-from { font-size:11px; font-weight:800; color:#856404; text-transform:uppercase; letter-spacing:0.05em; }
+    .inspo-detail-name { font-size:14px; font-weight:800; color:var(--text); }
+    .inspo-my-version-btn { width:100%; height:48px; border-radius:14px; background:linear-gradient(135deg,#6B47FF 0%,#C84B9E 100%); border:none; color:white; font-size:14px; font-weight:800; cursor:pointer; margin-top:10px; box-shadow:0 4px 16px rgba(107,71,255,0.3); }
+    /* Inspo Modal */
+    .inspo-col-item { display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--bg); border-radius:14px; margin-bottom:8px; cursor:pointer; border:1.5px solid transparent; transition:all 0.15s; }
+    .inspo-col-item.selected { border-color:var(--purple); background:var(--purple-light); }
+    .inspo-col-item:active { border-color:var(--purple); }
+    .inspo-col-name { flex:1; font-size:14px; font-weight:700; color:var(--text); }
+    .inspo-col-check { color:var(--purple); font-size:16px; font-weight:800; }
+    .inspo-modal-actions { display:flex; gap:10px; margin-top:16px; }
+    .inspo-modal-cancel { flex:1; height:50px; border-radius:14px; background:var(--bg); border:1.5px solid var(--purple-border); font-size:14px; font-weight:700; color:var(--text2); cursor:pointer; }
+    .inspo-modal-save { flex:2; height:50px; border-radius:14px; background:var(--purple); border:none; font-size:14px; font-weight:800; color:white; cursor:pointer; }
+
+    /* ─────────────── PROFIL ─────────────── */
+    .profil-hero {
+      background: var(--purple); padding: 14px 20px 22px;
+      position: relative; overflow: hidden; flex-shrink: 0;
+    }
+    .profil-hero::before {
+      content: ''; position: absolute; right: -30px; top: -30px;
+      width: 150px; height: 150px; border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+    }
+    .profil-settings-btn { position:absolute; top:14px; right:16px; background:none; border:none; color:white; font-size:22px; cursor:pointer; padding:4px; z-index:2; line-height:1; }
+    .profil-identity { display:flex; align-items:center; gap:14px; }
+    .profil-name-new { font-size: 20px; font-weight: 800; color: white; }
+    .profil-handle-new { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 3px; }
+    .profil-avatar-new { width: 62px; height: 62px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 30px; border: 3px solid rgba(255,255,255,0.4); flex-shrink: 0; }
+
+    /* ── Einstellungen Panel ── */
+    .settings-panel { position:absolute; inset:0; background:var(--bg); z-index:400; transform:translateX(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); display:flex; flex-direction:column; overflow:hidden; }
+    .settings-panel.active { transform:translateX(0); }
+    .settings-header { display:flex; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid var(--purple-border); background:var(--card); flex-shrink:0; }
+    .settings-back { background:none; border:none; font-size:22px; cursor:pointer; color:var(--text); padding:0; line-height:1; }
+    .settings-title { font-size:17px; font-weight:800; color:var(--text); }
+    .settings-scroll { flex:1; overflow-y:auto; scrollbar-width:none; padding-bottom:30px; }
+    .settings-scroll::-webkit-scrollbar { display:none; }
+    .settings-section-header { padding:18px 20px 8px; font-size:11px; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:0.6px; }
+    .settings-row { display:flex; align-items:center; padding:15px 20px; border-bottom:1px solid var(--purple-border); gap:14px; cursor:pointer; }
+    .settings-row-icon { font-size:20px; width:28px; text-align:center; flex-shrink:0; }
+    .settings-row-label { flex:1; font-size:15px; font-weight:700; color:var(--text); }
+    .settings-row-arrow { font-size:18px; color:var(--text2); }
+    .settings-toggle { position:relative; width:44px; height:26px; flex-shrink:0; }
+    .settings-toggle input { opacity:0; width:0; height:0; position:absolute; }
+    .settings-toggle-slider { position:absolute; inset:0; background:#D1D5DB; border-radius:13px; transition:background 0.2s; cursor:pointer; }
+    .settings-toggle-slider::before { content:''; position:absolute; width:20px; height:20px; left:3px; top:3px; background:white; border-radius:50%; transition:transform 0.2s; box-shadow:0 1px 4px rgba(0,0,0,0.2); }
+    .settings-toggle input:checked + .settings-toggle-slider { background:var(--purple); }
+    .settings-toggle input:checked + .settings-toggle-slider::before { transform:translateX(18px); }
+    .settings-logout-row { margin:20px 20px 0; }
+    .settings-logout-btn { width:100%; height:50px; border-radius:16px; background:#FFF0F0; border:1.5px solid #FFCDD2; color:#E53935; font-size:15px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+
+    /* ── Freundes-Profil Panel ── */
+    .friend-profile-panel { position:absolute; inset:0; z-index:450; background:var(--bg); transform:translateX(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); display:flex; flex-direction:column; overflow:hidden; }
+    .friend-profile-panel.active { transform:translateX(0); }
+    .fp-scroll { flex:1; overflow-y:auto; scrollbar-width:none; }
+    .fp-scroll::-webkit-scrollbar { display:none; }
+    .fp-hero { background:var(--purple); padding:14px 20px 22px; position:relative; overflow:hidden; flex-shrink:0; }
+    .fp-hero::before { content:''; position:absolute; right:-30px; top:-30px; width:150px; height:150px; border-radius:50%; background:rgba(255,255,255,0.08); }
+    .fp-back { position:absolute; top:14px; left:16px; background:none; border:none; color:white; font-size:22px; cursor:pointer; z-index:2; padding:4px; line-height:1; }
+    .fp-identity { display:flex; align-items:center; gap:14px; margin-top:4px; }
+    .fp-avatar { width:62px; height:62px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:30px; border:3px solid rgba(255,255,255,0.4); flex-shrink:0; }
+    .fp-name { font-size:20px; font-weight:800; color:white; }
+    .fp-handle { font-size:13px; color:rgba(255,255,255,0.7); margin-top:3px; }
+    .fp-stats { margin:0 20px 14px; background:var(--card); border-radius:20px; padding:14px; box-shadow:0 8px 24px rgba(107,71,255,0.15); display:flex; }
+    .fp-stat { flex:1; text-align:center; }
+    .fp-stat+.fp-stat { border-left:1px solid #F0EBFF; }
+    .fp-stat .fpnum { font-size:18px; font-weight:800; color:var(--text); }
+    .fp-stat .fplbl { font-size:11px; color:var(--text2); margin-top:2px; font-weight:600; }
+    .fp-actions { display:flex; gap:10px; margin:0 20px 16px; }
+    .fp-follow-btn { flex:1; height:44px; border-radius:14px; font-size:14px; font-weight:800; cursor:pointer; border:none; transition:all 0.2s; }
+    .fp-follow-btn.not-following { background:var(--purple); color:white; }
+    .fp-follow-btn.following { background:var(--card); color:var(--text2); border:1.5px solid var(--purple-border); }
+    .fp-follow-btn.friends { background:#DCFCE7; color:#16A34A; border:1.5px solid #86EFAC; }
+    .fp-msg-btn { width:44px; height:44px; border-radius:14px; background:var(--card); border:1.5px solid var(--purple-border); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+    .fp-tabs { display:flex; margin:0 20px 16px; background:var(--card); border-radius:14px; padding:4px; gap:4px; }
+    .fp-tab { flex:1; height:36px; border-radius:10px; border:none; font-size:13px; font-weight:700; cursor:pointer; background:none; color:var(--text2); transition:all 0.2s; }
+    .fp-tab.active { background:var(--purple); color:white; }
+    .fp-tab.locked { opacity:0.4; cursor:default; }
+    .fp-posts-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; }
+    .fp-post-item { aspect-ratio:1/1; position:relative; cursor:pointer; overflow:hidden; background:var(--purple-light); display:flex; align-items:center; justify-content:center; font-size:48px; }
+    .fp-post-overlay { position:absolute; inset:0; background:linear-gradient(to top,rgba(0,0,0,0.45) 0%,transparent 55%); display:flex; align-items:flex-end; padding:5px 7px; }
+    .fp-post-likes { font-size:11px; font-weight:700; color:white; display:flex; align-items:center; gap:3px; }
+    .fp-private-msg { padding:40px 20px; text-align:center; }
+    .fp-private-icon { font-size:48px; margin-bottom:12px; }
+    .fp-private-text { font-size:15px; font-weight:700; color:var(--text2); line-height:1.5; }
+    .fp-wardrobe-filters { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding:0 20px 12px; }
+    .fp-wardrobe-filters::-webkit-scrollbar { display:none; }
+    .fp-filter-pill { flex-shrink:0; padding:7px 14px; border-radius:20px; background:var(--card); border:1.5px solid var(--purple-border); font-size:13px; font-weight:700; color:var(--text2); cursor:pointer; }
+    .fp-filter-pill.active { background:var(--purple-light); border-color:var(--purple); color:var(--purple); }
+    .fp-wardrobe-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:0 20px 16px; }
+    .fp-wardrobe-item { background:var(--card); border-radius:16px; padding:12px 8px; text-align:center; }
+    .fp-wardrobe-emoji { font-size:36px; margin-bottom:4px; }
+    .fp-wardrobe-name { font-size:11px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .fp-wardrobe-type { font-size:10px; color:var(--text2); margin-top:1px; }
+    .fp-ki-btn { margin:0 20px 16px; width:calc(100% - 40px); height:48px; border-radius:16px; background:linear-gradient(135deg,#6B47FF 0%,#C84B9E 100%); border:none; color:white; font-size:14px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .fp-ki-panel { position:absolute; inset:0; background:var(--bg); z-index:10; transform:translateX(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); display:flex; flex-direction:column; overflow:hidden; }
+    .fp-ki-panel.active { transform:translateX(0); }
+    .fp-ki-header { display:flex; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid var(--purple-border); background:var(--card); flex-shrink:0; }
+    .fp-ki-scroll { flex:1; overflow-y:auto; scrollbar-width:none; padding:16px 20px 30px; }
+    .fp-ki-scroll::-webkit-scrollbar { display:none; }
+    .fp-ki-intro { font-size:14px; color:var(--text2); font-weight:600; margin-bottom:16px; line-height:1.5; background:var(--purple-light); padding:12px 14px; border-radius:14px; border-left:3px solid var(--purple); }
+    .fp-ki-item { background:var(--card); border-radius:18px; padding:14px; margin-bottom:12px; display:flex; align-items:center; gap:14px; box-shadow:var(--shadow); }
+    .fp-ki-item-emoji { font-size:36px; flex-shrink:0; }
+    .fp-ki-item-info { flex:1; }
+    .fp-ki-item-name { font-size:15px; font-weight:800; color:var(--text); }
+    .fp-ki-item-match { font-size:12px; color:var(--purple); margin-top:3px; font-weight:600; }
+    .fp-ki-tausch-btn { background:var(--purple-light); border:1.5px solid var(--purple-border); color:var(--purple); font-size:12px; font-weight:800; border-radius:10px; padding:7px 11px; cursor:pointer; flex-shrink:0; white-space:nowrap; }
+    .fp-head-tappable { cursor:pointer; display:flex; align-items:center; gap:10px; flex:1; }
+
+    .profil-stats { margin: 0 20px 16px; background: var(--card); border-radius: 20px; padding: 16px; box-shadow: 0 8px 24px rgba(107,71,255,0.15); display: flex; }
+    .profil-stat { flex: 1; text-align: center; }
+    .profil-stat + .profil-stat { border-left: 1px solid #F0EBFF; }
+    .profil-stat .pnum { font-size: 20px; font-weight: 800; color: var(--text); }
+    .profil-stat .plbl { font-size: 11px; color: var(--text2); margin-top: 2px; font-weight: 600; }
+
+    .pro-card { margin: 0 20px 16px; background: var(--purple); border-radius: 20px; padding: 16px; display: flex; align-items: center; gap: 12px; }
+    .pro-icon { font-size: 32px; }
+    .pro-text { flex: 1; }
+    .pro-title { font-size: 15px; font-weight: 800; color: white; }
+    .pro-sub { font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 2px; }
+    .pro-btn { background: white; color: var(--purple); padding: 8px 14px; border-radius: 12px; font-size: 12px; font-weight: 800; border: none; cursor: pointer; white-space: nowrap; }
+
+    .saved-scroll { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; padding: 0 20px 4px; }
+    .saved-scroll::-webkit-scrollbar { display: none; }
+    .saved-card { flex-shrink: 0; width: 110px; background: var(--card); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); }
+    .saved-img { height: 100px; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 44px; }
+    .saved-info { padding: 8px; }
+    .saved-name { font-size: 11px; font-weight: 700; color: var(--text); }
+    .saved-rating { font-size: 10px; color: var(--text2); margin-top: 2px; }
+
+    .settings-list { padding: 0 20px; }
+    .setting-row { background: var(--card); border-radius: 16px; padding: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; cursor: pointer; box-shadow: var(--shadow); }
+    .setting-ico { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+    .setting-info { flex: 1; }
+    .setting-name { font-size: 14px; font-weight: 700; color: var(--text); }
+    .setting-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
+    .setting-arrow { font-size: 18px; color: var(--text2); }
+
+    /* ── KI Outfit Cards (neu) ── */
+    .outfit-card-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; }
+    .heart-btn { background:none; border:none; font-size:24px; cursor:pointer; padding:0; line-height:1; transition:transform 0.18s; flex-shrink:0; }
+    .heart-btn:active { transform:scale(1.35); }
+    .outfit-items-vertical { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; border-top:1px solid #F0EBFF; border-bottom:1px solid #F0EBFF; padding:14px 0; }
+    .outfit-item-row { display:flex; align-items:center; gap:12px; }
+    .outfit-item-photo { width:56px; height:56px; border-radius:14px; background:#F7F3FF; display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; background-size:cover; background-position:center; border:1.5px solid #EEE8FF; overflow:hidden; }
+    .outfit-item-row-name { font-size:14px; font-weight:700; color:var(--text); }
+    .outfit-save-btn { width:100%; height:46px; border-radius:14px; background:var(--purple-light); color:var(--purple); border:1.5px solid var(--purple-border); font-size:14px; font-weight:800; cursor:pointer; margin-top:12px; transition:transform 0.15s; }
+    .outfit-save-btn:active { transform:scale(0.97); }
+
+    /* Save modal list */
+    .save-col-item { display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--bg); border-radius:14px; margin-bottom:8px; cursor:pointer; border:1.5px solid transparent; transition:all 0.15s; }
+    .save-col-item:active { border-color:var(--purple); background:var(--purple-light); }
+    .save-col-emoji { font-size:22px; flex-shrink:0; }
+    .save-col-info { flex:1; }
+    .save-col-name { font-size:14px; font-weight:700; color:var(--text); }
+    .save-col-count { font-size:11px; color:var(--text2); margin-top:1px; }
+
+    /* Toast */
+    #ki-toast { position:absolute; bottom:96px; left:50%; transform:translateX(-50%) translateY(8px); background:var(--purple); color:white; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:700; opacity:0; transition:opacity 0.25s, transform 0.25s; z-index:500; white-space:nowrap; pointer-events:none; }
+    #ki-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+    /* ── Swipe-to-Delete ── */
+    .swipe-wrapper { position:relative; overflow:hidden; margin-bottom:14px; border-radius:20px; }
+    .swipe-wrapper.col-wrap { border-radius:18px; margin-bottom:12px; }
+    .swipe-delete-bg { position:absolute; right:0; top:0; bottom:0; width:100px; background:#EF4444; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:4px; }
+    .swipe-delete-bg-icon { font-size:26px; }
+    .swipe-delete-bg-label { font-size:11px; font-weight:800; color:white; letter-spacing:0.3px; }
+    .swipe-inner { position:relative; will-change:transform; }
+    .swipe-inner:not(.dragging) { transition:transform 0.32s cubic-bezier(0.4,0,0.2,1), opacity 0.25s; }
+    .swipe-wrapper .outfit-card-ki { margin-bottom:0; }
+    .swipe-wrapper .col-outfit-card { margin-bottom:0; }
+
+    /* Undo Toast */
+    #swipe-undo-toast { position:absolute; bottom:82px; left:50%; transform:translateX(-50%) translateY(80px); background:#1F2937; color:white; padding:10px 10px 10px 16px; border-radius:20px; font-size:13px; font-weight:700; opacity:0; transition:opacity 0.25s, transform 0.25s; z-index:900; display:flex; align-items:center; gap:12px; pointer-events:none; white-space:nowrap; }
+    #swipe-undo-toast.show { opacity:1; transform:translateX(-50%) translateY(0); pointer-events:all; }
+    #swipe-undo-btn { background:rgba(255,255,255,0.18); border:none; color:white; font-size:13px; font-weight:800; padding:7px 12px; border-radius:12px; cursor:pointer; white-space:nowrap; }
+
+    /* ── KI Pills ── */
+    .ki-pills-wrap { display:flex; gap:8px; padding:10px 14px; overflow-x:auto; scrollbar-width:none; flex-shrink:0; border-bottom:1px solid #EEE8FF; background:var(--bg); }
+    .ki-pills-wrap::-webkit-scrollbar { display:none; }
+    .ki-pill { flex-shrink:0; padding:8px 16px; border-radius:20px; font-size:13px; font-weight:700; cursor:pointer; border:1.5px solid var(--purple-border); background:var(--card); color:var(--text2); transition:all 0.18s; white-space:nowrap; display:flex; align-items:center; gap:5px; }
+    .ki-pill.active { background:var(--purple); color:white; border-color:var(--purple); }
+    .ki-section-label { font-size:17px; font-weight:800; color:var(--text); padding:14px 20px 10px; display:flex; align-items:center; justify-content:space-between; }
+    .ki-section-clear { font-size:12px; font-weight:700; color:var(--purple); cursor:pointer; }
+    /* Saved outfit mini cards */
+    .ki-saved-card { background:var(--card); border-radius:16px; padding:12px 14px; margin-bottom:10px; box-shadow:var(--shadow); cursor:pointer; transition:transform 0.15s; display:flex; align-items:center; gap:12px; }
+    .ki-saved-card:active { transform:scale(0.98); }
+    .ki-saved-photos { display:flex; gap:6px; flex-shrink:0; }
+    .ki-saved-photo { width:46px; height:46px; border-radius:10px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; background-size:cover; background-position:center; border:1px solid #EEE8FF; overflow:hidden; }
+    .ki-saved-meta { flex:1; min-width:0; }
+    .ki-saved-from { font-size:10px; font-weight:800; color:var(--purple); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:3px; }
+    .ki-saved-name { font-size:14px; font-weight:800; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ki-saved-match { font-size:12px; color:var(--text2); margin-top:2px; }
+    .ki-saved-heart { background:none; border:none; font-size:20px; cursor:pointer; flex-shrink:0; padding:0; }
+
+    /* ── Generate Modal ── */
+    .ki-gen-overlay { position:absolute; inset:0; z-index:150; background:rgba(0,0,0,0.45); display:none; align-items:flex-end; }
+    .ki-gen-overlay.active { display:flex; animation:genOverlayIn 0.2s ease; }
+    @keyframes genOverlayIn { from { opacity:0; } to { opacity:1; } }
+    .ki-gen-modal { width:100%; background:var(--card); border-radius:24px 24px 0 0; padding:22px 20px 36px; max-height:80%; overflow-y:auto; scrollbar-width:none; animation:genSlideUp 0.25s ease; }
+    .ki-gen-modal::-webkit-scrollbar { display:none; }
+    @keyframes genSlideUp { from { transform:translateY(60px); opacity:0; } to { transform:none; opacity:1; } }
+    .ki-gen-title { font-size:18px; font-weight:800; color:var(--text); margin-bottom:18px; }
+    .ki-gen-label { font-size:12px; font-weight:800; color:var(--text2); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:8px; }
+    .ki-gen-textarea { width:100%; min-height:82px; border:1.5px solid var(--purple-border); border-radius:14px; padding:12px; font-size:14px; color:var(--text); background:var(--bg); outline:none; resize:none; font-family:inherit; box-sizing:border-box; transition:border-color 0.15s; line-height:1.5; }
+    .ki-gen-textarea:focus { border-color:var(--purple); }
+    .ki-gen-divider { display:flex; align-items:center; gap:10px; margin:16px 0; }
+    .ki-gen-divider-line { flex:1; height:1px; background:var(--purple-border); }
+    .ki-gen-divider-text { font-size:11px; font-weight:800; color:var(--text2); letter-spacing:0.1em; }
+    .ki-gen-cols { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding:2px 0 6px; }
+    .ki-gen-cols::-webkit-scrollbar { display:none; }
+    .ki-gen-col-chip { flex-shrink:0; padding:8px 14px; border-radius:20px; font-size:13px; font-weight:700; cursor:pointer; border:1.5px solid var(--purple-border); background:var(--bg); color:var(--text2); transition:all 0.18s; white-space:nowrap; }
+    .ki-gen-col-chip.active { background:var(--purple); color:white; border-color:var(--purple); }
+    .ki-gen-actions { display:flex; gap:12px; margin-top:22px; }
+    .ki-gen-cancel { flex:1; height:52px; border-radius:16px; background:var(--bg); border:1.5px solid var(--purple-border); font-size:15px; font-weight:700; color:var(--text2); cursor:pointer; }
+    .ki-gen-confirm { flex:2; height:52px; border-radius:16px; background:linear-gradient(135deg,#6B47FF 0%,#C84B9E 100%); border:none; font-size:15px; font-weight:800; color:white; cursor:pointer; box-shadow:0 6px 20px rgba(107,71,255,0.3); }
+
+    /* ── KI Panel Ansichten ── */
+    .ki-panel { position:absolute; inset:0; z-index:50; background:var(--bg); display:none; flex-direction:column; animation:kiPanelIn 0.22s ease; }
+    .ki-panel.active { display:flex; }
+    @keyframes kiPanelIn { from { transform:translateX(30px); opacity:0; } to { transform:none; opacity:1; } }
+    .ki-panel-header { display:flex; align-items:center; gap:10px; padding:14px 16px 12px; border-bottom:1px solid #EEE8FF; flex-shrink:0; background:var(--bg); }
+    .ki-back-btn { background:none; border:none; cursor:pointer; font-size:22px; color:var(--purple); padding:0 4px 0 0; line-height:1; flex-shrink:0; }
+    .ki-panel-title { flex:1; font-size:17px; font-weight:800; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ki-options-btn { background:none; border:none; cursor:pointer; font-size:18px; color:var(--text2); padding:4px 2px; letter-spacing:3px; line-height:1; flex-shrink:0; }
+    .ki-panel-sub { font-size:13px; color:var(--text2); font-weight:600; padding:10px 16px 0; flex-shrink:0; }
+    .ki-panel-scroll { flex:1; overflow-y:auto; scrollbar-width:none; padding:12px 16px 24px; }
+    .ki-panel-scroll::-webkit-scrollbar { display:none; }
+    /* Mini outfit cards inside collection */
+    .col-outfit-card { background:var(--card); border-radius:18px; padding:14px; margin-bottom:12px; box-shadow:var(--shadow); cursor:pointer; transition:transform 0.15s; }
+    .col-outfit-card:active { transform:scale(0.98); }
+    .col-outfit-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:12px; }
+    .col-outfit-name { font-size:15px; font-weight:800; color:var(--text); margin-bottom:5px; }
+    .col-outfit-preview { display:flex; gap:8px; }
+    .col-card-photo { width:60px; height:60px; border-radius:12px; background:var(--bg); display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; background-size:cover; background-position:center; border:1.5px solid #EEE8FF; overflow:hidden; }
+    /* Collection Tabs */
+    .col-tab-row { display:flex; gap:0; padding:0 16px; flex-shrink:0; border-bottom:1px solid #EEE8FF; background:var(--bg); }
+    .col-tab { flex:1; padding:11px 0 10px; font-size:13px; font-weight:800; color:var(--text2); cursor:pointer; border:none; background:none; border-bottom:2.5px solid transparent; transition:color 0.18s, border-color 0.18s; text-align:center; white-space:nowrap; }
+    .col-tab.active { color:var(--purple); border-bottom-color:var(--purple); }
+    /* Inspo Cards in Collection */
+    .inspo-card { background:var(--card); border-radius:18px; padding:14px; margin-bottom:12px; box-shadow:var(--shadow); }
+    .inspo-card-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .inspo-card-avatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+    .inspo-card-from-label { font-size:10px; font-weight:800; color:#856404; text-transform:uppercase; letter-spacing:0.05em; }
+    .inspo-card-from-name { font-size:14px; font-weight:800; color:var(--text); }
+    .inspo-card-title { font-size:15px; font-weight:800; color:var(--text); margin-bottom:8px; }
+    .inspo-version-btn { width:100%; height:44px; border-radius:14px; background:linear-gradient(135deg,#6B47FF 0%,#C84B9E 100%); border:none; color:white; font-size:13px; font-weight:800; cursor:pointer; margin-top:10px; box-shadow:0 4px 14px rgba(107,71,255,0.28); }
+    /* Empty state */
+    .ki-empty-state { text-align:center; padding:52px 24px; }
+    .ki-empty-icon { font-size:48px; margin-bottom:14px; }
+    .ki-empty-text { font-size:14px; font-weight:600; color:var(--text2); line-height:1.6; }
+    /* Options menu */
+    #ki-options-menu { position:absolute; right:12px; top:54px; z-index:200; background:white; border-radius:14px; box-shadow:0 8px 32px rgba(0,0,0,0.16); overflow:hidden; display:none; min-width:200px; }
+    .ki-menu-item { padding:14px 18px; font-size:14px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:10px; }
+    .ki-menu-item:active { background:var(--bg); }
+    .ki-menu-danger { color:#EF4444; }
+    /* Outfit detail action buttons */
+    .detail-action-row { display:flex; gap:12px; padding:0 0 8px; }
+    .detail-fav-btn { flex:1; height:48px; border-radius:14px; background:var(--bg); border:1.5px solid var(--purple-border); font-size:20px; cursor:pointer; }
+    .detail-save-btn { flex:2; height:48px; border-radius:14px; background:var(--purple-light); color:var(--purple); border:1.5px solid var(--purple-border); font-size:14px; font-weight:800; cursor:pointer; }
+    .detail-post-btn { width:100%; height:46px; border-radius:14px; background:var(--bg); border:1.5px solid var(--purple-border); color:var(--text); font-size:14px; font-weight:800; cursor:pointer; margin-top:8px; display:flex; align-items:center; justify-content:center; gap:8px; transition:transform 0.15s; }
+    .detail-post-btn:active { transform:scale(0.97); }
+
+    /* ─── POST MODAL ─── */
+    .post-modal-overlay { position:absolute; inset:0; z-index:500; background:rgba(0,0,0,0.5); display:flex; align-items:flex-end; opacity:0; pointer-events:none; transition:opacity 0.25s; }
+    .post-modal-overlay.open { opacity:1; pointer-events:all; }
+    .post-modal { background:var(--card); border-radius:24px 24px 0 0; width:100%; max-height:90%; overflow-y:auto; padding:20px 20px 36px; scrollbar-width:none; }
+    .post-modal::-webkit-scrollbar { display:none; }
+    .post-modal-handle { width:40px; height:4px; border-radius:2px; background:var(--purple-border); margin:0 auto 16px; }
+    .post-modal-title { font-size:17px; font-weight:800; color:var(--text); text-align:center; margin-bottom:20px; }
+    .post-modal-label { font-size:11px; font-weight:800; color:var(--text2); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px; margin-top:2px; }
+    .post-img-row { display:flex; gap:10px; margin-bottom:14px; }
+    .post-img-btn { flex:1; height:46px; border-radius:14px; background:var(--bg); border:1.5px solid var(--purple-border); font-size:12px; font-weight:700; color:var(--text); cursor:pointer; }
+    .post-img-preview-wrap { margin-bottom:14px; position:relative; border-radius:14px; overflow:hidden; display:none; }
+    .post-img-preview-wrap img { width:100%; max-height:180px; object-fit:cover; display:block; }
+    .post-img-remove-btn { position:absolute; top:8px; right:8px; width:28px; height:28px; border-radius:50%; background:rgba(0,0,0,0.55); border:none; color:white; font-size:14px; cursor:pointer; line-height:1; }
+    .post-caption-input { width:100%; min-height:72px; border:1.5px solid var(--purple-border); border-radius:14px; padding:12px; font-size:14px; color:var(--text); background:var(--bg); outline:none; resize:none; font-family:inherit; box-sizing:border-box; transition:border-color 0.15s; line-height:1.5; margin-bottom:4px; }
+    .post-caption-input:focus { border-color:var(--purple); }
+    .post-modal-divider { height:1px; background:var(--purple-border); margin:14px 0; }
+    .post-vis-row { display:flex; gap:8px; margin-bottom:14px; }
+    .post-vis-btn { flex:1; height:44px; border-radius:14px; background:var(--bg); border:1.5px solid var(--purple-border); font-size:13px; font-weight:700; color:var(--text2); cursor:pointer; transition:all 0.15s; }
+    .post-vis-btn.active { background:var(--purple-light); border-color:var(--purple); color:var(--purple); font-weight:800; }
+    .post-tags-wrap { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:18px; }
+    .post-tag-chip { background:var(--purple-light); color:var(--purple); border-radius:20px; padding:5px 10px; font-size:12px; font-weight:700; }
+    .post-modal-actions { display:flex; gap:10px; margin-top:4px; }
+    .post-modal-cancel { flex:1; height:50px; border-radius:14px; background:var(--bg); border:1.5px solid var(--purple-border); font-size:14px; font-weight:700; color:var(--text2); cursor:pointer; }
+    .post-modal-confirm { flex:2; height:50px; border-radius:14px; background:var(--purple); border:none; font-size:14px; font-weight:800; color:white; cursor:pointer; }
+
+    /* ─── PROFIL POSTS ─── */
+
+    .profil-posts-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:2px; }
+    .profil-post-item { aspect-ratio:1/1; position:relative; cursor:pointer; overflow:hidden; background:var(--purple-light); }
+    .profil-post-bg { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:40px; }
+    .profil-post-photo { width:100%; height:100%; object-fit:cover; display:block; }
+    .profil-post-overlay { position:absolute; inset:0; background:linear-gradient(to top,rgba(0,0,0,0.45) 0%,transparent 55%); display:flex; align-items:flex-end; justify-content:space-between; padding:5px 7px; }
+    .profil-post-vis { font-size:12px; line-height:1; }
+    .profil-post-likes { font-size:11px; color:white; font-weight:700; }
+    .profil-posts-empty { text-align:center; padding:44px 20px 20px; }
+    .profil-posts-empty-icon { font-size:52px; margin-bottom:14px; }
+    .profil-posts-empty-title { font-size:16px; font-weight:800; color:var(--text2); }
+    .profil-posts-empty-sub { font-size:13px; color:var(--text2); margin-top:6px; line-height:1.5; }
+    .profil-posts-empty-btn { margin-top:20px; background:var(--purple); color:white; border:none; border-radius:14px; padding:13px 28px; font-size:14px; font-weight:800; cursor:pointer; }
+
+    /* ─── POST DETAIL PANEL ─── */
+    .post-detail-panel { position:absolute; inset:0; background:var(--bg); z-index:300; transform:translateX(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); display:flex; flex-direction:column; overflow:hidden; }
+    .post-detail-panel.active { transform:translateX(0); }
+    .post-detail-header { display:flex; align-items:center; padding:14px 16px 10px; gap:10px; flex-shrink:0; }
+    .post-detail-back { width:36px; height:36px; border-radius:12px; background:var(--purple-light); border:none; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .post-detail-title-text { flex:1; font-size:16px; font-weight:800; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .post-detail-scroll { flex:1; overflow-y:auto; padding:0 16px 28px; }
+    .post-detail-emoji-bg { width:100%; height:200px; border-radius:18px; background:var(--purple-light); display:flex; align-items:center; justify-content:center; font-size:80px; margin-bottom:14px; }
+    .post-detail-photo { width:100%; border-radius:18px; max-height:280px; object-fit:cover; display:block; margin-bottom:14px; }
+    .post-detail-vis-badge { display:inline-flex; align-items:center; gap:6px; background:var(--purple-light); color:var(--purple); border-radius:20px; padding:5px 12px; font-size:12px; font-weight:700; margin-bottom:10px; cursor:pointer; border:1.5px solid var(--purple-border); }
+    .post-detail-caption { font-size:15px; color:var(--text); line-height:1.6; margin-bottom:12px; font-weight:500; }
+    .post-detail-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+    .post-detail-stats { display:flex; gap:18px; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid #F0EBFF; }
+    .post-detail-stat { font-size:13px; color:var(--text2); }
+    .post-detail-stat strong { color:var(--text); font-weight:800; }
+    .post-detail-actions { display:flex; gap:10px; }
+    .post-detail-edit-btn { flex:1; height:48px; border-radius:14px; background:var(--purple-light); color:var(--purple); border:1.5px solid var(--purple-border); font-size:14px; font-weight:800; cursor:pointer; }
+    .post-detail-delete-btn { flex:1; height:48px; border-radius:14px; background:#FEF2F2; color:#EF4444; border:1.5px solid #FECACA; font-size:14px; font-weight:800; cursor:pointer; }
+
+    /* ─── NEUER BEITRAG BUTTON ─── */
+    .profil-posts-label { display:flex; align-items:center; justify-content:space-between; padding:16px 20px 12px; font-size:15px; font-weight:800; color:var(--text); }
+    .new-post-btn { background:var(--purple); color:white; border:none; border-radius:12px; padding:7px 13px; font-size:13px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:5px; flex-shrink:0; transition:transform 0.15s; margin-right:4px; }
+    .new-post-btn:active { transform:scale(0.94); }
+
+    /* ─── NEUER BEITRAG MODAL ─── */
+    .new-post-modal-overlay { position:absolute; inset:0; z-index:550; background:rgba(0,0,0,0.55); opacity:0; pointer-events:none; transition:opacity 0.25s; display:flex; flex-direction:column; }
+    .new-post-modal-overlay.open { opacity:1; pointer-events:all; }
+    .new-post-modal { background:var(--bg); flex:1; overflow-y:auto; margin-top:44px; border-radius:24px 24px 0 0; padding-bottom:36px; scrollbar-width:none; transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .new-post-modal::-webkit-scrollbar { display:none; }
+    .new-post-modal-overlay.open .new-post-modal { transform:translateY(0); }
+    .new-post-modal-handle { width:40px; height:4px; border-radius:2px; background:var(--purple-border); margin:14px auto 0; }
+    .new-post-modal-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px 4px; }
+    .new-post-modal-title { font-size:18px; font-weight:800; color:var(--text); }
+    .new-post-modal-close { width:32px; height:32px; border-radius:50%; background:var(--card); border:none; font-size:18px; cursor:pointer; color:var(--text2); display:flex; align-items:center; justify-content:center; }
+    .new-post-section { padding:14px 20px 0; }
+    .new-post-section-label { font-size:11px; font-weight:800; color:var(--text2); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px; }
+    .new-post-img-area { border:2px dashed var(--purple-border); border-radius:18px; background:var(--card); display:flex; align-items:center; justify-content:center; min-height:180px; cursor:pointer; margin-bottom:10px; position:relative; overflow:hidden; }
+    .new-post-img-placeholder { display:flex; flex-direction:column; align-items:center; gap:8px; padding:32px; pointer-events:none; }
+    .new-post-img-placeholder-icon { font-size:44px; }
+    .new-post-img-placeholder-text { font-size:13px; color:var(--text2); font-weight:600; }
+    .new-post-img-btn-row { display:flex; gap:8px; }
+    .new-post-img-btn { flex:1; height:44px; border-radius:14px; background:var(--card); border:1.5px solid var(--purple-border); font-size:13px; font-weight:700; color:var(--text); cursor:pointer; }
+    .new-post-img-remove { position:absolute; top:10px; right:10px; width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,0.55); border:none; color:white; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:5; }
+    .new-post-caption-input { width:100%; min-height:80px; border:1.5px solid var(--purple-border); border-radius:14px; padding:12px; font-size:14px; color:var(--text); background:var(--card); outline:none; resize:none; font-family:inherit; box-sizing:border-box; transition:border-color 0.15s; line-height:1.5; }
+    .new-post-caption-input:focus { border-color:var(--purple); }
+    .wardrobe-pills-wrap { display:flex; flex-wrap:wrap; gap:8px; }
+    .wardrobe-pill { display:inline-flex; align-items:center; gap:5px; padding:7px 12px; border-radius:20px; background:var(--card); border:1.5px solid var(--purple-border); font-size:13px; font-weight:700; color:var(--text2); cursor:pointer; transition:all 0.15s; user-select:none; }
+    .wardrobe-pill.selected { background:var(--purple-light); border-color:var(--purple); color:var(--purple); }
+    .wardrobe-pills-empty { font-size:13px; color:var(--text2); padding:6px 0; line-height:1.6; }
+    .new-post-vis-row { display:flex; gap:8px; }
+    .new-post-vis-btn { flex:1; height:44px; border-radius:14px; background:var(--card); border:1.5px solid var(--purple-border); font-size:13px; font-weight:700; color:var(--text2); cursor:pointer; transition:all 0.15s; }
+    .new-post-vis-btn.active { background:var(--purple-light); border-color:var(--purple); color:var(--purple); font-weight:800; }
+    .new-post-modal-actions { display:flex; gap:10px; padding:20px 20px 0; }
+    .new-post-cancel-btn { flex:1; height:52px; border-radius:16px; background:var(--card); border:1.5px solid var(--purple-border); font-size:14px; font-weight:700; color:var(--text2); cursor:pointer; }
+    .new-post-submit-btn { flex:2; height:52px; border-radius:16px; background:var(--purple); border:none; font-size:15px; font-weight:800; color:white; cursor:pointer; }
+
+    /* ─── OWN FEED POST ─── */
+    .own-post-feed-img { width:100%; max-height:280px; object-fit:cover; border-radius:16px; margin-bottom:10px; display:block; }
+    .own-post-feed-emoji { width:100%; height:160px; border-radius:16px; background:var(--purple-light); display:flex; align-items:center; justify-content:center; font-size:64px; margin-bottom:10px; }
+
+    /* ─── ITEM DETAIL POPUP ─── */
+    .item-detail-overlay { position:absolute; inset:0; z-index:700; background:rgba(0,0,0,0.5); display:flex; align-items:flex-end; opacity:0; pointer-events:none; transition:opacity 0.22s; }
+    .item-detail-overlay.open { opacity:1; pointer-events:all; }
+    .item-detail-sheet { background:var(--card); border-radius:24px 24px 0 0; padding:20px 20px 36px; width:100%; transform:translateY(100%); transition:transform 0.28s cubic-bezier(0.4,0,0.2,1); }
+    .item-detail-overlay.open .item-detail-sheet { transform:translateY(0); }
+    .item-detail-handle { width:40px; height:4px; border-radius:2px; background:var(--purple-border); margin:0 auto 18px; }
+    .item-detail-head { display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+    .item-detail-icon { width:56px; height:56px; border-radius:16px; background:var(--purple-light); display:flex; align-items:center; justify-content:center; font-size:30px; flex-shrink:0; }
+    .item-detail-name { font-size:17px; font-weight:800; color:var(--text); }
+    .item-detail-sub { font-size:13px; color:var(--text2); margin-top:3px; }
+    .item-detail-chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+    .item-detail-chip { background:var(--bg); border:1.5px solid var(--purple-border); border-radius:20px; padding:4px 12px; font-size:12px; font-weight:700; color:var(--text2); }
+    .item-shop-btn { width:100%; height:50px; border-radius:16px; background:linear-gradient(135deg,#6B47FF 0%,#C84B9E 100%); border:none; color:white; font-size:15px; font-weight:800; cursor:pointer; }
+    .item-detail-close-btn { width:100%; height:46px; border-radius:16px; background:var(--bg); border:1.5px solid var(--purple-border); font-size:14px; font-weight:700; color:var(--text2); cursor:pointer; margin-top:10px; }
+
+    /* ─── COMMENT SHEET ─── */
+    .comment-sheet-overlay { position:absolute; inset:0; z-index:600; background:rgba(0,0,0,0.5); opacity:0; pointer-events:none; transition:opacity 0.25s; display:flex; flex-direction:column; justify-content:flex-end; }
+    .comment-sheet-overlay.open { opacity:1; pointer-events:all; }
+    .comment-sheet { background:var(--card); border-radius:24px 24px 0 0; display:flex; flex-direction:column; max-height:82%; transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .comment-sheet-overlay.open .comment-sheet { transform:translateY(0); }
+    .comment-sheet-handle { width:40px; height:4px; border-radius:2px; background:var(--purple-border); margin:14px auto 0; flex-shrink:0; }
+    .comment-sheet-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px 10px; flex-shrink:0; border-bottom:1px solid #F0EBFF; }
+    .comment-sheet-title { font-size:16px; font-weight:800; color:var(--text); }
+    .comment-sheet-close { width:32px; height:32px; border-radius:50%; background:var(--bg); border:none; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--text2); line-height:1; }
+    .comment-list { flex:1; overflow-y:auto; padding:6px 0 4px; scrollbar-width:none; }
+    .comment-list::-webkit-scrollbar { display:none; }
+    .comment-item { display:flex; gap:10px; padding:10px 16px; position:relative; }
+    .comment-avatar { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
+    .comment-body { flex:1; min-width:0; }
+    .comment-name { font-size:12px; font-weight:800; color:var(--text); }
+    .comment-text { font-size:14px; color:var(--text); line-height:1.5; margin-top:2px; }
+    .comment-meta { display:flex; align-items:center; gap:12px; margin-top:5px; }
+    .comment-time { font-size:11px; color:var(--text2); }
+    .comment-like-btn { display:flex; align-items:center; gap:3px; font-size:11px; color:var(--text2); font-weight:700; background:none; border:none; cursor:pointer; padding:0; transition:color 0.15s; }
+    .comment-like-btn.liked { color:#EF4444; }
+    .comment-delete-popup { position:absolute; right:14px; top:8px; background:white; border-radius:12px; box-shadow:0 8px 28px rgba(0,0,0,0.18); overflow:hidden; display:none; z-index:20; }
+    .comment-delete-popup.show { display:block; }
+    .comment-delete-item { padding:12px 20px; font-size:14px; font-weight:700; color:#EF4444; cursor:pointer; white-space:nowrap; }
+    .comment-delete-item:active { background:var(--bg); }
+    .comment-input-row { display:flex; align-items:center; gap:10px; padding:10px 14px 14px; border-top:1px solid #F0EBFF; flex-shrink:0; background:var(--card); }
+    .comment-my-avatar { width:32px; height:32px; border-radius:50%; background:var(--purple-light); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+    .comment-input { flex:1; height:38px; border:1.5px solid var(--purple-border); border-radius:20px; padding:0 14px; font-size:14px; color:var(--text); background:var(--bg); outline:none; font-family:inherit; transition:border-color 0.15s; }
+    .comment-input:focus { border-color:var(--purple); }
+    .comment-send-btn { width:38px; height:38px; border-radius:50%; background:var(--purple); border:none; color:white; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:transform 0.15s; }
+    .comment-send-btn:active { transform:scale(0.88); }
+    .comment-empty { text-align:center; padding:36px 20px; color:var(--text2); font-size:14px; font-weight:600; line-height:1.6; }
+    /* ─── POST ACTION BUTTONS (updated) ─── */
+    .post-act-like { display:inline-flex; align-items:center; gap:5px; background:none; border:none; font-size:14px; font-weight:700; color:var(--text2); cursor:pointer; padding:6px 8px; border-radius:10px; }
+    .post-act-like.liked { color:#EF4444; }
+    .post-act-like svg { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+    .post-act-like.liked svg { fill:#EF4444; stroke:#EF4444; }
+    .post-act-comment { display:inline-flex; align-items:center; gap:5px; background:none; border:none; font-size:14px; font-weight:700; color:var(--text2); cursor:pointer; padding:6px 8px; border-radius:10px; }
+    .post-act-comment svg { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+    .post-act-share { display:inline-flex; align-items:center; gap:5px; background:none; border:none; font-size:14px; font-weight:700; color:var(--text2); cursor:pointer; padding:6px 8px; border-radius:10px; }
+    .post-act-share svg { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; display:block; flex-shrink:0; }
+    .post-act-share.shared { color:var(--purple); }
+    .post-act-share.shared svg { stroke:var(--purple); }
+
+    /* ── Streak Badge in Profil Header ── */
+    .profil-streak { display:flex; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap; }
+    .streak-badge-pill { display:inline-flex; align-items:center; gap:5px; border-radius:20px; padding:4px 10px; font-size:12px; font-weight:800; cursor:pointer; user-select:none; }
+    .streak-badge-pill:active { opacity:0.75; }
+
+    /* ── Streak Detail Panel ── */
+    .streak-detail-panel { position:absolute; inset:0; z-index:460; background:var(--bg); transform:translateX(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); display:flex; flex-direction:column; overflow:hidden; }
+    .streak-detail-panel.active { transform:translateX(0); }
+    .sdp-header { display:flex; align-items:center; gap:10px; padding:14px 16px 12px; background:var(--card); border-bottom:1px solid var(--purple-border); flex-shrink:0; }
+    .sdp-back { background:none; border:none; font-size:22px; cursor:pointer; color:var(--purple); padding:4px 8px 4px 0; line-height:1; }
+    .sdp-header-title { font-size:17px; font-weight:800; color:var(--text); }
+    .sdp-scroll { flex:1; overflow-y:auto; padding:0 16px 32px; }
+    .sdp-hero { background:linear-gradient(135deg,#7C3AED,#9F5EF0); border-radius:22px; padding:26px 20px; text-align:center; margin:16px 0 20px; }
+    .sdp-hero-flame { font-size:60px; line-height:1; margin-bottom:6px; }
+    .sdp-hero-days { font-size:38px; font-weight:900; color:white; line-height:1.1; }
+    .sdp-hero-label { font-size:13px; color:rgba(255,255,255,0.75); margin-top:4px; font-weight:600; }
+    .sdp-hero-freeze { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,0.15); border-radius:20px; padding:7px 16px; font-size:13px; font-weight:700; color:white; margin-top:14px; }
+    .sdp-section { margin-bottom:22px; }
+    .sdp-section-title { font-size:15px; font-weight:800; color:var(--text); margin-bottom:10px; }
+    .sdp-lb-card { background:var(--card); border-radius:18px; overflow:hidden; box-shadow:var(--shadow); }
+    .sdp-lb-row { display:flex; align-items:center; gap:11px; padding:12px 14px; border-bottom:1px solid var(--purple-border); }
+    .sdp-lb-row:last-child { border-bottom:none; }
+    .sdp-lb-row.me { background:var(--purple-light); }
+    .sdp-lb-divider { height:1px; background:var(--purple-border); margin:0 14px; }
+    .sdp-lb-rank { font-size:16px; width:26px; text-align:center; flex-shrink:0; }
+    .sdp-lb-avatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+    .sdp-lb-name { flex:1; font-size:14px; font-weight:700; color:var(--text); }
+    .sdp-lb-streak { font-size:13px; font-weight:800; color:var(--text2); }
+    .sdp-friend-row { display:flex; align-items:center; gap:12px; padding:11px 14px; background:var(--card); border-radius:16px; margin-bottom:8px; }
+    .sdp-friend-avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+    .sdp-friend-name { flex:1; font-size:14px; font-weight:700; color:var(--text); }
+    .sdp-friend-streak { font-size:13px; font-weight:800; color:var(--text2); }
+    .sdp-milestone-row { display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--card); border-radius:16px; margin-bottom:8px; transition:opacity 0.2s; }
+    .sdp-milestone-check { font-size:22px; flex-shrink:0; }
+    .sdp-milestone-info { flex:1; }
+    .sdp-milestone-label { font-size:14px; font-weight:800; color:var(--text); }
+    .sdp-milestone-desc { font-size:12px; color:var(--text2); margin-top:2px; }
+    .sdp-milestone-row.done .sdp-milestone-label { color:var(--purple); }
+    .sdp-milestone-row.locked { opacity:0.5; }
+    .streak-c0 { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.8); }
+    .streak-c1 { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.8); }
+    .streak-c2 { background:rgba(251,146,60,0.25); color:#FB923C; }
+    .streak-c3 { background:rgba(239,68,68,0.25); color:#FCA5A5; }
+    .streak-c4 { background:rgba(217,70,239,0.3); color:#F0ABFC; }
+    .streak-c5 { background:rgba(245,158,11,0.3); color:#FCD34D; }
+    .streak-freeze-pill { display:inline-flex; align-items:center; gap:4px; background:rgba(147,197,253,0.2); color:#BAE6FD; border-radius:20px; padding:3px 9px; font-size:11px; font-weight:700; }
+
+    /* ── Milestone Modal ── */
+    .milestone-overlay { position:absolute; inset:0; z-index:800; background:rgba(0,0,0,0.65); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.3s; }
+    .milestone-overlay.show { opacity:1; pointer-events:all; }
+    .milestone-card { background:var(--card); border-radius:28px; padding:36px 28px; text-align:center; width:270px; transform:scale(0.75); transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1); box-shadow:0 24px 60px rgba(107,71,255,0.3); }
+    .milestone-overlay.show .milestone-card { transform:scale(1); }
+    .milestone-emoji { font-size:72px; display:block; margin-bottom:12px; animation:mFloat 1.6s ease-in-out infinite; }
+    @keyframes mFloat { 0%,100%{transform:translateY(0) rotate(-3deg)} 50%{transform:translateY(-10px) rotate(3deg)} }
+    .milestone-days { font-size:48px; font-weight:900; background:linear-gradient(135deg,#6B47FF,#C84B9E); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; line-height:1; margin-bottom:4px; }
+    .milestone-title { font-size:18px; font-weight:900; color:var(--text); margin-bottom:6px; }
+    .milestone-sub { font-size:13px; color:var(--text2); font-weight:600; margin-bottom:22px; line-height:1.4; }
+    .milestone-btn { width:100%; height:50px; border-radius:16px; background:linear-gradient(135deg,#6B47FF,#C84B9E); border:none; color:white; font-size:15px; font-weight:800; cursor:pointer; }
+
+    /* ── Streak Reminder Banner ── */
+    #streak-reminder { position:absolute; top:0; left:0; right:0; z-index:700; background:linear-gradient(135deg,#EF4444,#F59E0B); padding:11px 14px; display:flex; align-items:center; gap:10px; transform:translateY(-100%); transition:transform 0.3s; pointer-events:none; }
+    #streak-reminder.show { transform:translateY(0); pointer-events:all; }
+    .reminder-text { flex:1; font-size:13px; font-weight:700; color:white; line-height:1.35; }
+    .reminder-post-btn { background:white; color:#EF4444; font-size:12px; font-weight:800; border:none; border-radius:10px; padding:7px 11px; cursor:pointer; flex-shrink:0; }
+    .reminder-close-btn { background:none; border:none; color:white; font-size:18px; cursor:pointer; padding:2px; line-height:1; flex-shrink:0; opacity:0.8; }
+
+    /* ── OOTD Badge ── */
+    .ootd-badge { display:inline-flex; align-items:center; gap:5px; background:linear-gradient(135deg,#F59E0B,#EF4444); color:white; font-size:11px; font-weight:800; padding:4px 11px; border-radius:20px; margin-bottom:9px; }
+
+    /* ── Leaderboard ── */
+    .leaderboard-wrap { margin:0 16px 16px; background:var(--card); border-radius:20px; overflow:hidden; box-shadow:var(--shadow); }
+    .leaderboard-head { padding:14px 16px 10px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--purple-border); }
+    .leaderboard-title { font-size:15px; font-weight:800; color:var(--text); }
+    .leaderboard-row { display:flex; align-items:center; gap:11px; padding:10px 16px; border-bottom:1px solid var(--purple-border); }
+    .leaderboard-row:last-child { border-bottom:none; }
+    .leaderboard-row.me { background:var(--purple-light); }
+    .lb-rank { font-size:16px; width:26px; text-align:center; flex-shrink:0; }
+    .lb-avatar { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+    .lb-name { flex:1; font-size:14px; font-weight:700; color:var(--text); }
+    .lb-streak { font-size:13px; font-weight:800; color:#EF4444; display:flex; align-items:center; gap:4px; white-space:nowrap; }
+
+    /* ── Streak on Friend Profile ── */
+    .fp-streak-pill { display:inline-flex; align-items:center; gap:5px; background:rgba(255,255,255,0.15); border-radius:20px; padding:3px 10px; font-size:12px; font-weight:800; color:white; margin-top:5px; }
+  </style>
+</head>
+<body>
+<div id="phone">
+
+  <div class="status-bar">
+    <span class="status-time" id="clock">22:11</span>
+    <div class="status-icons">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </div>
+  </div>
+
+  <div id="app">
+
+    <!-- ═══════════ SCHRANK ═══════════ -->
+    <div id="schrank" class="screen active">
+      <div class="screen-header">
+        <div>
+          <div class="big-title">Mein Schrank</div>
+          <div class="big-sub" id="schrank-sub">12 Artikel</div>
+        </div>
+      </div>
+      <div class="scroll-content">
+        <div class="search-wrap">
+          <div class="search-wrap-inner">
+            <svg class="search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="search-input" id="schrank-search" placeholder="Name, Farbe, Saison…"
+              oninput="_schrankSearch(this.value)" autocomplete="off" autocorrect="off" spellcheck="false" />
+            <button class="search-clear-btn" id="schrank-search-clear" onclick="_clearSchrankSearch()" style="display:none;">
+              <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="chip-row">
+          <div class="chip active" data-filter="alle" onclick="filterChip(this)">Alle</div>
+          <div class="chip" data-filter="tops" onclick="filterChip(this)"><span>👕</span> Tops</div>
+          <div class="chip" data-filter="hosen" onclick="filterChip(this)"><span>👖</span> Hosen</div>
+          <div class="chip" data-filter="kleider" onclick="filterChip(this)"><span>👗</span> Kleider</div>
+          <div class="chip" data-filter="schuhe" onclick="filterChip(this)"><span>👟</span> Schuhe</div>
+          <div class="chip" data-filter="accessoires" onclick="filterChip(this)"><span>🧣</span> Accessoires</div>
+        </div>
+
+        <div class="clothes-grid" id="clothes-grid">
+          <div class="cloth-card" data-category="tops">
+            <div class="cloth-icon">👕</div>
+            <div class="cloth-name">Weißes T-Shirt</div>
+            <div class="cloth-color-row"><div class="color-dot" style="background:#E0E0E0;"></div><span class="cloth-color-name">Weiß</span></div>
+            <span class="season-tag s-sommer">Sommer</span>
+          </div>
+          <div class="cloth-card" data-category="hosen">
+            <div class="cloth-icon">👖</div>
+            <div class="cloth-name">Jeans</div>
+            <div class="cloth-color-row"><div class="color-dot" style="background:#1565C0;"></div><span class="cloth-color-name">Blau</span></div>
+            <span class="season-tag s-ganzjahrig">Ganzjährig</span>
+          </div>
+          <div class="cloth-card" data-category="schuhe">
+            <div class="cloth-icon">👟</div>
+            <div class="cloth-name">Sneaker</div>
+            <div class="cloth-color-row"><div class="color-dot" style="background:#EEEEEE; border:1px solid #ddd;"></div><span class="cloth-color-name">Weiß</span></div>
+            <span class="season-tag s-ganzjahrig">Ganzjährig</span>
+          </div>
+          <div class="cloth-card" data-category="kleider">
+            <div class="cloth-icon">👗</div>
+            <div class="cloth-name">Sommerkleid</div>
+            <div class="cloth-color-row"><div class="color-dot" style="background:#EC407A;"></div><span class="cloth-color-name">Rosa</span></div>
+            <span class="season-tag s-sommer">Sommer</span>
+          </div>
+          <div class="cloth-card" data-category="tops">
+            <div class="cloth-icon">🧥</div>
+            <div class="cloth-name">Lederjacke</div>
+            <div class="cloth-color-row"><div class="color-dot" style="background:#212121;"></div><span class="cloth-color-name">Schwarz</span></div>
+            <span class="season-tag s-winter">Winter</span>
+          </div>
+          <div class="cloth-card" data-category="hosen">
+            <div class="cloth-icon">👖</div>
+            <div class="cloth-name">Chino-Hose</div>
+            <div class="cloth-color-row"><div class="color-dot" style="background:#D7BC8D;"></div><span class="cloth-color-name">Beige</span></div>
+            <span class="season-tag s-sommer">Sommer</span>
+          </div>
+          <div class="cloth-card" data-category="schuhe">
+            <div class="cloth-icon">👢</div>
+            <div class="cloth-name">Stiefel</div>
+            <div class="cloth-color-row"><div class="color-dot" style="background:#795548;"></div><span class="cloth-color-name">Braun</span></div>
+            <span class="season-tag s-winter">Winter</span>
+          </div>
+          <div class="cloth-card" data-category="accessoires">
+            <div class="cloth-icon">🕶️</div>
+            <div class="cloth-name">Sonnenbrille</div>
+            <div class="cloth-color-row"><div class="color-dot" style="background:#212121;"></div><span class="cloth-color-name">Schwarz</span></div>
+            <span class="season-tag s-sommer">Sommer</span>
+          </div>
+          <div class="cloth-card" data-category="tops">
+            <div class="cloth-icon">🧶</div>
+            <div class="cloth-name">Strickpullover</div>
+            <div class="cloth-color-row"><div class="color-dot" style="background:#9E9E9E;"></div><span class="cloth-color-name">Grau</span></div>
+            <span class="season-tag s-winter">Winter</span>
+          </div>
+          <div class="cloth-card" data-category="hosen">
+            <div class="cloth-icon">👖</div>
+            <div class="cloth-name">Jogginghose</div>
+            <div class="cloth-color-row"><div class="color-dot" style="background:#212121;"></div><span class="cloth-color-name">Schwarz</span></div>
+            <span class="season-tag s-ganzjahrig">Ganzjährig</span>
+          </div>
+          <div class="cloth-card" data-category="schuhe">
+            <div class="cloth-icon">🩴</div>
+            <div class="cloth-name">Sandalen</div>
+            <div class="cloth-color-row"><div class="color-dot" style="background:#795548;"></div><span class="cloth-color-name">Braun</span></div>
+            <span class="season-tag s-sommer">Sommer</span>
+          </div>
+          <div class="cloth-card" data-category="accessoires">
+            <div class="cloth-icon">🧣</div>
+            <div class="cloth-name">Schal</div>
+            <div class="cloth-color-row"><div class="color-dot" style="background:#E53935;"></div><span class="cloth-color-name">Rot</span></div>
+            <span class="season-tag s-winter">Winter</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ SCANNEN ═══════════ -->
+    <div id="scannen" class="screen">
+      <div class="screen-header">
+        <div>
+          <div class="big-title">Artikel scannen</div>
+          <div class="big-sub-gray">Füge neue Kleidung zu deinem Schrank hinzu</div>
+        </div>
+      </div>
+      <div class="scroll-content">
+        <div class="scan-drop-zone">
+          <div class="scan-img-circle">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </div>
+          <div class="scan-drop-title">Kleidungsstück hier ablegen</div>
+          <div class="scan-drop-sub">Ziehe ein Bild hierher oder tippe zum Auswählen</div>
+        </div>
+
+        <div class="scan-action-row">
+          <button class="scan-action-btn scan-btn-primary">
+            <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Foto aufnehmen
+          </button>
+          <button class="scan-action-btn scan-btn-secondary">
+            <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+            Bild hochladen
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══════════ KI STYLING ═══════════ -->
+    <div id="ki-styling" class="screen">
+      <!-- Kollektions-Pills (horizontal scrollbar oben) -->
+      <div class="ki-pills-wrap" id="ki-pills-wrap"></div>
+
+      <!-- Haupt-Scroll-Bereich -->
+      <div class="scroll-content" id="ki-scroll" style="flex:1;overflow-y:auto;padding:0;">
+
+        <!-- Oberer Button: öffnet Modal, kein API Call -->
+        <button class="generate-btn" id="ki-generate-btn" onclick="_openGenerateModal('browse')">
+          <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+          Outfit generieren
+          <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        </button>
+
+        <!-- Vorgeschlagene Outfits: 2–3 random aus Gespeicherten, kein API -->
+        <div class="ki-section-label" id="ki-preview-label">✨ Vorgeschlagene Outfits</div>
+        <div id="ki-preview-suggestions" style="padding:0 20px 8px;"></div>
+
+        <!-- KI Vorschläge: erscheinen nach unterem Button -->
+        <div class="ki-section-label" id="ki-suggestions-label" style="display:none;">🤖 KI Vorschläge</div>
+        <div class="outfit-cards" id="ki-ai-suggestions" style="padding:0 20px 8px;display:none;"></div>
+
+        <!-- Unterer Button: öffnet Modal + macht API Call nach Bestätigung -->
+        <button class="generate-btn-more" id="ki-more-btn" onclick="_openGenerateModal('generate')">
+          <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+          Mehr Vorschläge generieren
+        </button>
+
+        <!-- Alle gespeicherten Outfits -->
+        <div class="ki-section-label" id="ki-saved-label">
+          <span id="ki-saved-label-text">📁 Gespeicherte Outfits</span>
+        </div>
+        <div id="ki-saved-outfits" style="padding:0 20px 20px;"></div>
+      </div>
+
+      <!-- Verstecktes ordner-grid (für Rückwärtskompatibilität) -->
+      <div id="ordner-grid" style="display:none;">
+        <div class="ordner-card" id="ordner-favoriten">
+          <div class="ordner-preview" id="favoriten-preview">
+            <div class="ordner-preview-cell" style="grid-column:1/-1;grid-row:1/-1;font-size:36px;background:var(--purple-light);">❤️</div>
+          </div>
+          <div class="ordner-info">
+            <div class="ordner-name">❤️ Favoriten</div>
+            <div class="ordner-count" id="favoriten-count">0 Outfits</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Kollektion Detail Panel ── -->
+      <div class="ki-panel" id="ki-collection-panel">
+        <div class="ki-panel-header">
+          <button class="ki-back-btn" onclick="_closeCollection()">←</button>
+          <div class="ki-panel-title" id="ki-col-title">Kollektion</div>
+        </div>
+        <div class="ki-panel-sub" id="ki-col-sub">0 Outfits</div>
+        <div class="col-tab-row" id="ki-col-tabs">
+          <button class="col-tab active" data-col-tab="fits" onclick="_selectColTab('fits')">✨ Meine Fits</button>
+          <button class="col-tab" data-col-tab="inspo" onclick="_selectColTab('inspo')">💡 Inspo</button>
+        </div>
+        <div class="ki-panel-scroll" id="ki-col-list"></div>
+      </div>
+
+      <!-- ── Outfit Detail Panel ── -->
+      <div class="ki-panel" id="ki-outfit-panel">
+        <div class="ki-panel-header">
+          <button class="ki-back-btn" onclick="_closeOutfitDetail()">←</button>
+          <div class="ki-panel-title" id="ki-outfit-panel-title">Outfit</div>
+          <button class="ki-options-btn" onclick="_toggleOptionsMenu(event)">···</button>
+        </div>
+        <div class="ki-panel-scroll" id="ki-outfit-detail-content"></div>
+        <!-- Optionen-Menü -->
+        <div id="ki-options-menu">
+          <div class="ki-menu-item ki-menu-danger" onclick="_removeCurrentOutfit()">🗑️ Aus Kollektion entfernen</div>
+        </div>
+      </div>
+
+      <!-- ── Generate Modal ── -->
+      <div class="ki-gen-overlay" id="ki-generate-modal" onclick="_closeGenerateModalOutside(event)">
+        <div class="ki-gen-modal">
+          <div class="ki-gen-title" id="ki-gen-title">✨ Outfit generieren</div>
+          <div class="ki-gen-label">📝 Beschreibung (optional)</div>
+          <textarea class="ki-gen-textarea" id="ki-gen-description" placeholder="z.B. Casual für den Alltag, elegant für ein Date…" rows="3"></textarea>
+          <div class="ki-gen-divider">
+            <div class="ki-gen-divider-line"></div>
+            <div class="ki-gen-divider-text">ODER / UND</div>
+            <div class="ki-gen-divider-line"></div>
+          </div>
+          <div class="ki-gen-label">📁 Kollektion als Inspo</div>
+          <div class="ki-gen-cols" id="ki-gen-collections"></div>
+          <div class="ki-gen-divider" id="ki-gen-inspo-divider" style="display:none;">
+            <div class="ki-gen-divider-line"></div>
+            <div class="ki-gen-divider-text">ODER / UND</div>
+            <div class="ki-gen-divider-line"></div>
+          </div>
+          <div class="ki-gen-label" id="ki-gen-inspo-label" style="display:none;">💡 Inspo Outfit</div>
+          <div class="ki-gen-cols" id="ki-gen-inspo-outfits"></div>
+          <div class="ki-gen-actions">
+            <button class="ki-gen-cancel" onclick="_closeGenerateModal()">Abbrechen</button>
+            <button class="ki-gen-confirm" id="ki-gen-confirm-btn" onclick="_confirmGenerate()">✨ Anzeigen</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ═══════════ FREUNDE ═══════════ -->
+    <div id="freunde" class="screen">
+      <div class="freunde-header">
+        <div class="big-title">Feed</div>
+        <button class="search-friend-btn" onclick="_openFriendSearch()">🔍</button>
+      </div>
+      <div class="tab-row">
+        <button class="tab-pill active" onclick="switchTab('entdecken', this)">Entdecken</button>
+        <button class="tab-pill" onclick="switchTab('freunde-feed', this)">Freunde</button>
+      </div>
+
+      <div class="scroll-content">
+
+        <!-- ENTDECKEN PANEL -->
+        <div id="panel-entdecken" class="tab-panel active">
+
+          <div class="post-card-new" data-feed-id="feed_sophie_fruehlings_chic" data-post-name="Sophie K." data-post-avatar="👩‍🦰" data-post-bg="#FFE0B2" data-post-title="Frühlings-Chic" data-post-items='[{"emoji":"👗","name":"Seidentop"},{"emoji":"👖","name":"Weite Hose"},{"emoji":"👠","name":"Mules"}]'>
+            <div class="post-head">
+              <div class="fp-head-tappable" data-open-friend="sophie">
+                <div class="post-avatar-wrap">
+                  <div class="post-avatar-new" style="background:#FFE0B2;">👩‍🦰</div>
+                  <div class="avatar-badge">🌐</div>
+                </div>
+                <div class="post-meta">
+                  <div class="post-name-new">Sophie K.</div>
+                  <div class="post-time-new">Vor 1 Stunde</div>
+                </div>
+              </div>
+              <button class="feed-follow-btn" data-feed-follow="sophie">➕ Folgen</button>
+            </div>
+            <div class="post-title-new">Frühlings-Chic</div>
+            <div class="outfit-chips">
+              <div class="outfit-chip-item"><span>👗</span> Seidentop</div>
+              <div class="outfit-chip-item"><span>👖</span> Weite Hose</div>
+              <div class="outfit-chip-item"><span>👠</span> Mules</div>
+            </div>
+            <div class="ai-match-new">
+              <div class="ai-match-new-header">
+                <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+                Das passt zu deinen Outfits:
+              </div>
+              <div class="ai-match-new-items">
+                <div class="ai-match-new-item">
+                  <div class="ai-match-emoji">👜</div>
+                  <div class="ai-match-text">
+                    <div class="ai-match-name-new">Handtasche</div>
+                    <div class="ai-match-outfit-new">passt zu: Business Outfit</div>
+                  </div>
+                </div>
+                <div class="ai-match-new-item">
+                  <div class="ai-match-emoji">⌚</div>
+                  <div class="ai-match-text">
+                    <div class="ai-match-name-new">Uhr</div>
+                    <div class="ai-match-outfit-new">passt zu: Elegant</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="post-actions-new">
+              <button class="post-act-like" data-feed-like="feed_sophie_fruehlings_chic"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="like-cnt">34</span></button>
+              <button class="post-act-comment" data-feed-comment="feed_sophie_fruehlings_chic"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="comment-cnt">7</span></button>
+              <button class="post-act-share" data-feed-share="feed_sophie_fruehlings_chic"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span class="share-cnt">0</span></button>
+              <button class="inspo-btn" onclick="_openInspoModal(this)">💡 Inspo ✨</button>
+            </div>
+          </div>
+
+          <div class="post-card-new" data-feed-id="feed_lara_festival_ready" data-post-name="Lara D." data-post-avatar="👩‍🦳" data-post-bg="#FFF9C4" data-post-title="Festival Ready" data-post-items='[{"emoji":"👕","name":"Crop-Top"},{"emoji":"🩳","name":"Hotpants"},{"emoji":"👢","name":"Cowboy-Stiefel"}]'>
+            <div class="post-head">
+              <div class="fp-head-tappable" data-open-friend="lara">
+                <div class="post-avatar-wrap">
+                  <div class="post-avatar-new" style="background:#FFF9C4;">👩‍🦳</div>
+                  <div class="avatar-badge">🌐</div>
+                </div>
+                <div class="post-meta">
+                  <div class="post-name-new">Lara D.</div>
+                  <div class="post-time-new">Gestern</div>
+                </div>
+              </div>
+              <button class="feed-follow-btn" data-feed-follow="lara">✓ Gefolgt</button>
+            </div>
+            <div class="post-title-new">Festival Ready</div>
+            <div class="outfit-chips">
+              <div class="outfit-chip-item"><span>👕</span> Crop-Top</div>
+              <div class="outfit-chip-item"><span>🩳</span> Hotpants</div>
+              <div class="outfit-chip-item"><span>👢</span> Cowboy-Stiefel</div>
+            </div>
+            <div class="ai-match-new">
+              <div class="ai-match-new-header">
+                <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+                Das passt zu deinen Outfits:
+              </div>
+              <div class="ai-match-new-items">
+                <div class="ai-match-new-item">
+                  <div class="ai-match-emoji">🕶️</div>
+                  <div class="ai-match-text">
+                    <div class="ai-match-name-new">Sonnenbrille</div>
+                    <div class="ai-match-outfit-new">passt zu: Sommer-Chic</div>
+                  </div>
+                </div>
+                <div class="ai-match-new-item">
+                  <div class="ai-match-emoji">👜</div>
+                  <div class="ai-match-text">
+                    <div class="ai-match-name-new">Crossbody-Tasche</div>
+                    <div class="ai-match-outfit-new">passt zu: Casual Look</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="post-actions-new">
+              <button class="post-act-like" data-feed-like="feed_lara_festival_ready"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="like-cnt">112</span></button>
+              <button class="post-act-comment" data-feed-comment="feed_lara_festival_ready"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="comment-cnt">33</span></button>
+              <button class="post-act-share" data-feed-share="feed_lara_festival_ready"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span class="share-cnt">0</span></button>
+              <button class="inspo-btn" onclick="_openInspoModal(this)">💡 Inspo ✨</button>
+            </div>
+          </div>
+
+        </div><!-- /entdecken -->
+
+        <!-- FREUNDE FEED PANEL -->
+        <div id="panel-freunde-feed" class="tab-panel">
+          <!-- Streak Leaderboard -->
+          <div class="leaderboard-wrap" style="margin-top:14px;">
+            <div class="leaderboard-head">
+              <div class="leaderboard-title">🏆 Streak Bestenliste</div>
+            </div>
+            <div id="streak-leaderboard"></div>
+          </div>
+
+          <div class="post-card-new" data-feed-id="feed_lena_herbst_layering" data-post-name="Lena M." data-post-avatar="🧒" data-post-bg="#FFE0B2" data-post-title="Herbst-Layering" data-post-items='[{"emoji":"🧥","name":"Lederjacke"},{"emoji":"👕","name":"Bluse"},{"emoji":"👖","name":"Jeans"},{"emoji":"👢","name":"Stiefel"}]'>
+            <div class="post-head">
+              <div class="fp-head-tappable" data-open-friend="lena">
+                <div class="post-avatar-wrap">
+                  <div class="post-avatar-new" style="background:#FFE0B2;">🧒</div>
+                  <div class="avatar-badge">🔒</div>
+                </div>
+                <div class="post-meta">
+                  <div class="post-name-new">Lena M.</div>
+                  <div class="post-time-new">Vor 2 Stunden</div>
+                </div>
+              </div>
+              <button class="feed-follow-btn" data-feed-follow="lena">👥 Freunde</button>
+            </div>
+            <div class="post-title-new">Herbst-Layering</div>
+            <div class="outfit-chips">
+              <div class="outfit-chip-item"><span>🧥</span> Lederjacke</div>
+              <div class="outfit-chip-item"><span>👕</span> Bluse</div>
+              <div class="outfit-chip-item"><span>👖</span> Jeans</div>
+              <div class="outfit-chip-item"><span>👢</span> Stiefel</div>
+            </div>
+            <div class="ai-match-new">
+              <div class="ai-match-new-header">
+                <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+                Das passt zu deinen Outfits:
+              </div>
+              <div class="ai-match-new-items">
+                <div class="ai-match-new-item">
+                  <div class="ai-match-emoji">🧥</div>
+                  <div class="ai-match-text">
+                    <div class="ai-match-name-new">Lenas Lederjacke</div>
+                    <div class="ai-match-outfit-new">passt zu: Casual Look</div>
+                  </div>
+                </div>
+                <div class="ai-match-new-item">
+                  <div class="ai-match-emoji">👢</div>
+                  <div class="ai-match-text">
+                    <div class="ai-match-name-new">Lenas Stiefel</div>
+                    <div class="ai-match-outfit-new">passt zu: Herbst-Outfit</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="post-actions-new">
+              <button class="post-act-like" data-feed-like="feed_lena_herbst_layering"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="like-cnt">24</span></button>
+              <button class="post-act-comment" data-feed-comment="feed_lena_herbst_layering"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="comment-cnt">8</span></button>
+              <button class="post-act-share" data-feed-share="feed_lena_herbst_layering"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span class="share-cnt">0</span></button>
+              <button class="inspo-btn" onclick="_openInspoModal(this)">💡 Inspo ✨</button>
+            </div>
+          </div>
+
+          <div class="post-card-new" data-feed-id="feed_marie_sommer_chic" data-post-name="Marie K." data-post-avatar="👩" data-post-bg="#FFF9C4" data-post-title="Sommer-Chic" data-post-items='[{"emoji":"👗","name":"Sommerkleid"},{"emoji":"🕶️","name":"Sonnenbrille"},{"emoji":"🩴","name":"Sandalen"}]'>
+            <div class="post-head">
+              <div class="fp-head-tappable" data-open-friend="marie">
+                <div class="post-avatar-wrap">
+                  <div class="post-avatar-new" style="background:#FFF9C4;">👩</div>
+                  <div class="avatar-badge">🔒</div>
+                </div>
+                <div class="post-meta">
+                  <div class="post-name-new">Marie K.</div>
+                  <div class="post-time-new">Vor 5 Stunden</div>
+                </div>
+              </div>
+              <button class="feed-follow-btn" data-feed-follow="marie">➕ Folgen</button>
+            </div>
+            <div class="post-title-new">Sommer-Chic</div>
+            <div class="outfit-chips">
+              <div class="outfit-chip-item"><span>👗</span> Sommerkleid</div>
+              <div class="outfit-chip-item"><span>🕶️</span> Sonnenbrille</div>
+              <div class="outfit-chip-item"><span>🩴</span> Sandalen</div>
+            </div>
+            <div class="ai-match-new">
+              <div class="ai-match-new-header">
+                <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+                Das passt zu deinen Outfits:
+              </div>
+              <div class="ai-match-new-items">
+                <div class="ai-match-new-item">
+                  <div class="ai-match-emoji">🕶️</div>
+                  <div class="ai-match-text">
+                    <div class="ai-match-name-new">Maries Sonnenbrille</div>
+                    <div class="ai-match-outfit-new">passt zu: Sommer Day</div>
+                  </div>
+                </div>
+                <div class="ai-match-new-item">
+                  <div class="ai-match-emoji">🩴</div>
+                  <div class="ai-match-text">
+                    <div class="ai-match-name-new">Maries Sandalen</div>
+                    <div class="ai-match-outfit-new">passt zu: Casual Look</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="post-actions-new">
+              <button class="post-act-like" data-feed-like="feed_marie_sommer_chic"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="like-cnt">61</span></button>
+              <button class="post-act-comment" data-feed-comment="feed_marie_sommer_chic"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="comment-cnt">14</span></button>
+              <button class="post-act-share" data-feed-share="feed_marie_sommer_chic"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span class="share-cnt">0</span></button>
+              <button class="inspo-btn" onclick="_openInspoModal(this)">💡 Inspo ✨</button>
+            </div>
+          </div>
+
+        </div><!-- /freunde-feed -->
+
+      </div><!-- /scroll-content -->
+
+      <!-- ── Profil-Suche Panel ── -->
+      <div class="friend-search-panel" id="friend-search-panel">
+        <div class="friend-search-header">
+          <button class="friend-search-back" onclick="_closeFriendSearch()">←</button>
+          <div class="friend-search-input-wrap">
+            <span class="friend-search-icon">🔍</span>
+            <input class="friend-search-input" id="friend-search-input"
+                   placeholder="Profile suchen…"
+                   autocomplete="off" autocorrect="off" spellcheck="false"
+                   oninput="_onFriendSearch(this)" />
+            <button class="friend-search-clear" id="friend-search-clear" onclick="_clearFriendSearch()">✕</button>
+          </div>
+        </div>
+        <div class="friend-search-results" id="friend-search-results">
+          <div class="friend-search-placeholder">Tippe einen Namen oder @username ein</div>
+        </div>
+      </div>
+
+    </div><!-- /freunde screen -->
+
+    <!-- ═══════════ PROFIL ═══════════ -->
+    <div id="profil" class="screen">
+      <div class="scroll-content">
+        <div class="profil-hero">
+          <button class="profil-settings-btn" onclick="_openSettings()">⚙️</button>
+          <div class="profil-identity">
+            <div class="profil-avatar-new">👩‍🦱</div>
+            <div>
+              <div class="profil-name-new">Anna Müller</div>
+              <div class="profil-handle-new">@annas_style</div>
+              <div class="profil-streak" id="profil-streak-row">
+                <div class="streak-badge-pill streak-c3" id="profil-streak-pill" onclick="_openStreakPanel()">🔥 7 Tage Streak</div>
+                <div class="streak-freeze-pill" id="profil-freeze-pill">❄️ 1 Freeze</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="profil-stats">
+          <div class="profil-stat"><div class="pnum">18</div><div class="plbl">Artikel</div></div>
+          <div class="profil-stat"><div class="pnum">12</div><div class="plbl">Outfits</div></div>
+          <div class="profil-stat"><div class="pnum">284</div><div class="plbl">Follower</div></div>
+          <div class="profil-stat"><div class="pnum" id="profil-posts-count">0</div><div class="plbl">Posts</div></div>
+        </div>
+        <div class="profil-posts-label"><span>📤 Meine Posts</span><button class="new-post-btn" onclick="_openNewPostModal()">➕ Neuer Beitrag</button></div>
+        <div id="profil-posts-grid"></div>
+      </div>
+      <!-- Post Detail Panel -->
+      <div class="post-detail-panel" id="post-detail-panel">
+        <div class="post-detail-header">
+          <button class="post-detail-back" onclick="_closePostDetail()">←</button>
+          <div class="post-detail-title-text" id="post-detail-title">Post</div>
+        </div>
+        <div class="post-detail-scroll" id="post-detail-content"></div>
+      </div>
+      <!-- Einstellungen Panel -->
+      <div class="settings-panel" id="settings-panel">
+        <div class="settings-header">
+          <button class="settings-back" onclick="_closeSettings()">←</button>
+          <div class="settings-title">Einstellungen</div>
+        </div>
+        <div class="settings-scroll">
+          <div class="settings-section-header">Konto</div>
+          <div class="settings-row">
+            <div class="settings-row-icon">👤</div>
+            <div class="settings-row-label">Profil bearbeiten</div>
+            <div class="settings-row-arrow">›</div>
+          </div>
+          <div class="settings-section-header">Datenschutz</div>
+          <div class="settings-row">
+            <div class="settings-row-icon">🔒</div>
+            <div class="settings-row-label">Schrank für Freunde teilen</div>
+            <label class="settings-toggle"><input type="checkbox" checked /><span class="settings-toggle-slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-icon">🌍</div>
+            <div class="settings-row-label">Profil öffentlich</div>
+            <label class="settings-toggle"><input type="checkbox" /><span class="settings-toggle-slider"></span></label>
+          </div>
+          <div class="settings-section-header">Allgemein</div>
+          <div class="settings-row">
+            <div class="settings-row-icon">🔔</div>
+            <div class="settings-row-label">Benachrichtigungen</div>
+            <label class="settings-toggle"><input type="checkbox" checked /><span class="settings-toggle-slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-icon">🎨</div>
+            <div class="settings-row-label">Style Präferenzen</div>
+            <div class="settings-row-arrow">›</div>
+          </div>
+          <div class="settings-section-header">Support</div>
+          <div class="settings-row">
+            <div class="settings-row-icon">❓</div>
+            <div class="settings-row-label">Hilfe & Support</div>
+            <div class="settings-row-arrow">›</div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-icon">ℹ️</div>
+            <div class="settings-row-label">Über Closet</div>
+            <div class="settings-row-arrow">›</div>
+          </div>
+          <div class="settings-logout-row">
+            <button class="settings-logout-btn" onclick="_showToast('👋 Tschüss!')">🚪 Ausloggen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Neuer Beitrag Modal ── -->
+    <div class="new-post-modal-overlay" id="new-post-modal-overlay" onclick="_closeNewPostModalOutside(event)">
+      <div class="new-post-modal">
+        <div class="new-post-modal-handle"></div>
+        <div class="new-post-modal-header">
+          <div class="new-post-modal-title">➕ Neuer Beitrag</div>
+          <button class="new-post-modal-close" onclick="_closeNewPostModal()">✕</button>
+        </div>
+        <!-- Bild -->
+        <div class="new-post-section">
+          <div class="new-post-section-label">🖼️ BILD HINZUFÜGEN</div>
+          <div class="new-post-img-area" id="new-post-img-area" onclick="document.getElementById('new-post-gallery-input').click()">
+            <div class="new-post-img-placeholder" id="new-post-img-placeholder">
+              <div class="new-post-img-placeholder-icon">🖼️</div>
+              <div class="new-post-img-placeholder-text">Tippe um ein Bild hinzuzufügen</div>
+            </div>
+            <img id="new-post-img-preview" src="" alt="" style="display:none;width:100%;height:100%;min-height:180px;object-fit:cover;" />
+            <button class="new-post-img-remove" id="new-post-img-remove-btn" style="display:none;" onclick="event.stopPropagation();_removeNewPostImg()">✕</button>
+          </div>
+          <div class="new-post-img-btn-row">
+            <button class="new-post-img-btn" onclick="document.getElementById('new-post-camera-input').click()">📷 Foto aufnehmen</button>
+            <button class="new-post-img-btn" onclick="document.getElementById('new-post-gallery-input').click()">🖼️ Hochladen</button>
+          </div>
+          <input type="file" id="new-post-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="_handleNewPostImg(this)">
+          <input type="file" id="new-post-gallery-input" accept="image/*" style="display:none;" onchange="_handleNewPostImg(this)">
+        </div>
+        <!-- Caption -->
+        <div class="new-post-section" style="padding-top:16px;">
+          <div class="new-post-section-label">✏️ CAPTION</div>
+          <textarea class="new-post-caption-input" id="new-post-caption" placeholder="Beschreibe deinen Look…" rows="3"></textarea>
+        </div>
+        <!-- Kleidungsstücke -->
+        <div class="new-post-section" style="padding-top:16px;">
+          <div class="new-post-section-label">👕 KLEIDUNGSSTÜCKE HINZUFÜGEN</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:10px;">Welche Teile trägst du auf dem Foto?</div>
+          <div class="wardrobe-pills-wrap" id="new-post-wardrobe-pills"></div>
+        </div>
+        <!-- Sichtbarkeit -->
+        <div class="new-post-section" style="padding-top:16px;">
+          <div class="new-post-section-label">👥 SICHTBARKEIT</div>
+          <div class="new-post-vis-row">
+            <button class="new-post-vis-btn active" id="new-post-vis-friends" onclick="_selectNewPostVis('friends')">🔒 Nur Freunde</button>
+            <button class="new-post-vis-btn" id="new-post-vis-public" onclick="_selectNewPostVis('public')">🌍 Öffentlich</button>
+          </div>
+        </div>
+        <!-- Actions -->
+        <div class="new-post-modal-actions">
+          <button class="new-post-submit-btn" onclick="_submitNewPost()">📤 Posten</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Item Detail Popup ── -->
+    <div class="item-detail-overlay" id="item-detail-overlay" onclick="_closeItemDetailPopup()">
+      <div class="item-detail-sheet" onclick="event.stopPropagation()">
+        <div class="item-detail-handle"></div>
+        <div class="item-detail-head">
+          <div class="item-detail-icon" id="item-detail-icon">👕</div>
+          <div>
+            <div class="item-detail-name" id="item-detail-name">Item</div>
+            <div class="item-detail-sub" id="item-detail-sub"></div>
+          </div>
+        </div>
+        <div class="item-detail-chips" id="item-detail-chips"></div>
+        <button class="item-shop-btn" id="item-shop-btn" style="display:none;">🛍️ Ähnliche Teile shoppen</button>
+        <button class="item-detail-close-btn" onclick="_closeItemDetailPopup()">Schließen</button>
+      </div>
+    </div>
+
+    <!-- ── Kommentar Sheet ── -->
+    <div class="comment-sheet-overlay" id="comment-sheet-overlay" onclick="_closeCommentSheetOutside(event)">
+      <div class="comment-sheet" id="comment-sheet">
+        <div class="comment-sheet-handle"></div>
+        <div class="comment-sheet-header">
+          <div class="comment-sheet-title" id="comment-sheet-title">💬 Kommentare</div>
+          <button class="comment-sheet-close" onclick="_closeCommentSheet()">✕</button>
+        </div>
+        <div class="comment-list" id="comment-list"></div>
+        <div class="comment-input-row">
+          <div class="comment-my-avatar">👩‍🦱</div>
+          <input class="comment-input" id="comment-input" placeholder="Schreibe einen Kommentar…" maxlength="300" />
+          <button class="comment-send-btn" onclick="_sendComment()">📤</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Post Erstellen Modal ── -->
+    <div class="post-modal-overlay" id="post-modal-overlay" onclick="_closePostModalOutside(event)">
+      <div class="post-modal">
+        <div class="post-modal-handle"></div>
+        <div class="post-modal-title" id="post-modal-title">📤 Outfit posten</div>
+
+        <div class="post-modal-label">🖼️ BILD</div>
+        <div class="post-img-preview-wrap" id="post-img-preview-wrap">
+          <img id="post-img-preview" src="" alt="" />
+          <button class="post-img-remove-btn" onclick="_removePostImg()">✕</button>
+        </div>
+        <div class="post-img-row" id="post-img-btn-row">
+          <button class="post-img-btn" onclick="document.getElementById('post-camera-input').click()">📷 Foto aufnehmen</button>
+          <button class="post-img-btn" onclick="document.getElementById('post-gallery-input').click()">🖼️ Bild hochladen</button>
+        </div>
+        <input type="file" id="post-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="_handlePostImg(this)">
+        <input type="file" id="post-gallery-input" accept="image/*" style="display:none;" onchange="_handlePostImg(this)">
+
+        <div class="post-modal-label">✏️ CAPTION</div>
+        <textarea class="post-caption-input" id="post-caption" placeholder="Beschreibe deinen Look…" rows="3"></textarea>
+
+        <div class="post-modal-divider"></div>
+
+        <div class="post-modal-label">👥 SICHTBARKEIT</div>
+        <div class="post-vis-row">
+          <button class="post-vis-btn active" id="post-vis-friends" onclick="_selectPostVis('friends')">🔒 Nur Freunde</button>
+          <button class="post-vis-btn" id="post-vis-public" onclick="_selectPostVis('public')">🌍 Öffentlich</button>
+        </div>
+
+        <div class="post-modal-label">🏷️ OUTFIT TAGS</div>
+        <div class="post-tags-wrap" id="post-modal-tags"></div>
+
+        <div class="post-modal-actions">
+          <button class="post-modal-cancel" onclick="_closePostModal()">Abbrechen</button>
+          <button class="post-modal-confirm" id="post-modal-confirm-btn" onclick="_confirmPost()">📤 Posten</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /app -->
+
+  <!-- ═══════════ BOTTOM NAV ═══════════ -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" id="nav-schrank" onclick="navigate('schrank',this)">
+      <svg viewBox="0 0 24 24"><path d="M6.5 2h11l1.5 3H5L6.5 2z"/><rect x="2" y="5" width="20" height="16" rx="2"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="5" x2="12" y2="21"/></svg>
+      <span class="nav-label">Schrank</span>
+    </button>
+    <button class="nav-item" id="nav-scannen" onclick="navigate('scannen',this)">
+      <svg viewBox="0 0 24 24"><polyline points="16 4 20 4 20 8"/><polyline points="4 8 4 4 8 4"/><polyline points="8 20 4 20 4 16"/><polyline points="20 16 20 20 16 20"/></svg>
+      <span class="nav-label">Scannen</span>
+    </button>
+    <div class="nav-center" id="nav-ki" onclick="navigateCenter()">
+      <div class="nav-center-circle">
+        <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+      </div>
+      <span class="nav-label">KI Styling</span>
+    </div>
+    <button class="nav-item" id="nav-freunde" onclick="navigate('freunde',this)">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="nav-label">Feed</span>
+    </button>
+    <button class="nav-item" id="nav-profil" onclick="navigate('profil',this)">
+      <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span class="nav-label">Profil</span>
+    </button>
+  </nav>
+
+  <!-- KI Generator Modal -->
+  <div class="ki-modal-overlay" id="ki-modal-overlay" onclick="closeKiModalOutside(event)">
+    <div class="ki-modal-sheet">
+      <div class="ki-modal-handle"></div>
+      <div class="ki-modal-title">✨ Outfit generieren</div>
+      <div class="ki-modal-sub">Beschreibe deinen Wunsch oder lade ein Bild hoch</div>
+
+      <div class="ki-input-label">Beschreibung für die KI</div>
+      <textarea class="ki-textarea" id="ki-description" placeholder="z. B. Lässiges Outfit für einen Herbstspaziergang, warm aber stylisch…"></textarea>
+
+      <div class="ki-input-label">Inspo von anderen nutzen</div>
+      <div class="ki-ordner-row">
+        <div class="ki-ordner-chip" onclick="selectKiInspo(this)">
+          <div class="ki-ordner-chip-emoji">💡</div>
+          <div class="ki-ordner-chip-info">
+            <div class="ki-ordner-chip-name">Gespeicherte Inspos</div>
+            <div class="ki-ordner-chip-count">8 Outfits</div>
+          </div>
+        </div>
+        <div class="ki-ordner-chip" onclick="selectKiInspo(this)">
+          <div class="ki-ordner-chip-emoji">👩‍🦱</div>
+          <div class="ki-ordner-chip-info">
+            <div class="ki-ordner-chip-name">Lenas Looks</div>
+            <div class="ki-ordner-chip-count">3 gespeichert</div>
+          </div>
+        </div>
+        <div class="ki-ordner-chip" onclick="selectKiInspo(this)">
+          <div class="ki-ordner-chip-emoji">👩‍🦳</div>
+          <div class="ki-ordner-chip-info">
+            <div class="ki-ordner-chip-name">Laras Looks</div>
+            <div class="ki-ordner-chip-count">2 gespeichert</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ki-divider">
+        <div class="ki-divider-line"></div>
+        <div class="ki-divider-text">oder eigenes Bild hochladen</div>
+        <div class="ki-divider-line"></div>
+      </div>
+
+      <div class="ki-input-label">Inspiration hochladen (optional)</div>
+      <div class="ki-img-upload-wrap" id="ki-upload-wrap">
+        <div class="ki-img-upload" onclick="document.getElementById('ki-file-input').click()">
+          <div class="ki-img-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </div>
+          <div class="ki-img-text">
+            <div class="ki-img-title">Bild auswählen</div>
+            <div class="ki-img-sub">Foto, Screenshot oder Inspiration</div>
+          </div>
+        </div>
+      </div>
+      <div class="ki-img-preview-wrap" id="ki-preview-wrap">
+        <div class="ki-img-preview">
+          <img id="ki-preview-img" src="" alt="Vorschau" />
+          <button class="ki-img-remove" onclick="removeKiImage()">✕</button>
+        </div>
+      </div>
+      <input type="file" id="ki-file-input" accept="image/*" style="display:none" onchange="handleKiImage(event)" />
+
+      <button class="ki-generate-confirm" onclick="confirmKiGenerate()">
+        <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+        Outfit generieren
+      </button>
+    </div>
+  </div>
+
+  <!-- Ordner-Modal -->
+  <div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Neuen Ordner erstellen</div>
+      <input class="modal-input" id="modal-input" placeholder="z. B. Herbst Outfits…" maxlength="30" />
+      <div class="modal-emoji-row">
+        <div class="modal-emoji selected" onclick="selectEmoji(this)">🌸</div>
+        <div class="modal-emoji" onclick="selectEmoji(this)">☀️</div>
+        <div class="modal-emoji" onclick="selectEmoji(this)">🍂</div>
+        <div class="modal-emoji" onclick="selectEmoji(this)">❄️</div>
+        <div class="modal-emoji" onclick="selectEmoji(this)">💼</div>
+        <div class="modal-emoji" onclick="selectEmoji(this)">🎉</div>
+        <div class="modal-emoji" onclick="selectEmoji(this)">🏃</div>
+        <div class="modal-emoji" onclick="selectEmoji(this)">✨</div>
+        <div class="modal-emoji" onclick="selectEmoji(this)">👑</div>
+        <div class="modal-emoji" onclick="selectEmoji(this)">🌙</div>
+      </div>
+      <button class="modal-confirm" onclick="createOrdner()">Ordner erstellen</button>
+    </div>
+  </div>
+
+  <!-- Toast Benachrichtigung -->
+  <div id="ki-toast"></div>
+  <!-- Swipe-Delete Undo Toast -->
+  <div id="swipe-undo-toast"><span id="swipe-undo-text">Outfit gelöscht 🗑️</span><button id="swipe-undo-btn" onclick="_swipeUndo()">Rückgängig</button></div>
+
+  <!-- Speichern in Kollektion Modal -->
+  <div class="modal-overlay" id="save-modal-overlay" onclick="_closeSaveModalOutside(event)">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">In Kollektion speichern</div>
+      <div id="save-modal-list"></div>
+      <div id="save-new-input-wrap" style="display:none; margin-top:8px;">
+        <input class="modal-input" id="save-new-name" placeholder="Name der neuen Kollektion…" maxlength="30" />
+        <button class="modal-confirm" onclick="_confirmNewCollection()">Erstellen & Speichern</button>
+      </div>
+      <button id="save-new-toggle-btn" class="ordner-add-btn" style="width:100%;justify-content:center;padding:13px;border-radius:14px;font-size:14px;margin-top:4px;" onclick="_toggleNewCollectionInput()">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Neue Kollektion erstellen
+      </button>
+    </div>
+  </div>
+
+  <!-- Inspo speichern Modal -->
+  <div class="modal-overlay" id="inspo-modal-overlay" onclick="_closeInspoModalOutside(event)">
+    <div class="modal-sheet" style="max-height:85%;overflow-y:auto;scrollbar-width:none;">
+      <div class="modal-handle"></div>
+      <div class="modal-title">💡 Outfit als Inspo speichern</div>
+      <div id="inspo-modal-header"></div>
+      <div id="inspo-modal-list"></div>
+      <div id="inspo-new-input-wrap" style="display:none; margin-top:8px;">
+        <input class="modal-input" id="inspo-new-name" placeholder="Ordnername eingeben…" maxlength="30" onkeydown="if(event.key==='Enter')_confirmInspoNewFolder()" />
+        <button class="modal-confirm" onclick="_confirmInspoNewFolder()">Erstellen & Speichern</button>
+      </div>
+      <button id="inspo-new-toggle-btn" class="ordner-add-btn" style="width:100%;justify-content:center;padding:13px;border-radius:14px;font-size:14px;margin-top:4px;" onclick="_toggleInspoNewFolder()">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Neuen Ordner erstellen
+      </button>
+      <div class="inspo-modal-actions">
+        <button class="inspo-modal-cancel" onclick="_closeInspoModal()">Abbrechen</button>
+        <button class="inspo-modal-save" onclick="_confirmInspoSave()">💾 Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scan-Overlay (KI-Verarbeitung) -->
+  <div id="scan-overlay">
+    <!-- Lade-Zustand -->
+    <div id="scan-loading">
+      <div class="ai-spin">✨</div>
+      <div class="ai-load-title" id="scan-loading-text">KI analysiert…</div>
+      <div class="ai-load-sub">Bitte warte einen Moment</div>
+    </div>
+
+    <!-- Ergebnis-Zustand -->
+    <div id="scan-result">
+      <img id="scan-result-img" src="" alt="Kleidungsstück" />
+      <div id="scan-result-info">
+
+        <div class="scan-field-row">
+          <label class="scan-field-label">Name</label>
+          <input class="scan-field-input" id="scan-edit-name" type="text" placeholder="z. B. Weißes T-Shirt" />
+        </div>
+
+        <div class="scan-field-row">
+          <label class="scan-field-label">Marke</label>
+          <input class="scan-field-input" id="scan-edit-brand" type="text" placeholder="Nicht erkannt" />
+        </div>
+
+        <div class="scan-field-row">
+          <label class="scan-field-label">Kategorie</label>
+          <input class="scan-field-input" id="scan-edit-type" type="text" placeholder="z. B. Top, Hose, Jacke" />
+        </div>
+
+        <div class="scan-field-row">
+          <label class="scan-field-label">Farbe</label>
+          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+            <div id="scan-result-color-dot" style="width:14px;height:14px;border-radius:50%;background:#888;flex-shrink:0;border:1px solid #ddd;"></div>
+            <input class="scan-field-input" id="scan-edit-color" type="text" placeholder="z. B. Weiß" style="flex:1;" />
+          </div>
+        </div>
+
+        <div class="scan-field-row">
+          <label class="scan-field-label">Saison</label>
+          <select class="scan-field-input" id="scan-edit-season">
+            <option value="Sommer|s-sommer">☀️ Sommer</option>
+            <option value="Winter|s-winter">❄️ Winter</option>
+            <option value="Frühling|s-fruhjahr">🌸 Frühling</option>
+            <option value="Ganzjährig|s-ganzjahrig" selected>🍃 Ganzjährig</option>
+          </select>
+        </div>
+
+        <div class="scan-field-row">
+          <label class="scan-field-label">Stil</label>
+          <input class="scan-field-input" id="scan-edit-style" type="text" placeholder="z. B. Casual, Business" />
+        </div>
+
+      </div>
+      <div class="scan-result-btns">
+        <button class="scan-cancel-btn" onclick="cancelScan()">Abbrechen</button>
+        <button class="scan-confirm-btn" onclick="confirmScanItem()">✓ Speichern</button>
+      </div>
+    </div>
+
+    <!-- Fehler-Zustand -->
+    <div id="scan-error">
+      <div style="font-size:52px;">❌</div>
+      <div style="font-size:18px;font-weight:800;color:var(--text);">Fehler</div>
+      <div id="scan-error-text"></div>
+      <button class="scan-retry-btn" onclick="cancelScan();document.getElementById('scan-gallery-input').click()">Erneut versuchen</button>
+      <button class="scan-cancel2-btn" onclick="cancelScan()">Abbrechen</button>
+    </div>
+  </div>
+
+  <!-- ── Streak Reminder Banner ── -->
+  <div id="streak-reminder">
+    <div class="reminder-text">🔥 Dein Streak ist in Gefahr!<br>Poste heute noch dein OOTD!</div>
+    <button class="reminder-post-btn" onclick="_closeStreakReminder();document.getElementById('nav-profil').click();setTimeout(_openNewPostModal,300)">Jetzt posten</button>
+    <button class="reminder-close-btn" onclick="_closeStreakReminder()">✕</button>
+  </div>
+
+  <!-- ── Streak Detail Panel ── -->
+  <div class="streak-detail-panel" id="streak-detail-panel">
+    <div class="sdp-header">
+      <button class="sdp-back" onclick="_closeStreakPanel()">←</button>
+      <div class="sdp-header-title">🔥 Mein Streak</div>
+    </div>
+    <div class="sdp-scroll" id="sdp-scroll"></div>
+  </div>
+
+  <!-- ── Milestone Modal ── -->
+  <div class="milestone-overlay" id="milestone-overlay" onclick="if(event.target===this)_closeMilestone()">
+    <div class="milestone-card">
+      <span class="milestone-emoji" id="milestone-emoji">🔥</span>
+      <div class="milestone-days" id="milestone-days">7</div>
+      <div class="milestone-title" id="milestone-title">Eine Woche!</div>
+      <div class="milestone-sub" id="milestone-sub">Du hast 7 Tage am Stück gepostet. Weiter so!</div>
+      <button class="milestone-btn" onclick="_closeMilestone()">🔥 Weiter so!</button>
+    </div>
+  </div>
+
+  <!-- Versteckte Datei-Inputs -->
+  <input type="file" id="scan-camera-input" accept="image/*" capture="environment" style="display:none"
+         onchange="processScanFile(this.files[0]);this.value=''" />
+  <input type="file" id="scan-gallery-input" accept="image/*" style="display:none"
+         onchange="processScanFile(this.files[0]);this.value=''" />
+
+  <!-- ═══════════ FREUNDES-PROFIL PANEL ═══════════ -->
+  <div class="friend-profile-panel" id="friend-profile-panel">
+    <div class="fp-hero">
+      <button class="fp-back" onclick="_closeFriendProfile()">←</button>
+      <div class="fp-identity">
+        <div class="fp-avatar" id="fp-avatar" style="background:rgba(255,255,255,0.25);">👩‍🦰</div>
+        <div>
+          <div class="fp-name" id="fp-name">Sophie K.</div>
+          <div class="fp-handle" id="fp-handle">@sophiestyle</div>
+        </div>
+      </div>
+    </div>
+    <div class="fp-scroll">
+      <div class="fp-stats">
+        <div class="fp-stat"><div class="fpnum" id="fp-stat-artikel">24</div><div class="fplbl">Artikel</div></div>
+        <div class="fp-stat"><div class="fpnum" id="fp-stat-outfits">15</div><div class="fplbl">Outfits</div></div>
+        <div class="fp-stat"><div class="fpnum" id="fp-stat-follower">412</div><div class="fplbl">Follower</div></div>
+        <div class="fp-stat"><div class="fpnum" id="fp-stat-posts">8</div><div class="fplbl">Posts</div></div>
+      </div>
+      <div class="fp-actions">
+        <button class="fp-follow-btn not-following" id="fp-follow-btn" onclick="_toggleFollow()">➕ Folgen</button>
+        <button class="fp-msg-btn" onclick="_showToast('💬 Nachrichten kommen bald!')">💬</button>
+      </div>
+      <div class="fp-tabs">
+        <button class="fp-tab active" id="fp-tab-posts" onclick="_switchFriendTab('posts')">📤 Posts</button>
+        <button class="fp-tab" id="fp-tab-schrank" onclick="_switchFriendTab('schrank')">🧥 Schrank</button>
+      </div>
+      <!-- Posts Tab -->
+      <div id="fp-content-posts">
+        <div class="fp-posts-grid" id="fp-posts-grid"></div>
+        <div id="fp-private-posts-msg"></div>
+      </div>
+      <!-- Schrank Tab -->
+      <div id="fp-content-schrank" style="display:none;">
+        <div class="fp-wardrobe-filters" id="fp-wardrobe-filters">
+          <div class="fp-filter-pill active" data-fp-filter="alle">Alle</div>
+          <div class="fp-filter-pill" data-fp-filter="top">👕 Tops</div>
+          <div class="fp-filter-pill" data-fp-filter="hose">👖 Hosen</div>
+          <div class="fp-filter-pill" data-fp-filter="schuhe">👟 Schuhe</div>
+          <div class="fp-filter-pill" data-fp-filter="kleid">👗 Kleider</div>
+          <div class="fp-filter-pill" data-fp-filter="jacke">🧥 Jacken</div>
+        </div>
+        <div id="fp-schrank-content"></div>
+      </div>
+    </div>
+    <!-- KI Vergleich Sub-Panel -->
+    <div class="fp-ki-panel" id="fp-ki-panel">
+      <div class="fp-ki-header">
+        <button class="settings-back" onclick="_closeFriendKI()">←</button>
+        <div class="settings-title">🤖 KI Vergleich</div>
+      </div>
+      <div class="fp-ki-scroll" id="fp-ki-scroll"></div>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+<script>
+  const screens = ['schrank','scannen','ki-styling','freunde','profil'];
+  const navIds  = ['nav-schrank','nav-scannen','nav-ki','nav-freunde','nav-profil'];
+
+  function navigate(id, btn) {
+    screens.forEach(s => document.getElementById(s).classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.nav-item, .nav-center').forEach(n => n.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+  }
+
+  function navigateCenter() {
+    screens.forEach(s => document.getElementById(s).classList.remove('active'));
+    document.getElementById('ki-styling').classList.add('active');
+    document.querySelectorAll('.nav-item, .nav-center').forEach(n => n.classList.remove('active'));
+    document.getElementById('nav-ki').classList.add('active');
+  }
+
+  // Kategorie-Label für Untertitel und Leerzustand
+  var _filterLabels = {
+    alle: 'Artikel', tops: 'Tops', hosen: 'Hosen',
+    kleider: 'Kleider', schuhe: 'Schuhe', accessoires: 'Accessoires'
+  };
+
+  function filterChip(el) {
+    // Aktive Klasse umschalten
+    document.querySelectorAll('.chip-row .chip').forEach(function(c) { c.classList.remove('active'); });
+    el.classList.add('active');
+
+    var filter = el.getAttribute('data-filter') || 'alle';
+    var grid = document.getElementById('clothes-grid');
+    if (!grid) return;
+
+    // Leerzustand entfernen
+    var emptyEl = document.getElementById('wardrobe-filter-empty');
+    if (emptyEl) emptyEl.remove();
+
+    // Karten filtern
+    var cards = grid.querySelectorAll('.cloth-card');
+    var visible = 0;
+    cards.forEach(function(card) {
+      var cat = card.getAttribute('data-category') || 'tops';
+      var show = filter === 'alle' || cat === filter;
+      card.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+
+    // Untertitel aktualisieren
+    var sub = document.querySelector('#schrank .big-sub');
+    if (sub) sub.textContent = visible + ' ' + (_filterLabels[filter] || 'Artikel');
+
+    // Leerzustand anzeigen
+    if (visible === 0) {
+      var label = _filterLabels[filter] || filter;
+      emptyEl = document.createElement('div');
+      emptyEl.id = 'wardrobe-filter-empty';
+      emptyEl.style.cssText = 'grid-column:1/-1;text-align:center;padding:40px 16px 16px;';
+      emptyEl.innerHTML = '<div style="font-size:40px;">🧺</div>'
+        + '<div style="font-size:15px;font-weight:700;color:var(--text2);margin-top:12px;">Noch keine ' + label + ' vorhanden</div>'
+        + '<button onclick="navigate(\'scannen\', document.getElementById(\'nav-scannen\'))" '
+        + 'style="margin-top:16px;background:var(--purple);color:white;border:none;border-radius:14px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">+ Hinzufügen</button>';
+      grid.appendChild(emptyEl);
+    }
+  }
+
+  // Untertitel nach Scan-Import aktualisieren (wird aus ai.js aufgerufen)
+  function _updateWardrobeSubtitle() {
+    var q = (document.getElementById('schrank-search') || {}).value || '';
+    if (q.trim()) { _schrankSearch(q); return; }
+    var activeChip = document.querySelector('.chip-row .chip.active');
+    if (activeChip) filterChip(activeChip);
+  }
+
+  // Erweiterter Suchtext je Kategorie (für "Schuh" → findet schuhe-Karten)
+  var _catSearchText = {
+    tops: 'top tops shirt hemd bluse pullover jacke hoodie oberteil',
+    hosen: 'hose hosen jeans chino jogginghose shorts rock',
+    kleider: 'kleid kleider dress',
+    schuhe: 'schuh schuhe sneaker stiefel sandalen boot pumps',
+    accessoires: 'accessoire accessoires sonnenbrille brille uhr tasche schal schmuck'
+  };
+
+  function _schrankSearch(query) {
+    var q = query.trim().toLowerCase();
+    var grid = document.getElementById('clothes-grid');
+    var clearBtn = document.getElementById('schrank-search-clear');
+    var sub = document.querySelector('#schrank .big-sub');
+    if (!grid) return;
+
+    // X-Button zeigen/verstecken
+    if (clearBtn) clearBtn.style.display = q ? 'flex' : 'none';
+
+    // Alten Leerzustand entfernen
+    ['wardrobe-filter-empty', 'wardrobe-search-empty'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.remove();
+    });
+
+    if (!q) {
+      // Suche leer → aktiven Chip-Filter anwenden
+      var activeChip = document.querySelector('.chip-row .chip.active');
+      if (activeChip) filterChip(activeChip);
+      return;
+    }
+
+    // Wörter der Suchanfrage (alle müssen matchen)
+    var words = q.split(/\s+/).filter(Boolean);
+
+    var visible = 0;
+    grid.querySelectorAll('.cloth-card').forEach(function(card) {
+      var cat = card.getAttribute('data-category') || '';
+      var searchText = [
+        (card.querySelector('.cloth-name')?.textContent || '').toLowerCase(),
+        (card.querySelector('.cloth-color-name')?.textContent || '').toLowerCase(),
+        (card.querySelector('.season-tag')?.textContent || '').toLowerCase(),
+        cat,
+        (_catSearchText[cat] || '')
+      ].join(' ');
+
+      var matches = words.every(function(w) { return searchText.includes(w); });
+      card.style.display = matches ? '' : 'none';
+      if (matches) visible++;
+    });
+
+    // Untertitel
+    if (sub) {
+      sub.textContent = visible === 0
+        ? 'Keine Ergebnisse'
+        : visible + ' Ergebnis' + (visible !== 1 ? 'se' : '') + ' für „' + query.trim() + '"';
+    }
+
+    // Leerzustand
+    if (visible === 0) {
+      var emptyEl = document.createElement('div');
+      emptyEl.id = 'wardrobe-search-empty';
+      emptyEl.style.cssText = 'grid-column:1/-1;text-align:center;padding:40px 16px 16px;';
+      emptyEl.innerHTML = '<div style="font-size:44px;">🔍</div>'
+        + '<div style="font-size:15px;font-weight:700;color:var(--text);margin-top:12px;">Nichts gefunden</div>'
+        + '<div style="font-size:13px;color:var(--text2);margin-top:6px;">Versuche einen anderen Begriff</div>';
+      grid.appendChild(emptyEl);
+    }
+  }
+
+  function _clearSchrankSearch() {
+    var input = document.getElementById('schrank-search');
+    if (input) { input.value = ''; input.focus(); }
+    var clearBtn = document.getElementById('schrank-search-clear');
+    if (clearBtn) clearBtn.style.display = 'none';
+    // Chip-Filter wiederherstellen
+    var activeChip = document.querySelector('.chip-row .chip.active');
+    if (activeChip) filterChip(activeChip);
+  }
+
+  function toggleKiKollektionen() {
+    const list = document.getElementById('ki-kollektionen-list');
+    const arrow = document.getElementById('ki-kollektionen-arrow');
+    const open = list.style.display === 'none';
+    list.style.display = open ? 'flex' : 'none';
+    arrow.classList.toggle('open', open);
+  }
+
+  function selectKiOrdner(el, btnId) {
+    el.closest('.ki-ordner-dropdown').querySelectorAll('.ki-ordner-chip').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    const name = el.querySelector('.ki-ordner-chip-name').textContent;
+    const emoji = el.querySelector('.ki-ordner-chip-emoji').textContent;
+    const btn = document.getElementById(btnId);
+    btn.classList.add('selected');
+    btn.querySelector('.ki-source-sub').textContent = emoji + ' ' + name + ' ausgewählt';
+    document.getElementById('ki-kollektionen-list').style.display = 'none';
+    document.getElementById('ki-kollektionen-arrow').classList.remove('open');
+  }
+  function selectKiInspo(el) {
+    const row = el.closest('.ki-ordner-row');
+    row.querySelectorAll('.ki-ordner-chip').forEach(c => c.classList.remove('selected'));
+    el.classList.toggle('selected');
+  }
+
+  function openKiModal() {
+    document.getElementById('ki-description').value = '';
+    removeKiImage();
+    document.getElementById('ki-modal-overlay').classList.add('open');
+  }
+  function closeKiModalOutside(e) {
+    if (e.target === document.getElementById('ki-modal-overlay')) closeKiModal();
+  }
+  function closeKiModal() {
+    document.getElementById('ki-modal-overlay').classList.remove('open');
+  }
+  function handleKiImage(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('ki-preview-img').src = ev.target.result;
+      document.getElementById('ki-upload-wrap').style.display = 'none';
+      document.getElementById('ki-preview-wrap').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+  function removeKiImage() {
+    document.getElementById('ki-preview-img').src = '';
+    document.getElementById('ki-file-input').value = '';
+    document.getElementById('ki-upload-wrap').style.display = 'block';
+    document.getElementById('ki-preview-wrap').style.display = 'none';
+  }
+  function confirmKiGenerate() {
+    closeKiModal();
+  }
+
+  function openModal() {
+    document.getElementById('modal-input').value = '';
+    document.querySelectorAll('.modal-emoji').forEach((e,i) => e.classList.toggle('selected', i===0));
+    document.getElementById('modal-overlay').classList.add('open');
+    setTimeout(() => document.getElementById('modal-input').focus(), 100);
+  }
+
+  function closeModalOutside(e) {
+    if (e.target === document.getElementById('modal-overlay')) closeModal();
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+
+  function selectEmoji(el) {
+    document.querySelectorAll('.modal-emoji').forEach(e => e.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  function createOrdner() {
+    const name = document.getElementById('modal-input').value.trim();
+    if (!name) { document.getElementById('modal-input').focus(); return; }
+    const emoji = document.querySelector('.modal-emoji.selected')?.textContent || '📁';
+    const grid = document.getElementById('ordner-grid');
+    const newBtn = grid.querySelector('.ordner-new');
+    const card = document.createElement('div');
+    card.className = 'ordner-card';
+    card.innerHTML = `
+      <div class="ordner-preview">
+        <div class="ordner-preview-cell" style="grid-column:1/-1;grid-row:1/-1;font-size:36px;">${emoji}</div>
+      </div>
+      <div class="ordner-info">
+        <div class="ordner-name">${emoji} ${name}</div>
+        <div class="ordner-count">0 Outfits</div>
+      </div>`;
+    grid.insertBefore(card, newBtn);
+    closeModal();
+  }
+
+  function switchTab(id, btn) {
+    document.querySelectorAll('.tab-pill').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + id).classList.add('active');
+  }
+
+  // clock
+  function tick() {
+    const n = new Date();
+    document.getElementById('clock').textContent =
+      String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+  }
+  tick(); setInterval(tick, 30000);
+</script>
+<script src="/ai.js" defer></script>
+</body>
+</html>

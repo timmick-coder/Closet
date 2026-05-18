@@ -1,0 +1,11 @@
+{
+  "appId": "com.timseefried.stylesync",
+  "appName": "StyleSync",
+  "webDir": ".",
+  "server": {
+    "androidScheme": "https"
+  },
+  "ios": {
+    "contentInset": "automatic"
+  }
+}
