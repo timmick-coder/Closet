@@ -46,6 +46,24 @@
       box-shadow: 0 30px 80px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(255,255,255,0.1);
     }
 
+    /* ── Vollbild auf echtem Handy / PWA ── */
+    @media (max-width: 500px), (display-mode: standalone) {
+      html, body {
+        background: var(--bg);
+        display: block;
+        overflow: hidden;
+        height: 100dvh;
+      }
+      #phone {
+        width: 100vw;
+        height: 100dvh;
+        border-radius: 0;
+        box-shadow: none;
+        position: fixed;
+        top: 0; left: 0;
+      }
+    }
+
     .status-bar {
       height: 44px; background: transparent;
       display: flex; align-items: center; justify-content: space-between;
