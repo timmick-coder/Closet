@@ -89,10 +89,7 @@ async function analyzeClothingWithGemini(base64, mimeType) {
 // ── @imgly/background-removal: Hintergrund entfernen (kostenlos, im Browser) ──
 var _rembgModule = null;
 var _rembgModelLoaded = false;
-// esm.sh wandelt npm-Pakete zuverlässig in Browser-ESM um
 var _REMBG_CDN = 'https://esm.sh/@imgly/background-removal';
-// Modell-Dateien (ONNX/WASM) kommen vom jsDelivr CDN mit CORS-Support
-var _REMBG_PATH = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal/dist/';
 
 async function _loadRembgModule() {
   if (!_rembgModule) {
@@ -118,11 +115,8 @@ async function removeBackground(base64, mimeType) {
     for (var i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i);
     var inputBlob = new Blob([bytes], { type: mimeType || 'image/jpeg' });
 
-    // Hintergrund entfernen — gibt PNG-Blob mit transparentem Hintergrund zurück
-    var resultBlob = await lib.removeBackground(inputBlob, {
-      publicPath: _REMBG_PATH,
-      debug: false
-    });
+    // Hintergrund entfernen — Library holt Modell-Dateien selbst von ihrem CDN
+    var resultBlob = await lib.removeBackground(inputBlob);
 
     _rembgModelLoaded = true;
 
@@ -134,9 +128,9 @@ async function removeBackground(base64, mimeType) {
     });
   } catch (e) {
     console.error('[rembg] Fehler:', e.message, e);
-    // Fallback: Originalbild wird ohne Hintergrundentfernung verwendet
-    showScanOverlay('loading', { text: '⚠️ Hintergrundentfernung übersprungen – Original wird verwendet' });
-    await new Promise(function(r) { setTimeout(r, 900); });
+    var errMsg = (e && e.message) ? e.message.slice(0, 80) : 'Unbekannter Fehler';
+    showScanOverlay('loading', { text: '⚠️ rembg Fehler: ' + errMsg });
+    await new Promise(function(r) { setTimeout(r, 2500); });
     return 'data:' + (mimeType || 'image/jpeg') + ';base64,' + base64;
   }
 }
