@@ -121,9 +121,15 @@ async function removeBackground(base64, mimeType) {
       body: JSON.stringify({ base64: base64, mimeType: mimeType })
     });
     const data = await res.json();
-    if (data.skipped || !data.base64) return 'data:' + mimeType + ';base64,' + base64;
+    if (data.skipped || !data.base64) {
+      console.warn('[removebg] Übersprungen:', data.reason || 'unbekannt');
+      showScanOverlay('loading', { text: '⚠️ Hintergrund konnte nicht entfernt werden – Original wird verwendet' });
+      await new Promise(function(r) { setTimeout(r, 1200); });
+      return 'data:' + mimeType + ';base64,' + base64;
+    }
     return 'data:' + (data.mimeType || 'image/png') + ';base64,' + data.base64;
   } catch (e) {
+    console.error('[removebg] Netzwerkfehler:', e.message);
     return 'data:' + mimeType + ';base64,' + base64;
   }
 }
@@ -431,19 +437,24 @@ function _recropImage() {
 async function _processCroppedImage(base64, mimeType) {
   var origDataUrl = (_cropState && _cropState._lastOriginalDataUrl) || ('data:' + mimeType + ';base64,' + base64);
   try {
-    showScanOverlay('loading', { text: '🗜️ Bild wird optimiert…' });
+    showScanOverlay('loading', { text: '📸 Foto wird hochgeladen…' });
     var compressed = await _compressImage(base64, mimeType);
     base64 = compressed.base64;
     mimeType = compressed.mimeType;
 
-    showScanOverlay('loading', { text: '🔍 KI analysiert dein Kleidungsstück…' });
-    var analysis = await analyzeClothingWithGemini(base64, mimeType);
     showScanOverlay('loading', { text: '✂️ Hintergrund wird entfernt…' });
     var imageDataUrl = await removeBackground(base64, mimeType);
+
+    showScanOverlay('loading', { text: '🔍 KI erkennt Kleidungsstück…' });
+    // KI analysiert das Originalbild (bessere Erkennung durch Farb-/Texturinfos)
+    var analysis = await analyzeClothingWithGemini(base64, mimeType);
+    showScanOverlay('loading', { text: '✅ Fertig!' });
     _scanResult = Object.assign({}, analysis, {
       imageDataUrl: imageDataUrl,
       _origDataUrl: origDataUrl
     });
+    // Kurze Pause damit "Fertig!" sichtbar ist
+    await new Promise(function(r) { setTimeout(r, 600); });
     showScanOverlay('result', _scanResult);
   } catch (err) {
     showScanOverlay('error', { text: err.message || 'KI-Analyse fehlgeschlagen.' });
