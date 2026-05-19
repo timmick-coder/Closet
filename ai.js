@@ -132,6 +132,295 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
   catch { throw new Error('KI hat keine verwertbaren Outfits geliefert. Bitte erneut versuchen.'); }
 }
 
+// ── Crop Screen ───────────────────────────────────────────────────────────────
+var _cropState = null;
+var _cropDragState = null;
+var _cropMoveListenersAdded = false;
+
+function _openCropScreen(imageDataUrl, mimeType) {
+  _cropState = {
+    imageDataUrl: imageDataUrl,
+    mimeType: mimeType || 'image/jpeg',
+    rotation: 0,
+    mirrored: false,
+    cropRect: null
+  };
+  var screen = document.getElementById('crop-screen');
+  if (screen) screen.classList.add('active');
+  // Wait for DOM to render before sizing canvas
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      _initCropCanvas();
+    });
+  });
+}
+
+function _closeCropScreen() {
+  var screen = document.getElementById('crop-screen');
+  if (screen) screen.classList.remove('active');
+  _cropDragState = null;
+}
+
+function _initCropCanvas() {
+  if (!_cropState) return;
+  var img = new Image();
+  img.onload = function() {
+    _cropState.img = img;
+    _cropDrawAll();
+    _initCropDrag();
+  };
+  img.src = _cropState.imageDataUrl;
+}
+
+function _cropSizeCanvas() {
+  var canvas = document.getElementById('crop-canvas');
+  var wrap = document.getElementById('crop-canvas-wrap');
+  if (!canvas || !wrap || !_cropState || !_cropState.img) return;
+  var img = _cropState.img;
+  var rot = _cropState.rotation;
+  var isRotated = rot % 180 !== 0;
+  var imgW = isRotated ? img.naturalHeight : img.naturalWidth;
+  var imgH = isRotated ? img.naturalWidth : img.naturalHeight;
+  var maxW = wrap.clientWidth - 20;
+  var maxH = wrap.clientHeight - 20;
+  var scale = Math.min(maxW / imgW, maxH / imgH, 1);
+  canvas.width = Math.round(imgW * scale);
+  canvas.height = Math.round(imgH * scale);
+  _cropState.dispScale = scale;
+}
+
+function _cropDrawAll() {
+  var canvas = document.getElementById('crop-canvas');
+  if (!canvas || !_cropState || !_cropState.img) return;
+  _cropSizeCanvas();
+  var ctx = canvas.getContext('2d');
+  var cw = canvas.width;
+  var ch = canvas.height;
+  var img = _cropState.img;
+  var rot = _cropState.rotation;
+  var isRotated = rot % 180 !== 0;
+
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.save();
+  ctx.translate(cw / 2, ch / 2);
+  ctx.rotate(rot * Math.PI / 180);
+  if (_cropState.mirrored) ctx.scale(-1, 1);
+  var dw = isRotated ? ch : cw;
+  var dh = isRotated ? cw : ch;
+  ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+  ctx.restore();
+
+  // Init crop rect
+  if (!_cropState.cropRect) {
+    var pad = Math.round(Math.min(cw, ch) * 0.08);
+    _cropState.cropRect = { x: pad, y: pad, w: cw - pad * 2, h: ch - pad * 2 };
+  }
+  var cr = _cropState.cropRect;
+
+  // Dark overlay outside crop rect
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, cw, cr.y);
+  ctx.fillRect(0, cr.y + cr.h, cw, ch - cr.y - cr.h);
+  ctx.fillRect(0, cr.y, cr.x, cr.h);
+  ctx.fillRect(cr.x + cr.w, cr.y, cw - cr.x - cr.w, cr.h);
+
+  // Crop border
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(cr.x, cr.y, cr.w, cr.h);
+
+  // Rule of thirds grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cr.x + cr.w / 3, cr.y); ctx.lineTo(cr.x + cr.w / 3, cr.y + cr.h);
+  ctx.moveTo(cr.x + cr.w * 2 / 3, cr.y); ctx.lineTo(cr.x + cr.w * 2 / 3, cr.y + cr.h);
+  ctx.moveTo(cr.x, cr.y + cr.h / 3); ctx.lineTo(cr.x + cr.w, cr.y + cr.h / 3);
+  ctx.moveTo(cr.x, cr.y + cr.h * 2 / 3); ctx.lineTo(cr.x + cr.w, cr.y + cr.h * 2 / 3);
+  ctx.stroke();
+
+  // Corner handles
+  var hs = 12;
+  ctx.fillStyle = 'white';
+  [[cr.x, cr.y], [cr.x + cr.w, cr.y], [cr.x, cr.y + cr.h], [cr.x + cr.w, cr.y + cr.h]].forEach(function(c) {
+    ctx.fillRect(c[0] - hs / 2, c[1] - hs / 2, hs, hs);
+  });
+
+  // Corner L-shapes (stylistic)
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  var ls = 18;
+  [[cr.x, cr.y, 1, 1], [cr.x + cr.w, cr.y, -1, 1], [cr.x, cr.y + cr.h, 1, -1], [cr.x + cr.w, cr.y + cr.h, -1, -1]].forEach(function(c) {
+    ctx.beginPath();
+    ctx.moveTo(c[0] + c[2] * ls, c[1]);
+    ctx.lineTo(c[0], c[1]);
+    ctx.lineTo(c[0], c[1] + c[3] * ls);
+    ctx.stroke();
+  });
+}
+
+function _cropGetCanvasPos(e) {
+  var canvas = document.getElementById('crop-canvas');
+  var rect = canvas.getBoundingClientRect();
+  var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return {
+    x: (clientX - rect.left) * (canvas.width / rect.width),
+    y: (clientY - rect.top) * (canvas.height / rect.height)
+  };
+}
+
+function _cropHitTest(pos) {
+  if (!_cropState || !_cropState.cropRect) return null;
+  var cr = _cropState.cropRect;
+  var hit = 24;
+  var corners = [
+    { name: 'tl', x: cr.x, y: cr.y },
+    { name: 'tr', x: cr.x + cr.w, y: cr.y },
+    { name: 'bl', x: cr.x, y: cr.y + cr.h },
+    { name: 'br', x: cr.x + cr.w, y: cr.y + cr.h }
+  ];
+  for (var i = 0; i < corners.length; i++) {
+    if (Math.abs(pos.x - corners[i].x) < hit && Math.abs(pos.y - corners[i].y) < hit) {
+      return corners[i].name;
+    }
+  }
+  if (pos.x > cr.x + hit && pos.x < cr.x + cr.w - hit && pos.y > cr.y + hit && pos.y < cr.y + cr.h - hit) {
+    return 'move';
+  }
+  return null;
+}
+
+function _initCropDrag() {
+  var canvas = document.getElementById('crop-canvas');
+  if (!canvas) return;
+
+  function onStart(e) {
+    e.preventDefault();
+    var pos = _cropGetCanvasPos(e);
+    var handle = _cropHitTest(pos);
+    if (!handle) return;
+    _cropDragState = { handle: handle, startX: pos.x, startY: pos.y, startRect: Object.assign({}, _cropState.cropRect) };
+  }
+
+  function onMove(e) {
+    if (!_cropDragState || !_cropState) return;
+    e.preventDefault();
+    var pos = _cropGetCanvasPos(e);
+    var dx = pos.x - _cropDragState.startX;
+    var dy = pos.y - _cropDragState.startY;
+    var sr = _cropDragState.startRect;
+    var cr = _cropState.cropRect;
+    var cw = document.getElementById('crop-canvas').width;
+    var ch = document.getElementById('crop-canvas').height;
+    var min = 50;
+    if (_cropDragState.handle === 'move') {
+      cr.x = Math.max(0, Math.min(cw - cr.w, sr.x + dx));
+      cr.y = Math.max(0, Math.min(ch - cr.h, sr.y + dy));
+    } else {
+      var nx = sr.x, ny = sr.y, nw = sr.w, nh = sr.h;
+      if (_cropDragState.handle === 'tl') {
+        nx = Math.max(0, Math.min(sr.x + sr.w - min, sr.x + dx));
+        ny = Math.max(0, Math.min(sr.y + sr.h - min, sr.y + dy));
+        nw = sr.w - (nx - sr.x); nh = sr.h - (ny - sr.y);
+      } else if (_cropDragState.handle === 'tr') {
+        ny = Math.max(0, Math.min(sr.y + sr.h - min, sr.y + dy));
+        nw = Math.max(min, Math.min(cw - sr.x, sr.w + dx));
+        nh = sr.h - (ny - sr.y);
+      } else if (_cropDragState.handle === 'bl') {
+        nx = Math.max(0, Math.min(sr.x + sr.w - min, sr.x + dx));
+        nw = sr.w - (nx - sr.x);
+        nh = Math.max(min, Math.min(ch - sr.y, sr.h + dy));
+      } else if (_cropDragState.handle === 'br') {
+        nw = Math.max(min, Math.min(cw - sr.x, sr.w + dx));
+        nh = Math.max(min, Math.min(ch - sr.y, sr.h + dy));
+      }
+      cr.x = nx; cr.y = ny; cr.w = nw; cr.h = nh;
+    }
+    _cropDrawAll();
+  }
+
+  function onEnd() { _cropDragState = null; }
+
+  // Clean up old listeners by cloning
+  var newCanvas = canvas.cloneNode(true);
+  canvas.parentNode.replaceChild(newCanvas, canvas);
+  newCanvas.addEventListener('mousedown', onStart);
+  newCanvas.addEventListener('touchstart', onStart, { passive: false });
+
+  if (!_cropMoveListenersAdded) {
+    _cropMoveListenersAdded = true;
+    document.addEventListener('mousemove', function(e) { if (_cropDragState) onMove(e); });
+    document.addEventListener('touchmove', function(e) { if (_cropDragState) onMove(e); }, { passive: false });
+    document.addEventListener('mouseup', onEnd);
+    document.addEventListener('touchend', onEnd);
+  }
+}
+
+function _cropRotate() {
+  if (!_cropState) return;
+  _cropState.rotation = (_cropState.rotation + 90) % 360;
+  _cropState.cropRect = null;
+  _cropDrawAll();
+  _initCropDrag();
+}
+
+function _cropMirror() {
+  if (!_cropState) return;
+  _cropState.mirrored = !_cropState.mirrored;
+  _cropDrawAll();
+}
+
+async function _cropAndContinue() {
+  if (!_cropState) return;
+  var canvas = document.getElementById('crop-canvas');
+  if (!canvas) return;
+  var cr = _cropState.cropRect || { x: 0, y: 0, w: canvas.width, h: canvas.height };
+  var out = document.createElement('canvas');
+  out.width = Math.round(cr.w);
+  out.height = Math.round(cr.h);
+  var ctx = out.getContext('2d');
+  ctx.drawImage(canvas, Math.round(cr.x), Math.round(cr.y), Math.round(cr.w), Math.round(cr.h), 0, 0, out.width, out.height);
+  var dataUrl = out.toDataURL('image/jpeg', 0.92);
+  var base64 = dataUrl.split(',')[1];
+  // Store original dataUrl for re-crop
+  _cropState._lastOriginalDataUrl = _cropState.imageDataUrl;
+  _cropState._lastMimeType = _cropState.mimeType;
+  _closeCropScreen();
+  await _processCroppedImage(base64, 'image/jpeg');
+}
+
+function _recropImage() {
+  // Re-open crop screen with original image
+  var origUrl = (_cropState && _cropState._lastOriginalDataUrl) || (_scanResult && _scanResult._origDataUrl);
+  var origMime = (_cropState && _cropState._lastMimeType) || 'image/jpeg';
+  if (!origUrl) return;
+  hideScanOverlay();
+  _openCropScreen(origUrl, origMime);
+}
+
+async function _processCroppedImage(base64, mimeType) {
+  // Store originals for re-crop
+  if (_cropState) {
+    _cropState._processedBase64 = base64;
+    _cropState._processedMime = mimeType;
+  }
+  try {
+    showScanOverlay('loading', { text: '🔍 KI analysiert dein Kleidungsstück…' });
+    var analysis = await analyzeClothingWithGemini(base64, mimeType);
+    showScanOverlay('loading', { text: '✂️ Hintergrund wird entfernt…' });
+    var imageDataUrl = await removeBackground(base64, mimeType);
+    _scanResult = Object.assign({}, analysis, {
+      imageDataUrl: imageDataUrl,
+      _origDataUrl: (_cropState && _cropState._lastOriginalDataUrl) || ('data:' + mimeType + ';base64,' + base64)
+    });
+    showScanOverlay('result', _scanResult);
+  } catch (err) {
+    showScanOverlay('error', { text: err.message || 'KI-Analyse fehlgeschlagen.' });
+  }
+}
+
 // ── Scan-Overlay ──────────────────────────────────────────────────────────────
 var _scanResult = null;
 
@@ -187,23 +476,13 @@ function hideScanOverlay() {
 }
 async function processScanFile(file) {
   if (!file) return;
-  const base64 = await new Promise(function(resolve, reject) {
-    const reader = new FileReader();
-    reader.onload = function(e) { resolve(e.target.result.split(',')[1]); };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-  const mimeType = file.type || 'image/jpeg';
-  try {
-    showScanOverlay('loading', { text: '🔍 KI analysiert dein Kleidungsstück…' });
-    const analysis = await analyzeClothingWithGemini(base64, mimeType);
-    showScanOverlay('loading', { text: '✂️ Hintergrund wird entfernt…' });
-    const imageDataUrl = await removeBackground(base64, mimeType);
-    _scanResult = Object.assign({}, analysis, { imageDataUrl: imageDataUrl });
-    showScanOverlay('result', _scanResult);
-  } catch (err) {
-    showScanOverlay('error', { text: err.message || 'KI-Analyse fehlgeschlagen.' });
-  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var imageDataUrl = e.target.result;
+    var mimeType = file.type || 'image/jpeg';
+    _openCropScreen(imageDataUrl, mimeType);
+  };
+  reader.readAsDataURL(file);
 }
 function confirmScanItem() {
   if (!_scanResult) return;

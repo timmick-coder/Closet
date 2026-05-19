@@ -802,6 +802,20 @@
     .ki-panel-sub { font-size:13px; color:var(--text2); font-weight:600; padding:10px 16px 0; flex-shrink:0; }
     .ki-panel-scroll { flex:1; overflow-y:auto; scrollbar-width:none; padding:12px 16px 24px; }
     .ki-panel-scroll::-webkit-scrollbar { display:none; }
+
+    /* ── Crop Screen ── */
+    .crop-screen { position:absolute; inset:0; z-index:350; background:#111; display:none; flex-direction:column; }
+    .crop-screen.active { display:flex; }
+    .crop-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; background:#000; flex-shrink:0; }
+    .crop-cancel-btn { background:none; border:none; color:rgba(255,255,255,0.8); font-size:15px; font-weight:600; cursor:pointer; padding:8px; }
+    .crop-title { color:white; font-size:16px; font-weight:800; }
+    .crop-continue-btn { background:#6B47FF; color:white; border:none; border-radius:20px; padding:8px 18px; font-size:15px; font-weight:700; cursor:pointer; }
+    .crop-canvas-wrap { flex:1; position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:10px; }
+    #crop-canvas { display:block; max-width:100%; max-height:100%; touch-action:none; }
+    .crop-tools { display:flex; justify-content:center; gap:16px; padding:14px 16px 20px; background:#000; flex-shrink:0; }
+    .crop-tool-btn { background:#2a2a2a; border:1px solid #444; color:white; border-radius:14px; padding:10px 22px; font-size:14px; font-weight:600; cursor:pointer; }
+    .scan-recrop-btn { display:block; width:100%; margin:8px 0 0; padding:11px; background:var(--bg); border:1.5px solid var(--purple-border); border-radius:14px; color:var(--purple); font-size:14px; font-weight:700; cursor:pointer; }
+
     /* Mini outfit cards inside collection */
     .col-outfit-card { background:var(--card); border-radius:18px; padding:14px; margin-bottom:12px; box-shadow:var(--shadow); cursor:pointer; transition:transform 0.15s; }
     .col-outfit-card:active { transform:scale(0.98); }
@@ -1956,6 +1970,22 @@
     </div>
   </div>
 
+  <!-- ── Crop Screen ── -->
+  <div class="crop-screen" id="crop-screen">
+    <div class="crop-header">
+      <button class="crop-cancel-btn" onclick="_closeCropScreen()">← Abbrechen</button>
+      <div class="crop-title">Zuschneiden</div>
+      <button class="crop-continue-btn" onclick="_cropAndContinue()">Weiter →</button>
+    </div>
+    <div class="crop-canvas-wrap" id="crop-canvas-wrap">
+      <canvas id="crop-canvas"></canvas>
+    </div>
+    <div class="crop-tools">
+      <button class="crop-tool-btn" onclick="_cropRotate()">↺ Drehen</button>
+      <button class="crop-tool-btn" onclick="_cropMirror()">↔ Spiegeln</button>
+    </div>
+  </div>
+
   <!-- Scan-Overlay (KI-Verarbeitung) -->
   <div id="scan-overlay" style="display:none">
     <!-- Lade-Zustand -->
@@ -2009,6 +2039,7 @@
         </div>
 
       </div>
+      <button class="scan-recrop-btn" onclick="_recropImage()">✂️ Nochmal zuschneiden</button>
       <div class="scan-result-btns">
         <button class="scan-cancel-btn" onclick="cancelScan()">Abbrechen</button>
         <button class="scan-confirm-btn" onclick="confirmScanItem()">✓ Speichern</button>
