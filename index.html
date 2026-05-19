@@ -1138,6 +1138,15 @@
     .idp-confirm-btns { display:flex; gap:10px; }
     .idp-confirm-cancel { flex:1; padding:13px; background:var(--bg); border:1.5px solid var(--purple-border); border-radius:14px; font-size:15px; font-weight:700; color:var(--text); cursor:pointer; }
     .idp-confirm-delete { flex:1; padding:13px; background:#EF4444; border:none; border-radius:14px; font-size:15px; font-weight:700; color:white; cursor:pointer; }
+
+    /* ── Outfit / Kollektion umbenennen ── */
+    .outfit-name-editable { cursor:pointer; }
+    .outfit-rename-pencil { font-size:11px; opacity:0.35; margin-left:3px; pointer-events:none; flex-shrink:0; }
+    .outfit-name-edit-wrap { display:inline-flex; align-items:center; gap:4px; width:100%; }
+    .outfit-name-edit-input { font-size:inherit; font-weight:inherit; color:inherit; border:none; border-bottom:2px solid var(--purple); background:transparent; outline:none; min-width:60px; flex:1; padding:1px 0; font-family:inherit; line-height:inherit; }
+    .outfit-name-edit-confirm { background:none; border:none; font-size:15px; cursor:pointer; padding:0 2px; flex-shrink:0; line-height:1; }
+    .ki-panel-rename-btn { background:none; border:none; font-size:16px; cursor:pointer; padding:4px 6px; opacity:0.45; flex-shrink:0; line-height:1; }
+    .ki-panel-rename-btn:active { opacity:1; }
   </style>
 </head>
 <body>
@@ -1337,6 +1346,7 @@
         <div class="ki-panel-header">
           <button class="ki-back-btn" onclick="_closeCollection()">←</button>
           <div class="ki-panel-title" id="ki-col-title">Kollektion</div>
+          <button class="ki-panel-rename-btn" id="ki-col-rename-btn" title="Name ändern" onclick="_startCollectionRename(_currentCollectionName)">✏️</button>
         </div>
         <div class="ki-panel-sub" id="ki-col-sub">0 Outfits</div>
         <div class="col-tab-row" id="ki-col-tabs">
@@ -1351,6 +1361,7 @@
         <div class="ki-panel-header">
           <button class="ki-back-btn" onclick="_closeOutfitDetail()">←</button>
           <div class="ki-panel-title" id="ki-outfit-panel-title">Outfit</div>
+          <button class="ki-panel-rename-btn" id="ki-outfit-rename-btn" title="Name ändern" onclick="_startOutfitPanelRename()">✏️</button>
           <button class="ki-options-btn" onclick="_toggleOptionsMenu(event)">···</button>
         </div>
         <div class="ki-panel-scroll" id="ki-outfit-detail-content"></div>

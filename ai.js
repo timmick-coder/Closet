@@ -1358,6 +1358,260 @@ function _showToast(msg) {
   _toastTimer = setTimeout(function() { t.classList.remove('show'); }, 2800);
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// OUTFIT / KOLLEKTION UMBENENNEN
+// ══════════════════════════════════════════════════════════════════════════════
+
+function _buildRenameHtml(name) {
+  return name + ' <span class="outfit-rename-pencil">✏️</span>';
+}
+
+// Startet Inline-Editing auf einem beliebigen Name-Element
+function _startOutfitRename(id, nameEl) {
+  if (!nameEl || nameEl.querySelector('input')) return; // bereits im Edit-Modus
+  var outfit = _kiOutfitRegistry[id] || _loadOutfits().find(function(o) { return o.id === id; });
+  if (!outfit) return;
+  var currentName = outfit.name || 'Outfit';
+
+  var originalHTML = nameEl.innerHTML;
+
+  // Input + Bestätigen-Button aufbauen
+  var wrap = document.createElement('div');
+  wrap.className = 'outfit-name-edit-wrap';
+
+  var input = document.createElement('input');
+  input.className = 'outfit-name-edit-input';
+  input.value = currentName;
+  input.type = 'text';
+  input.maxLength = 60;
+
+  var confirmBtn = document.createElement('button');
+  confirmBtn.className = 'outfit-name-edit-confirm';
+  confirmBtn.textContent = '✅';
+  confirmBtn.type = 'button';
+
+  wrap.appendChild(input);
+  wrap.appendChild(confirmBtn);
+  nameEl.innerHTML = '';
+  nameEl.appendChild(wrap);
+
+  // Verhindert, dass Klick auf das Wrap das Panel/Karte öffnet
+  wrap.addEventListener('click', function(e) { e.stopPropagation(); });
+
+  input.focus();
+  try { input.setSelectionRange(0, input.value.length); } catch (e) {}
+
+  var committed = false;
+
+  function commit() {
+    if (committed) return;
+    committed = true;
+    var newName = input.value.trim();
+    if (newName && newName !== currentName) {
+      _doRenameOutfit(id, newName, nameEl);
+    } else {
+      nameEl.innerHTML = originalHTML;
+    }
+  }
+
+  function discard() {
+    if (committed) return;
+    committed = true;
+    nameEl.innerHTML = originalHTML;
+  }
+
+  confirmBtn.addEventListener('mousedown', function(e) { e.preventDefault(); commit(); });
+  confirmBtn.addEventListener('touchend', function(e) { e.preventDefault(); commit(); });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); discard(); }
+  });
+  input.addEventListener('blur', function() {
+    setTimeout(function() { if (!committed) discard(); }, 200);
+  });
+}
+
+// Speichert den neuen Outfit-Namen und aktualisiert alle sichtbaren Stellen
+function _doRenameOutfit(id, newName, triggerEl) {
+  var outfits = _loadOutfits();
+  var idx = outfits.findIndex(function(o) { return o.id === id; });
+  if (idx >= 0) {
+    outfits[idx].name = newName;
+    _storeOutfits(outfits);
+  }
+  if (_kiOutfitRegistry[id]) _kiOutfitRegistry[id].name = newName;
+
+  // Alle anderen gerenderten Name-Elemente dieses Outfits in-place updaten
+  document.querySelectorAll('[data-rename-id="' + id + '"]').forEach(function(el) {
+    if (el !== triggerEl) el.innerHTML = _buildRenameHtml(newName);
+  });
+
+  // Trigger-Element wiederherstellen (mit Pencil-Icon)
+  if (triggerEl) triggerEl.innerHTML = _buildRenameHtml(newName);
+
+  // Detail-Panel-Titel updaten falls dieses Outfit gerade geöffnet ist
+  if (_currentOutfitId === id) {
+    var titleEl = document.getElementById('ki-outfit-panel-title');
+    if (titleEl && titleEl !== triggerEl) titleEl.textContent = newName;
+  }
+
+  // Saved-Section neu rendern (im Hintergrund immer vorhanden)
+  _renderKiSavedSection();
+
+  _showToast('✅ Name geändert!');
+}
+
+// Umbenennen des Outfits vom Detail-Panel-Header aus (✏️-Button)
+function _startOutfitPanelRename() {
+  var titleEl = document.getElementById('ki-outfit-panel-title');
+  if (!titleEl || !_currentOutfitId) return;
+  var id = _currentOutfitId;
+  var outfit = _kiOutfitRegistry[id] || _loadOutfits().find(function(o) { return o.id === id; });
+  if (!outfit) return;
+  var currentName = outfit.name || 'Outfit';
+
+  if (titleEl.querySelector('input')) return;
+
+  var originalText = titleEl.textContent;
+  titleEl.innerHTML = '';
+
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;align-items:center;gap:4px;width:100%;';
+
+  var input = document.createElement('input');
+  input.className = 'outfit-name-edit-input';
+  input.value = currentName;
+  input.type = 'text';
+  input.maxLength = 60;
+  input.style.fontSize = '17px';
+  input.style.fontWeight = '800';
+
+  var confirmBtn = document.createElement('button');
+  confirmBtn.className = 'outfit-name-edit-confirm';
+  confirmBtn.textContent = '✅';
+  confirmBtn.type = 'button';
+  confirmBtn.style.fontSize = '18px';
+
+  wrap.appendChild(input);
+  wrap.appendChild(confirmBtn);
+  titleEl.appendChild(wrap);
+
+  wrap.addEventListener('click', function(e) { e.stopPropagation(); });
+  input.focus();
+  try { input.setSelectionRange(0, input.value.length); } catch(e) {}
+
+  var committed = false;
+
+  function commit() {
+    if (committed) return; committed = true;
+    var newName = input.value.trim();
+    if (newName && newName !== currentName) {
+      _doRenameOutfit(id, newName, null);
+      titleEl.textContent = newName;
+    } else {
+      titleEl.textContent = originalText;
+    }
+  }
+
+  function discard() {
+    if (committed) return; committed = true;
+    titleEl.textContent = originalText;
+  }
+
+  confirmBtn.addEventListener('mousedown', function(e) { e.preventDefault(); commit(); });
+  confirmBtn.addEventListener('touchend', function(e) { e.preventDefault(); commit(); });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); discard(); }
+  });
+  input.addEventListener('blur', function() {
+    setTimeout(function() { if (!committed) discard(); }, 200);
+  });
+}
+
+// Kollektion umbenennen (langer Druck oder ✏️-Button)
+function _startCollectionRename(colName) {
+  if (!colName || colName === '__favoriten__') return; // Favoriten nicht umbenennbar
+  var titleEl = document.getElementById('ki-col-title');
+  if (!titleEl || titleEl.querySelector('input')) return;
+  var currentDisplay = titleEl.textContent;
+
+  titleEl.innerHTML = '';
+
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;align-items:center;gap:4px;width:100%;';
+
+  var input = document.createElement('input');
+  input.className = 'outfit-name-edit-input';
+  input.value = currentDisplay;
+  input.type = 'text';
+  input.maxLength = 40;
+  input.style.fontSize = '18px';
+  input.style.fontWeight = '800';
+
+  var confirmBtn = document.createElement('button');
+  confirmBtn.className = 'outfit-name-edit-confirm';
+  confirmBtn.textContent = '✅';
+  confirmBtn.type = 'button';
+  confirmBtn.style.fontSize = '20px';
+
+  wrap.appendChild(input);
+  wrap.appendChild(confirmBtn);
+  titleEl.appendChild(wrap);
+
+  wrap.addEventListener('click', function(e) { e.stopPropagation(); });
+  input.focus();
+  try { input.setSelectionRange(0, input.value.length); } catch(e) {}
+
+  var committed = false;
+
+  function commit() {
+    if (committed) return; committed = true;
+    var newName = input.value.trim();
+    if (newName && newName !== colName) {
+      _doRenameCollection(colName, newName);
+    } else {
+      titleEl.textContent = currentDisplay;
+    }
+  }
+
+  function discard() {
+    if (committed) return; committed = true;
+    titleEl.textContent = currentDisplay;
+  }
+
+  confirmBtn.addEventListener('mousedown', function(e) { e.preventDefault(); commit(); });
+  confirmBtn.addEventListener('touchend', function(e) { e.preventDefault(); commit(); });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); discard(); }
+  });
+  input.addEventListener('blur', function() {
+    setTimeout(function() { if (!committed) discard(); }, 200);
+  });
+}
+
+// Alle Outfits einer Kollektion umbenennen + UI aktualisieren
+function _doRenameCollection(oldName, newName) {
+  var outfits = _loadOutfits();
+  outfits.forEach(function(o) {
+    var idx = (o.kollektionen || []).indexOf(oldName);
+    if (idx >= 0) o.kollektionen[idx] = newName;
+  });
+  _storeOutfits(outfits);
+  _currentCollectionName = newName;
+
+  // Collection-Panel-Titel
+  var titleEl = document.getElementById('ki-col-title');
+  if (titleEl) titleEl.textContent = newName;
+
+  // Kollektions-Pills + Saved-Section neu rendern
+  _renderKiPills();
+  _renderKiSavedSection();
+
+  _showToast('✅ Name geändert!');
+}
+
 // ── renderKiOutfits (KI-Vorschläge rendern) ───────────────────────────────────
 function renderKiOutfits(outfits) {
   var container = document.getElementById('ki-ai-suggestions') || document.querySelector('.outfit-cards');
@@ -1379,7 +1633,7 @@ function renderKiOutfits(outfits) {
       + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
       + '<div class="swipe-inner outfit-card-ki">'
       + '<div class="outfit-card-header">'
-      + '<div><div class="outfit-card-name">' + (outfit.name || 'Outfit') + '</div>'
+      + '<div><div class="outfit-card-name outfit-name-editable" data-rename-id="' + _escAttr(id) + '">' + _buildRenameHtml(outfit.name || 'Outfit') + '</div>'
       + '<div class="outfit-card-style">' + (outfit.style || '') + '</div></div>'
       + '<div style="display:flex;align-items:center;gap:8px;">'
       + '<span class="match-badge">' + (outfit.match || 90) + '% ✅</span>'
@@ -1445,6 +1699,9 @@ function _openCollection(name) {
   var displayName = (name === '__favoriten__') ? '❤️ Favoriten' : name;
   var titleEl = document.getElementById('ki-col-title');
   if (titleEl) titleEl.textContent = displayName;
+  // ✏️-Button nur bei echten Kollektionen sichtbar (nicht bei Favoriten)
+  var colRenameBtn = document.getElementById('ki-col-rename-btn');
+  if (colRenameBtn) colRenameBtn.style.display = (name === '__favoriten__') ? 'none' : '';
 
   var fits = allOutfits.filter(function(o) { return !o.isInspo; });
   var inspos = allOutfits.filter(function(o) { return !!o.isInspo; });
@@ -1608,7 +1865,7 @@ function _renderCollectionCard(outfit, collectionName) {
     + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
     + '<div class="swipe-inner col-outfit-card" data-col-id="' + _escAttr(id) + '" data-col-name="' + _escAttr(collectionName) + '">'
     + '<div class="col-outfit-header">'
-    + '<div>' + inspoMeta + '<div class="col-outfit-name">' + (outfit.name || 'Outfit') + '</div>'
+    + '<div>' + inspoMeta + '<div class="col-outfit-name outfit-name-editable" data-rename-id="' + _escAttr(id) + '">' + _buildRenameHtml(outfit.name || 'Outfit') + '</div>'
     + '<span class="match-badge">' + (outfit.match || 90) + '% ✅</span></div>'
     + '<button class="heart-btn" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
     + '</div>'
@@ -1818,7 +2075,7 @@ function _renderKiSavedSection() {
       + '<div class="ki-saved-photos">' + photosHtml + '</div>'
       + '<div class="ki-saved-meta">'
       + (col ? '<div class="ki-saved-from">' + col + '</div>' : '')
-      + '<div class="ki-saved-name" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' + (outfit.name || 'Outfit') + inspoBadge + '</div>'
+      + '<div class="ki-saved-name outfit-name-editable" data-rename-id="' + _escAttr(id) + '" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' + _buildRenameHtml(outfit.name || 'Outfit') + inspoBadge + '</div>'
       + inspoFromLine
       + '<div class="ki-saved-match">' + (outfit.match || 90) + '% Passend · ' + (outfit.style || '') + '</div>'
       + '</div>'
@@ -2072,7 +2329,7 @@ function _autoLoadKiSuggestions(force, customDesc, colContext) {
           + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
           + '<div class="swipe-inner outfit-card-ki">'
           + '<div class="outfit-card-header">'
-          + '<div><div class="outfit-card-name">' + (outfit.name || 'Outfit') + '</div>'
+          + '<div><div class="outfit-card-name outfit-name-editable" data-rename-id="' + _escAttr(id) + '">' + _buildRenameHtml(outfit.name || 'Outfit') + '</div>'
           + '<div class="outfit-card-style">' + (outfit.style || '') + '</div></div>'
           + '<div style="display:flex;align-items:center;gap:8px;">'
           + '<span class="match-badge">' + (outfit.match || 90) + '% ✅</span>'
@@ -4099,10 +4356,24 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  // ── Event Delegation: Outfit-Namen umbenennen (global für alle Karten) ──
+  var kiScreen = document.getElementById('ki');
+  if (kiScreen) {
+    kiScreen.addEventListener('click', function(e) {
+      var nameEl = e.target.closest('.outfit-name-editable');
+      if (!nameEl) return;
+      var renameId = nameEl.getAttribute('data-rename-id');
+      if (!renameId) return;
+      e.stopPropagation();
+      _startOutfitRename(renameId, nameEl);
+    });
+  }
+
   // ── Event Delegation: Gespeicherte Outfit-Karten ──
   var savedContainer = document.getElementById('ki-saved-outfits');
   if (savedContainer) {
     savedContainer.addEventListener('click', function(e) {
+      if (e.target.closest('.outfit-name-editable')) return; // rename handled above
       var heartBtn = e.target.closest('[data-heart-id]');
       if (heartBtn) {
         e.stopPropagation();
@@ -4125,6 +4396,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var colList = document.getElementById('ki-col-list');
   if (colList) {
     colList.addEventListener('click', function(e) {
+      if (e.target.closest('.outfit-name-editable')) return; // rename handled above
       // Inspo-Version-Button hat eigenen onclick — nicht weiter delegieren
       if (e.target.closest('.inspo-version-btn')) return;
       var heartBtn = e.target.closest('[data-heart-id]');
