@@ -89,9 +89,10 @@ async function analyzeClothingWithGemini(base64, mimeType) {
 // ── @imgly/background-removal: Hintergrund entfernen (kostenlos, im Browser) ──
 var _rembgModule = null;
 var _rembgModelLoaded = false;
-var _REMBG_VER = '1.4.5';
-var _REMBG_CDN = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@' + _REMBG_VER + '/dist/browser.mjs';
-var _REMBG_PATH = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@' + _REMBG_VER + '/dist/';
+// esm.sh wandelt npm-Pakete zuverlässig in Browser-ESM um
+var _REMBG_CDN = 'https://esm.sh/@imgly/background-removal';
+// Modell-Dateien (ONNX/WASM) kommen vom jsDelivr CDN mit CORS-Support
+var _REMBG_PATH = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal/dist/';
 
 async function _loadRembgModule() {
   if (!_rembgModule) {
@@ -104,7 +105,7 @@ async function removeBackground(base64, mimeType) {
   try {
     // Beim ersten Aufruf lädt das Modell (~40 MB, wird vom Browser gecacht)
     if (!_rembgModelLoaded) {
-      showScanOverlay('loading', { text: '⏳ KI-Modell wird geladen… (nur einmalig)' });
+      showScanOverlay('loading', { text: '⏳ KI-Modell wird geladen… (nur einmalig, ~40 MB)' });
     } else {
       showScanOverlay('loading', { text: '✂️ Hintergrund wird entfernt…' });
     }
@@ -132,7 +133,7 @@ async function removeBackground(base64, mimeType) {
       reader.readAsDataURL(resultBlob);
     });
   } catch (e) {
-    console.error('[rembg] Fehler:', e.message);
+    console.error('[rembg] Fehler:', e.message, e);
     // Fallback: Originalbild wird ohne Hintergrundentfernung verwendet
     showScanOverlay('loading', { text: '⚠️ Hintergrundentfernung übersprungen – Original wird verwendet' });
     await new Promise(function(r) { setTimeout(r, 900); });
