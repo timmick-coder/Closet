@@ -647,6 +647,49 @@ function _closeItemDetail() {
   _itemEditMode = false;
 }
 
+function _startItemNameRename(nameEl, currentName) {
+  if (!nameEl || nameEl.querySelector('input')) return;
+  var originalText = nameEl.textContent;
+  nameEl.textContent = '';
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentName || originalText;
+  input.maxLength = 60;
+  input.style.cssText = 'font-size:inherit;font-weight:inherit;color:inherit;border:none;border-bottom:2px solid var(--purple);background:transparent;outline:none;width:100%;padding:1px 0;font-family:inherit;';
+  nameEl.appendChild(input);
+  input.focus();
+  try { input.setSelectionRange(0, input.value.length); } catch(e) {}
+
+  var committed = false;
+  function commit() {
+    if (committed) return; committed = true;
+    var newName = input.value.trim();
+    if (!newName) { nameEl.textContent = originalText; return; }
+    if (newName === originalText) { nameEl.textContent = originalText; return; }
+    // Save to localStorage
+    var items = loadWardrobe();
+    var idx = items.findIndex(function(i) { return i.id === _currentItemId; });
+    if (idx >= 0) {
+      items[idx].name = newName;
+      saveWardrobe(items);
+      renderWardrobeGrid();
+      var titleEl = document.getElementById('idp-view-title');
+      if (titleEl) titleEl.textContent = newName;
+      _showToast('✅ Name geändert!');
+    }
+    nameEl.textContent = newName;
+  }
+  function discard() {
+    if (committed) return; committed = true;
+    nameEl.textContent = originalText;
+  }
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); discard(); }
+  });
+  input.addEventListener('blur', function() { setTimeout(commit, 150); });
+}
+
 function _populateItemView(item) {
   // Image
   var img = document.getElementById('idp-image');
@@ -666,6 +709,14 @@ function _populateItemView(item) {
   // Fields
   var set = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val || '—'; };
   set('idp-v-name', item.name);
+  // Artikel-Name direkt antippbar zum Umbenennen
+  var nameEl = document.getElementById('idp-v-name');
+  if (nameEl) {
+    nameEl.style.cursor = 'pointer';
+    var newNameEl = nameEl.cloneNode(true); // remove old listeners
+    nameEl.parentNode.replaceChild(newNameEl, nameEl);
+    newNameEl.addEventListener('click', function() { _startItemNameRename(newNameEl, item.name); });
+  }
   set('idp-v-type', item.type);
   set('idp-v-color', item.color);
   set('idp-v-season', item.season);
@@ -1370,67 +1421,40 @@ function _buildRenameHtml(name) {
 
 // Startet Inline-Editing auf einem beliebigen Name-Element
 function _startOutfitRename(id, nameEl) {
-  if (!nameEl || nameEl.querySelector('input')) return; // bereits im Edit-Modus
+  if (!nameEl || nameEl.querySelector('input')) return;
   var outfit = _kiOutfitRegistry[id] || _loadOutfits().find(function(o) { return o.id === id; });
   if (!outfit) return;
   var currentName = outfit.name || 'Outfit';
-
   var originalHTML = nameEl.innerHTML;
-
-  // Input + Bestätigen-Button aufbauen
-  var wrap = document.createElement('div');
-  wrap.className = 'outfit-name-edit-wrap';
 
   var input = document.createElement('input');
   input.className = 'outfit-name-edit-input';
   input.value = currentName;
   input.type = 'text';
   input.maxLength = 60;
-
-  var confirmBtn = document.createElement('button');
-  confirmBtn.className = 'outfit-name-edit-confirm';
-  confirmBtn.textContent = '✅';
-  confirmBtn.type = 'button';
-
-  wrap.appendChild(input);
-  wrap.appendChild(confirmBtn);
   nameEl.innerHTML = '';
-  nameEl.appendChild(wrap);
-
-  // Verhindert, dass Klick auf das Wrap das Panel/Karte öffnet
-  wrap.addEventListener('click', function(e) { e.stopPropagation(); });
+  nameEl.appendChild(input);
+  nameEl.addEventListener('click', function(e) { e.stopPropagation(); }, { once: true });
 
   input.focus();
   try { input.setSelectionRange(0, input.value.length); } catch (e) {}
 
   var committed = false;
-
   function commit() {
-    if (committed) return;
-    committed = true;
+    if (committed) return; committed = true;
     var newName = input.value.trim();
-    if (newName && newName !== currentName) {
-      _doRenameOutfit(id, newName, nameEl);
-    } else {
-      nameEl.innerHTML = originalHTML;
-    }
+    if (newName && newName !== currentName) { _doRenameOutfit(id, newName, nameEl); }
+    else { nameEl.innerHTML = originalHTML; }
   }
-
   function discard() {
-    if (committed) return;
-    committed = true;
+    if (committed) return; committed = true;
     nameEl.innerHTML = originalHTML;
   }
-
-  confirmBtn.addEventListener('mousedown', function(e) { e.preventDefault(); commit(); });
-  confirmBtn.addEventListener('touchend', function(e) { e.preventDefault(); commit(); });
   input.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); commit(); }
     if (e.key === 'Escape') { e.preventDefault(); discard(); }
   });
-  input.addEventListener('blur', function() {
-    setTimeout(function() { if (!committed) discard(); }, 200);
-  });
+  input.addEventListener('blur', function() { setTimeout(commit, 150); });
 }
 
 // Speichert den neuen Outfit-Namen und aktualisiert alle sichtbaren Stellen
@@ -1463,134 +1487,81 @@ function _doRenameOutfit(id, newName, triggerEl) {
   _showToast('✅ Name geändert!');
 }
 
-// Umbenennen des Outfits vom Detail-Panel-Header aus (✏️-Button)
+// Outfit-Titel im Detail-Panel direkt antippen → editierbar, außerhalb tippen → gespeichert
 function _startOutfitPanelRename() {
   var titleEl = document.getElementById('ki-outfit-panel-title');
-  if (!titleEl || !_currentOutfitId) return;
+  if (!titleEl || !_currentOutfitId || titleEl.querySelector('input')) return;
   var id = _currentOutfitId;
   var outfit = _kiOutfitRegistry[id] || _loadOutfits().find(function(o) { return o.id === id; });
   if (!outfit) return;
   var currentName = outfit.name || 'Outfit';
-
-  if (titleEl.querySelector('input')) return;
-
   var originalText = titleEl.textContent;
+
   titleEl.innerHTML = '';
-
-  var wrap = document.createElement('div');
-  wrap.style.cssText = 'display:flex;align-items:center;gap:4px;width:100%;';
-
   var input = document.createElement('input');
   input.className = 'outfit-name-edit-input';
   input.value = currentName;
   input.type = 'text';
   input.maxLength = 60;
-  input.style.fontSize = '17px';
-  input.style.fontWeight = '800';
+  input.style.cssText = 'font-size:17px;font-weight:800;width:100%;';
+  titleEl.appendChild(input);
 
-  var confirmBtn = document.createElement('button');
-  confirmBtn.className = 'outfit-name-edit-confirm';
-  confirmBtn.textContent = '✅';
-  confirmBtn.type = 'button';
-  confirmBtn.style.fontSize = '18px';
-
-  wrap.appendChild(input);
-  wrap.appendChild(confirmBtn);
-  titleEl.appendChild(wrap);
-
-  wrap.addEventListener('click', function(e) { e.stopPropagation(); });
   input.focus();
   try { input.setSelectionRange(0, input.value.length); } catch(e) {}
 
   var committed = false;
-
   function commit() {
     if (committed) return; committed = true;
     var newName = input.value.trim();
-    if (newName && newName !== currentName) {
-      _doRenameOutfit(id, newName, null);
-      titleEl.textContent = newName;
-    } else {
-      titleEl.textContent = originalText;
-    }
+    if (newName && newName !== currentName) { _doRenameOutfit(id, newName, null); titleEl.textContent = newName; }
+    else { titleEl.textContent = originalText; }
   }
-
   function discard() {
     if (committed) return; committed = true;
     titleEl.textContent = originalText;
   }
-
-  confirmBtn.addEventListener('mousedown', function(e) { e.preventDefault(); commit(); });
-  confirmBtn.addEventListener('touchend', function(e) { e.preventDefault(); commit(); });
   input.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); commit(); }
     if (e.key === 'Escape') { e.preventDefault(); discard(); }
   });
-  input.addEventListener('blur', function() {
-    setTimeout(function() { if (!committed) discard(); }, 200);
-  });
+  input.addEventListener('blur', function() { setTimeout(commit, 150); });
 }
 
-// Kollektion umbenennen (langer Druck oder ✏️-Button)
+// Kollektion umbenennen — außerhalb tippen → automatisch gespeichert
 function _startCollectionRename(colName) {
-  if (!colName || colName === '__favoriten__') return; // Favoriten nicht umbenennbar
+  if (!colName || colName === '__favoriten__') return;
   var titleEl = document.getElementById('ki-col-title');
   if (!titleEl || titleEl.querySelector('input')) return;
   var currentDisplay = titleEl.textContent;
 
   titleEl.innerHTML = '';
-
-  var wrap = document.createElement('div');
-  wrap.style.cssText = 'display:flex;align-items:center;gap:4px;width:100%;';
-
   var input = document.createElement('input');
   input.className = 'outfit-name-edit-input';
   input.value = currentDisplay;
   input.type = 'text';
   input.maxLength = 40;
-  input.style.fontSize = '18px';
-  input.style.fontWeight = '800';
+  input.style.cssText = 'font-size:18px;font-weight:800;width:100%;';
+  titleEl.appendChild(input);
 
-  var confirmBtn = document.createElement('button');
-  confirmBtn.className = 'outfit-name-edit-confirm';
-  confirmBtn.textContent = '✅';
-  confirmBtn.type = 'button';
-  confirmBtn.style.fontSize = '20px';
-
-  wrap.appendChild(input);
-  wrap.appendChild(confirmBtn);
-  titleEl.appendChild(wrap);
-
-  wrap.addEventListener('click', function(e) { e.stopPropagation(); });
   input.focus();
   try { input.setSelectionRange(0, input.value.length); } catch(e) {}
 
   var committed = false;
-
   function commit() {
     if (committed) return; committed = true;
     var newName = input.value.trim();
-    if (newName && newName !== colName) {
-      _doRenameCollection(colName, newName);
-    } else {
-      titleEl.textContent = currentDisplay;
-    }
+    if (newName && newName !== colName) { _doRenameCollection(colName, newName); }
+    else { titleEl.textContent = currentDisplay; }
   }
-
   function discard() {
     if (committed) return; committed = true;
     titleEl.textContent = currentDisplay;
   }
-
-  confirmBtn.addEventListener('mousedown', function(e) { e.preventDefault(); commit(); });
-  confirmBtn.addEventListener('touchend', function(e) { e.preventDefault(); commit(); });
   input.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); commit(); }
     if (e.key === 'Escape') { e.preventDefault(); discard(); }
   });
-  input.addEventListener('blur', function() {
-    setTimeout(function() { if (!committed) discard(); }, 200);
-  });
+  input.addEventListener('blur', function() { setTimeout(commit, 150); });
 }
 
 // Alle Outfits einer Kollektion umbenennen + UI aktualisieren
