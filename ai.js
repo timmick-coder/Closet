@@ -3827,7 +3827,6 @@ function _checkAndUpdateStreak() {
 
   _updateProfileStreak();
   _checkStreakReminder();
-  _renderLeaderboard();
 }
 
 function _incrementStreak() {
@@ -3840,7 +3839,6 @@ function _incrementStreak() {
   _saveStreak(s);
   _updateProfileStreak();
   _checkMilestone(s.current, s);
-  _renderLeaderboard();
 }
 
 function _updateProfileStreak() {
