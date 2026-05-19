@@ -1635,7 +1635,7 @@ function renderKiOutfits(outfits) {
       + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
       + '<div class="swipe-inner outfit-card-ki">'
       + '<div class="outfit-card-header">'
-      + '<div><div class="outfit-card-name outfit-name-editable" data-rename-id="' + _escAttr(id) + '">' + _buildRenameHtml(outfit.name || 'Outfit') + '</div>'
+      + '<div><div class="outfit-card-name">' + (outfit.name || 'Outfit') + '</div>'
       + '<div class="outfit-card-style">' + (outfit.style || '') + '</div></div>'
       + '<div style="display:flex;align-items:center;gap:8px;">'
       + '<span class="match-badge">' + (outfit.match || 90) + '% ✅</span>'
@@ -1867,7 +1867,7 @@ function _renderCollectionCard(outfit, collectionName) {
     + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
     + '<div class="swipe-inner col-outfit-card" data-col-id="' + _escAttr(id) + '" data-col-name="' + _escAttr(collectionName) + '">'
     + '<div class="col-outfit-header">'
-    + '<div>' + inspoMeta + '<div class="col-outfit-name outfit-name-editable" data-rename-id="' + _escAttr(id) + '">' + _buildRenameHtml(outfit.name || 'Outfit') + '</div>'
+    + '<div>' + inspoMeta + '<div class="col-outfit-name">' + (outfit.name || 'Outfit') + '</div>'
     + '<span class="match-badge">' + (outfit.match || 90) + '% ✅</span></div>'
     + '<button class="heart-btn" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
     + '</div>'
@@ -2077,7 +2077,7 @@ function _renderKiSavedSection() {
       + '<div class="ki-saved-photos">' + photosHtml + '</div>'
       + '<div class="ki-saved-meta">'
       + (col ? '<div class="ki-saved-from">' + col + '</div>' : '')
-      + '<div class="ki-saved-name outfit-name-editable" data-rename-id="' + _escAttr(id) + '" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' + _buildRenameHtml(outfit.name || 'Outfit') + inspoBadge + '</div>'
+      + '<div class="ki-saved-name" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' + (outfit.name || 'Outfit') + inspoBadge + '</div>'
       + inspoFromLine
       + '<div class="ki-saved-match">' + (outfit.match || 90) + '% Passend · ' + (outfit.style || '') + '</div>'
       + '</div>'
@@ -2331,7 +2331,7 @@ function _autoLoadKiSuggestions(force, customDesc, colContext) {
           + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
           + '<div class="swipe-inner outfit-card-ki">'
           + '<div class="outfit-card-header">'
-          + '<div><div class="outfit-card-name outfit-name-editable" data-rename-id="' + _escAttr(id) + '">' + _buildRenameHtml(outfit.name || 'Outfit') + '</div>'
+          + '<div><div class="outfit-card-name">' + (outfit.name || 'Outfit') + '</div>'
           + '<div class="outfit-card-style">' + (outfit.style || '') + '</div></div>'
           + '<div style="display:flex;align-items:center;gap:8px;">'
           + '<span class="match-badge">' + (outfit.match || 90) + '% ✅</span>'
@@ -4358,17 +4358,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // ── Event Delegation: Outfit-Namen umbenennen (global für alle Karten) ──
-  // Wichtig: Der KI-Screen heißt "ki-styling", nicht "ki"
-  var kiScreen = document.getElementById('ki-styling');
-  if (kiScreen) {
-    kiScreen.addEventListener('click', function(e) {
-      var nameEl = e.target.closest('.outfit-name-editable');
-      if (!nameEl) return;
-      var renameId = nameEl.getAttribute('data-rename-id');
-      if (!renameId) return;
-      e.stopPropagation();
-      _startOutfitRename(renameId, nameEl);
+  // ── Outfit-Detail-Panel: Titel direkt antippbar zum Umbenennen ──
+  var outfitPanelTitle = document.getElementById('ki-outfit-panel-title');
+  if (outfitPanelTitle) {
+    outfitPanelTitle.style.cursor = 'pointer';
+    outfitPanelTitle.addEventListener('click', function() {
+      _startOutfitPanelRename();
     });
   }
 
@@ -4376,7 +4371,6 @@ document.addEventListener('DOMContentLoaded', function() {
   var savedContainer = document.getElementById('ki-saved-outfits');
   if (savedContainer) {
     savedContainer.addEventListener('click', function(e) {
-      if (e.target.closest('.outfit-name-editable')) return; // rename handled above
       var heartBtn = e.target.closest('[data-heart-id]');
       if (heartBtn) {
         e.stopPropagation();
@@ -4399,9 +4393,8 @@ document.addEventListener('DOMContentLoaded', function() {
   var aiSugContainer = document.getElementById('ki-ai-suggestions');
   if (aiSugContainer) {
     aiSugContainer.addEventListener('click', function(e) {
-      if (e.target.closest('.outfit-name-editable')) return; // rename-Handler übernimmt
-      if (e.target.closest('.heart-btn')) return;            // Herz → nur liken
-      if (e.target.closest('.outfit-save-btn')) return;      // Speichern → nur Modal
+      if (e.target.closest('.heart-btn')) return;       // Herz → nur liken
+      if (e.target.closest('.outfit-save-btn')) return; // Speichern → nur Modal
       var wrapper = e.target.closest('[data-swipe-id]');
       if (wrapper) _openOutfitDetail(wrapper.getAttribute('data-swipe-id'), null);
     });
@@ -4411,7 +4404,6 @@ document.addEventListener('DOMContentLoaded', function() {
   var colList = document.getElementById('ki-col-list');
   if (colList) {
     colList.addEventListener('click', function(e) {
-      if (e.target.closest('.outfit-name-editable')) return; // rename handled above
       // Inspo-Version-Button hat eigenen onclick — nicht weiter delegieren
       if (e.target.closest('.inspo-version-btn')) return;
       var heartBtn = e.target.closest('[data-heart-id]');
