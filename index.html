@@ -2326,6 +2326,10 @@
     document.getElementById(id).classList.add('active');
     document.querySelectorAll('.nav-item, .nav-center').forEach(n => n.classList.remove('active'));
     if (btn) btn.classList.add('active');
+    // Rembg-Modul im Hintergrund vorwärmen wenn Scan-Screen geöffnet wird
+    if (id === 'scan' && typeof _loadRembgModule === 'function') {
+      _loadRembgModule().catch(function() {});
+    }
   }
 
   function navigateCenter() {

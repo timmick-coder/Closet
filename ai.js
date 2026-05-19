@@ -1,11 +1,8 @@
-// ai.js — StyleSync KI-Features (Gemini + Remove.bg)
+// ai.js — StyleSync KI-Features (Gemini + @imgly/background-removal)
 
 // ── API Keys ──────────────────────────────────────────────────────────────────
 function getGeminiKey() {
   return (window.__ENV && window.__ENV.EXPO_PUBLIC_GEMINI_API_KEY) || '';
-}
-function getRemoveBgKey() {
-  return (window.__ENV && window.__ENV.EXPO_PUBLIC_REMOVEBG_API_KEY) || '';
 }
 
 // ── Bild komprimieren (max 1024px, JPEG 0.82) ─────────────────────────────────
@@ -89,47 +86,57 @@ async function analyzeClothingWithGemini(base64, mimeType) {
   catch { throw new Error('KI hat keine verwertbare Antwort geliefert. Bitte erneut versuchen.'); }
 }
 
-// ── Remove.bg: Hintergrund entfernen ─────────────────────────────────────────
+// ── @imgly/background-removal: Hintergrund entfernen (kostenlos, im Browser) ──
+var _rembgModule = null;
+var _rembgModelLoaded = false;
+var _REMBG_VER = '1.4.5';
+var _REMBG_CDN = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@' + _REMBG_VER + '/dist/browser.mjs';
+var _REMBG_PATH = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@' + _REMBG_VER + '/dist/';
+
+async function _loadRembgModule() {
+  if (!_rembgModule) {
+    _rembgModule = await import(_REMBG_CDN);
+  }
+  return _rembgModule;
+}
+
 async function removeBackground(base64, mimeType) {
-  const key = getRemoveBgKey();
-  // Lokal: direkt mit Key aufrufen
-  if (key && key !== 'your_removebg_api_key_here') {
-    const byteStr = atob(base64);
-    const bytes = new Uint8Array(byteStr.length);
-    for (let i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i);
-    const blob = new Blob([bytes], { type: mimeType });
-    const formData = new FormData();
-    formData.append('image_file', blob, 'clothing.jpg');
-    formData.append('size', 'auto');
-    const res = await fetch('https://api.remove.bg/v1.0/removebg', {
-      method: 'POST', headers: { 'X-Api-Key': key }, body: formData
+  try {
+    // Beim ersten Aufruf lädt das Modell (~40 MB, wird vom Browser gecacht)
+    if (!_rembgModelLoaded) {
+      showScanOverlay('loading', { text: '⏳ KI-Modell wird geladen… (nur einmalig)' });
+    } else {
+      showScanOverlay('loading', { text: '✂️ Hintergrund wird entfernt…' });
+    }
+
+    var lib = await _loadRembgModule();
+
+    // base64 → Blob
+    var byteStr = atob(base64);
+    var bytes = new Uint8Array(byteStr.length);
+    for (var i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i);
+    var inputBlob = new Blob([bytes], { type: mimeType || 'image/jpeg' });
+
+    // Hintergrund entfernen — gibt PNG-Blob mit transparentem Hintergrund zurück
+    var resultBlob = await lib.removeBackground(inputBlob, {
+      publicPath: _REMBG_PATH,
+      debug: false
     });
-    if (!res.ok) return 'data:' + mimeType + ';base64,' + base64;
-    const resultBlob = await res.blob();
+
+    _rembgModelLoaded = true;
+
+    // Blob → data URL
     return new Promise(function(resolve) {
-      const reader = new FileReader();
+      var reader = new FileReader();
       reader.onload = function(e) { resolve(e.target.result); };
       reader.readAsDataURL(resultBlob);
     });
-  }
-  // Produktion: über Vercel Proxy
-  try {
-    const res = await fetch('/api/removebg', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base64: base64, mimeType: mimeType })
-    });
-    const data = await res.json();
-    if (data.skipped || !data.base64) {
-      console.warn('[removebg] Übersprungen:', data.reason || 'unbekannt');
-      showScanOverlay('loading', { text: '⚠️ Hintergrund konnte nicht entfernt werden – Original wird verwendet' });
-      await new Promise(function(r) { setTimeout(r, 1200); });
-      return 'data:' + mimeType + ';base64,' + base64;
-    }
-    return 'data:' + (data.mimeType || 'image/png') + ';base64,' + data.base64;
   } catch (e) {
-    console.error('[removebg] Netzwerkfehler:', e.message);
-    return 'data:' + mimeType + ';base64,' + base64;
+    console.error('[rembg] Fehler:', e.message);
+    // Fallback: Originalbild wird ohne Hintergrundentfernung verwendet
+    showScanOverlay('loading', { text: '⚠️ Hintergrundentfernung übersprungen – Original wird verwendet' });
+    await new Promise(function(r) { setTimeout(r, 900); });
+    return 'data:' + (mimeType || 'image/jpeg') + ';base64,' + base64;
   }
 }
 
@@ -471,7 +478,7 @@ async function _processCroppedImage(base64, mimeType) {
     base64 = compressed.base64;
     mimeType = compressed.mimeType;
 
-    showScanOverlay('loading', { text: '✂️ Hintergrund wird entfernt…' });
+    // removeBackground zeigt eigene Lade-Meldung (Modell-Download vs. normaler Lauf)
     var imageDataUrl = await removeBackground(base64, mimeType);
 
     // If this is an item image update (from item detail), save directly
