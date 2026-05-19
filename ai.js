@@ -474,6 +474,21 @@ async function _processCroppedImage(base64, mimeType) {
     showScanOverlay('loading', { text: '✂️ Hintergrund wird entfernt…' });
     var imageDataUrl = await removeBackground(base64, mimeType);
 
+    // If this is an item image update (from item detail), save directly
+    if (_cropState && _cropState._isItemImageUpdate) {
+      var updateId = _cropState._itemIdToUpdate;
+      var updateItems = loadWardrobe();
+      var updateIdx = updateItems.findIndex(function(i) { return i.id === updateId; });
+      if (updateIdx >= 0) {
+        updateItems[updateIdx].imageDataUrl = imageDataUrl;
+        saveWardrobe(updateItems);
+        renderWardrobeGrid();
+        _showToast('✅ Bild aktualisiert!');
+        _openItemDetail(updateId);
+      }
+      return;
+    }
+
     showScanOverlay('loading', { text: '🔍 KI erkennt Kleidungsstück…' });
     // KI analysiert das Originalbild (bessere Erkennung durch Farb-/Texturinfos)
     var analysis = await analyzeClothingWithGemini(base64, mimeType);
@@ -602,6 +617,233 @@ function _wardrobeCategory(item) {
   return 'tops';
 }
 
+// ── Item Detail Panel ─────────────────────────────────────────────────────────
+var _currentItemId = null;
+var _itemEditMode = false;
+
+function _openItemDetail(itemId) {
+  var items = loadWardrobe();
+  var item = items.find(function(i) { return i.id === itemId; });
+  if (!item) return;
+  _currentItemId = itemId;
+  _itemEditMode = false;
+  _populateItemView(item);
+  document.getElementById('idp-header-view').style.display = '';
+  document.getElementById('idp-header-edit').style.display = 'none';
+  document.getElementById('idp-view-content').style.display = '';
+  document.getElementById('idp-edit-content').style.display = 'none';
+  document.getElementById('idp-change-img-btn').classList.remove('visible');
+  var panel = document.getElementById('item-detail-panel');
+  if (panel) panel.classList.add('active');
+}
+
+function _closeItemDetail() {
+  var panel = document.getElementById('item-detail-panel');
+  if (panel) panel.classList.remove('active');
+  _hideDeleteConfirm();
+  _currentItemId = null;
+  _itemEditMode = false;
+}
+
+function _populateItemView(item) {
+  // Image
+  var img = document.getElementById('idp-image');
+  var emojiEl = document.getElementById('idp-emoji');
+  if (item.imageDataUrl && item.imageDataUrl.length > 20) {
+    img.src = item.imageDataUrl;
+    img.style.display = '';
+    emojiEl.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    emojiEl.textContent = item.emoji || '👕';
+    emojiEl.style.display = '';
+  }
+  // Title
+  var titleEl = document.getElementById('idp-view-title');
+  if (titleEl) titleEl.textContent = item.name || 'Artikel';
+  // Fields
+  var set = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val || '—'; };
+  set('idp-v-name', item.name);
+  set('idp-v-type', item.type);
+  set('idp-v-color', item.color);
+  set('idp-v-season', item.season);
+  set('idp-v-style', item.style);
+  set('idp-v-brand', item.brand);
+  // Color dot
+  var dot = document.getElementById('idp-v-colordot');
+  if (dot) dot.style.background = item.colorHex || '#888';
+  // Brand row visibility
+  var brandRow = document.getElementById('idp-v-brand-row');
+  if (brandRow) brandRow.style.display = item.brand ? '' : 'none';
+  // Date
+  var dateEl = document.getElementById('idp-v-date');
+  if (dateEl) {
+    if (item.id && item.id.startsWith('item_')) {
+      var ts = parseInt(item.id.replace('item_', ''));
+      if (!isNaN(ts)) {
+        dateEl.textContent = new Date(ts).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+      } else { dateEl.textContent = '—'; }
+    } else { dateEl.textContent = '—'; }
+  }
+  // Favorit
+  var favBtn = document.getElementById('idp-fav-btn');
+  var favIcon = document.getElementById('idp-fav-icon');
+  if (favBtn && favIcon) {
+    var isFav = item.isFav || false;
+    favIcon.textContent = isFav ? '❤️' : '🤍';
+    favBtn.classList.toggle('active-fav', isFav);
+  }
+}
+
+function _enterItemEditMode() {
+  var items = loadWardrobe();
+  var item = items.find(function(i) { return i.id === _currentItemId; });
+  if (!item) return;
+  _itemEditMode = true;
+  document.getElementById('idp-header-view').style.display = 'none';
+  document.getElementById('idp-header-edit').style.display = '';
+  document.getElementById('idp-view-content').style.display = 'none';
+  document.getElementById('idp-edit-content').style.display = '';
+  document.getElementById('idp-change-img-btn').classList.add('visible');
+  // Fill edit fields
+  var setVal = function(id, val) { var el = document.getElementById(id); if (el) el.value = val || ''; };
+  setVal('idp-e-name', item.name);
+  setVal('idp-e-color', item.color);
+  setVal('idp-e-colorhex', item.colorHex || '#888888');
+  setVal('idp-e-brand', item.brand);
+  // Type select
+  var typeSelect = document.getElementById('idp-e-type');
+  if (typeSelect) typeSelect.value = item.type || 'Top';
+  // Season select
+  var seasonSelect = document.getElementById('idp-e-season');
+  if (seasonSelect) {
+    var seasonMap = { 'Sommer':'Sommer|s-sommer','Winter':'Winter|s-winter','Frühling':'Frühling|s-fruhjahr','Ganzjährig':'Ganzjährig|s-ganzjahrig' };
+    seasonSelect.value = seasonMap[item.season] || 'Ganzjährig|s-ganzjahrig';
+  }
+  // Style select
+  var styleSelect = document.getElementById('idp-e-style');
+  if (styleSelect) styleSelect.value = item.style || 'Casual';
+  // Scroll to top
+  var scroll = document.getElementById('idp-scroll');
+  if (scroll) scroll.scrollTop = 0;
+}
+
+function _cancelItemEdit() {
+  var items = loadWardrobe();
+  var item = items.find(function(i) { return i.id === _currentItemId; });
+  if (!item) { _closeItemDetail(); return; }
+  _itemEditMode = false;
+  document.getElementById('idp-header-view').style.display = '';
+  document.getElementById('idp-header-edit').style.display = 'none';
+  document.getElementById('idp-view-content').style.display = '';
+  document.getElementById('idp-edit-content').style.display = 'none';
+  document.getElementById('idp-change-img-btn').classList.remove('visible');
+}
+
+function _saveItemEdit() {
+  if (!_currentItemId) return;
+  try {
+    var items = loadWardrobe();
+    var idx = items.findIndex(function(i) { return i.id === _currentItemId; });
+    if (idx < 0) return;
+    var seasonRaw = document.getElementById('idp-e-season').value || 'Ganzjährig|s-ganzjahrig';
+    var seasonParts = seasonRaw.split('|');
+    items[idx] = Object.assign({}, items[idx], {
+      name: document.getElementById('idp-e-name').value.trim() || items[idx].name,
+      type: document.getElementById('idp-e-type').value || items[idx].type,
+      color: document.getElementById('idp-e-color').value.trim() || items[idx].color,
+      colorHex: document.getElementById('idp-e-colorhex').value || items[idx].colorHex,
+      brand: document.getElementById('idp-e-brand').value.trim(),
+      season: seasonParts[0],
+      seasonClass: seasonParts[1] || 's-ganzjahrig',
+      style: document.getElementById('idp-e-style').value || items[idx].style
+    });
+    saveWardrobe(items);
+    renderWardrobeGrid();
+    _showToast('✅ Artikel aktualisiert!');
+    // Back to view mode
+    _populateItemView(items[idx]);
+    _cancelItemEdit();
+  } catch (err) {
+    _showToast('❌ Fehler: ' + err.message);
+  }
+}
+
+function _toggleItemFav() {
+  if (!_currentItemId) return;
+  var items = loadWardrobe();
+  var idx = items.findIndex(function(i) { return i.id === _currentItemId; });
+  if (idx < 0) return;
+  items[idx].isFav = !items[idx].isFav;
+  saveWardrobe(items);
+  renderWardrobeGrid();
+  _populateItemView(items[idx]);
+  _showToast(items[idx].isFav ? '❤️ Als Favorit gespeichert' : '🤍 Aus Favoriten entfernt');
+}
+
+function _postItemToFeed() {
+  _showToast('📤 Post-Funktion kommt bald!');
+}
+
+function _syncColorName(hexVal) {
+  // Just sync the hex picker with the color dot in the image wrap
+  var img = document.getElementById('idp-image');
+  var wrap = img && img.parentElement;
+  // No-op for now, color name stays manual
+}
+
+function _showDeleteConfirm() {
+  var overlay = document.getElementById('idp-confirm-overlay');
+  if (overlay) overlay.classList.add('show');
+}
+
+function _hideDeleteConfirm() {
+  var overlay = document.getElementById('idp-confirm-overlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+function _deleteItem() {
+  if (!_currentItemId) return;
+  var items = loadWardrobe();
+  var filtered = items.filter(function(i) { return i.id !== _currentItemId; });
+  saveWardrobe(filtered);
+  renderWardrobeGrid();
+  _closeItemDetail();
+  _showToast('🗑️ Artikel gelöscht');
+}
+
+function _changeItemImage() {
+  var input = document.getElementById('idp-img-input');
+  if (input) input.click();
+}
+
+async function _onItemImageSelected(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  input.value = '';
+  // Read file
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    var dataUrl = e.target.result;
+    var mimeType = file.type || 'image/jpeg';
+    // Open crop screen for the new image, then on continue update item
+    _cropState = {
+      imageDataUrl: dataUrl,
+      mimeType: mimeType,
+      rotation: 0,
+      mirrored: false,
+      cropRect: null,
+      _isItemImageUpdate: true,
+      _itemIdToUpdate: _currentItemId
+    };
+    _closeItemDetail();
+    var screen = document.getElementById('crop-screen');
+    if (screen) screen.classList.add('active');
+    requestAnimationFrame(function() { requestAnimationFrame(function() { _initCropCanvas(); }); });
+  };
+  reader.readAsDataURL(file);
+}
+
 // ── Garderobe-Grid rendern ────────────────────────────────────────────────────
 function renderWardrobeGrid() {
   var grid = document.getElementById('clothes-grid');
@@ -613,6 +855,8 @@ function renderWardrobeGrid() {
     var hasImg = item.imageDataUrl && item.imageDataUrl.length > 20;
     var card = document.createElement('div');
     card.className = 'cloth-card ai-wardrobe-item';
+    card.style.cursor = 'pointer';
+    card.onclick = (function(id) { return function() { _openItemDetail(id); }; })(item.id);
     card.setAttribute('data-category', _wardrobeCategory(item));
     var brandLine = item.brand
       ? '<div class="cloth-color-name" style="font-size:10px;color:var(--purple);font-weight:700;margin-bottom:3px;">' + item.brand + '</div>'
