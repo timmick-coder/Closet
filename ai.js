@@ -4359,7 +4359,8 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ── Event Delegation: Outfit-Namen umbenennen (global für alle Karten) ──
-  var kiScreen = document.getElementById('ki');
+  // Wichtig: Der KI-Screen heißt "ki-styling", nicht "ki"
+  var kiScreen = document.getElementById('ki-styling');
   if (kiScreen) {
     kiScreen.addEventListener('click', function(e) {
       var nameEl = e.target.closest('.outfit-name-editable');
