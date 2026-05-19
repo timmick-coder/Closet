@@ -8,6 +8,34 @@ function getRemoveBgKey() {
   return (window.__ENV && window.__ENV.EXPO_PUBLIC_REMOVEBG_API_KEY) || '';
 }
 
+// ── Bild komprimieren (max 1024px, JPEG 0.82) ─────────────────────────────────
+function _compressImage(base64, mimeType) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = function() {
+      var maxSize = 1024;
+      var w = img.naturalWidth;
+      var h = img.naturalHeight;
+      if (w <= maxSize && h <= maxSize) {
+        // Schon klein genug — trotzdem als JPEG re-encoden
+        var c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0);
+        resolve({ base64: c.toDataURL('image/jpeg', 0.82).split(',')[1], mimeType: 'image/jpeg' });
+        return;
+      }
+      var scale = Math.min(maxSize / w, maxSize / h);
+      var c = document.createElement('canvas');
+      c.width = Math.round(w * scale);
+      c.height = Math.round(h * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      resolve({ base64: c.toDataURL('image/jpeg', 0.82).split(',')[1], mimeType: 'image/jpeg' });
+    };
+    img.onerror = function() { resolve({ base64: base64, mimeType: mimeType }); };
+    img.src = 'data:' + mimeType + ';base64,' + base64;
+  });
+}
+
 // ── Garderobe (LocalStorage) ──────────────────────────────────────────────────
 function loadWardrobe() {
   try { return JSON.parse(localStorage.getItem('stylesync_wardrobe') || '[]'); }
@@ -401,19 +429,20 @@ function _recropImage() {
 }
 
 async function _processCroppedImage(base64, mimeType) {
-  // Store originals for re-crop
-  if (_cropState) {
-    _cropState._processedBase64 = base64;
-    _cropState._processedMime = mimeType;
-  }
+  var origDataUrl = (_cropState && _cropState._lastOriginalDataUrl) || ('data:' + mimeType + ';base64,' + base64);
   try {
+    showScanOverlay('loading', { text: '🗜️ Bild wird optimiert…' });
+    var compressed = await _compressImage(base64, mimeType);
+    base64 = compressed.base64;
+    mimeType = compressed.mimeType;
+
     showScanOverlay('loading', { text: '🔍 KI analysiert dein Kleidungsstück…' });
     var analysis = await analyzeClothingWithGemini(base64, mimeType);
     showScanOverlay('loading', { text: '✂️ Hintergrund wird entfernt…' });
     var imageDataUrl = await removeBackground(base64, mimeType);
     _scanResult = Object.assign({}, analysis, {
       imageDataUrl: imageDataUrl,
-      _origDataUrl: (_cropState && _cropState._lastOriginalDataUrl) || ('data:' + mimeType + ';base64,' + base64)
+      _origDataUrl: origDataUrl
     });
     showScanOverlay('result', _scanResult);
   } catch (err) {
