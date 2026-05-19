@@ -13,15 +13,14 @@ function _compressImage(base64, mimeType) {
   return new Promise(function(resolve) {
     var img = new Image();
     img.onload = function() {
-      var maxSize = 1024;
+      var maxSize = 1600; // Höhere Auflösung für bessere KI-Erkennung
       var w = img.naturalWidth;
       var h = img.naturalHeight;
       if (w <= maxSize && h <= maxSize) {
-        // Schon klein genug — trotzdem als JPEG re-encoden
         var c = document.createElement('canvas');
         c.width = w; c.height = h;
         c.getContext('2d').drawImage(img, 0, 0);
-        resolve({ base64: c.toDataURL('image/jpeg', 0.82).split(',')[1], mimeType: 'image/jpeg' });
+        resolve({ base64: c.toDataURL('image/jpeg', 0.92).split(',')[1], mimeType: 'image/jpeg' });
         return;
       }
       var scale = Math.min(maxSize / w, maxSize / h);
@@ -29,7 +28,7 @@ function _compressImage(base64, mimeType) {
       c.width = Math.round(w * scale);
       c.height = Math.round(h * scale);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      resolve({ base64: c.toDataURL('image/jpeg', 0.82).split(',')[1], mimeType: 'image/jpeg' });
+      resolve({ base64: c.toDataURL('image/jpeg', 0.92).split(',')[1], mimeType: 'image/jpeg' });
     };
     img.onerror = function() { resolve({ base64: base64, mimeType: mimeType }); };
     img.src = 'data:' + mimeType + ';base64,' + base64;
@@ -407,18 +406,48 @@ function _cropMirror() {
 }
 
 async function _cropAndContinue() {
-  if (!_cropState) return;
-  var canvas = document.getElementById('crop-canvas');
-  if (!canvas) return;
-  var cr = _cropState.cropRect || { x: 0, y: 0, w: canvas.width, h: canvas.height };
+  if (!_cropState || !_cropState.img) return;
+  var displayCanvas = document.getElementById('crop-canvas');
+  if (!displayCanvas) return;
+
+  var cr = _cropState.cropRect || { x: 0, y: 0, w: displayCanvas.width, h: displayCanvas.height };
+  var img = _cropState.img;
+  var rot = _cropState.rotation;
+  var isRotated = rot % 180 !== 0;
+
+  // 1. Original-Auflösung des rotierten Bildes
+  var fullW = isRotated ? img.naturalHeight : img.naturalWidth;
+  var fullH = isRotated ? img.naturalWidth : img.naturalHeight;
+
+  // 2. Vollbild-Canvas bei Original-Auflösung (mit Rotation + Mirror)
+  var fullCanvas = document.createElement('canvas');
+  fullCanvas.width = fullW;
+  fullCanvas.height = fullH;
+  var fullCtx = fullCanvas.getContext('2d');
+  fullCtx.save();
+  fullCtx.translate(fullW / 2, fullH / 2);
+  fullCtx.rotate(rot * Math.PI / 180);
+  if (_cropState.mirrored) fullCtx.scale(-1, 1);
+  fullCtx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+  fullCtx.restore();
+
+  // 3. Crop-Koordinaten vom Display-Canvas auf Original skalieren
+  var scaleX = fullW / displayCanvas.width;
+  var scaleY = fullH / displayCanvas.height;
+  var cropX = Math.round(cr.x * scaleX);
+  var cropY = Math.round(cr.y * scaleY);
+  var cropW = Math.max(1, Math.round(cr.w * scaleX));
+  var cropH = Math.max(1, Math.round(cr.h * scaleY));
+
+  // 4. Ausschnitt aus dem Full-Res-Canvas
   var out = document.createElement('canvas');
-  out.width = Math.round(cr.w);
-  out.height = Math.round(cr.h);
-  var ctx = out.getContext('2d');
-  ctx.drawImage(canvas, Math.round(cr.x), Math.round(cr.y), Math.round(cr.w), Math.round(cr.h), 0, 0, out.width, out.height);
-  var dataUrl = out.toDataURL('image/jpeg', 0.92);
+  out.width = cropW;
+  out.height = cropH;
+  out.getContext('2d').drawImage(fullCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+  var dataUrl = out.toDataURL('image/jpeg', 0.95);
   var base64 = dataUrl.split(',')[1];
-  // Store original dataUrl for re-crop
+
   _cropState._lastOriginalDataUrl = _cropState.imageDataUrl;
   _cropState._lastMimeType = _cropState.mimeType;
   _closeCropScreen();
@@ -526,22 +555,38 @@ async function processScanFile(file) {
 }
 function confirmScanItem() {
   if (!_scanResult) return;
-  var name = (document.getElementById('scan-edit-name')?.value || '').trim() || _scanResult.name;
-  var brand = (document.getElementById('scan-edit-brand')?.value || '').trim();
-  var type = (document.getElementById('scan-edit-type')?.value || '').trim() || _scanResult.type;
-  var color = (document.getElementById('scan-edit-color')?.value || '').trim() || _scanResult.color;
-  var style = (document.getElementById('scan-edit-style')?.value || '').trim() || _scanResult.style;
-  var seasonRaw = document.getElementById('scan-edit-season')?.value || 'Ganzjährig|s-ganzjahrig';
-  var seasonParts = seasonRaw.split('|');
-  var item = Object.assign({}, _scanResult, {
-    name: name, brand: brand, type: type, color: color,
-    season: seasonParts[0], seasonClass: seasonParts[1] || 's-ganzjahrig', style: style
-  });
-  addToWardrobe(item);
-  renderWardrobeGrid();
-  hideScanOverlay();
-  _scanResult = null;
-  navigate('schrank', document.getElementById('nav-schrank'));
+  try {
+    var name = (document.getElementById('scan-edit-name').value || '').trim() || _scanResult.name;
+    var brand = (document.getElementById('scan-edit-brand').value || '').trim();
+    var type = (document.getElementById('scan-edit-type').value || '').trim() || _scanResult.type;
+    var color = (document.getElementById('scan-edit-color').value || '').trim() || _scanResult.color;
+    var style = (document.getElementById('scan-edit-style').value || '').trim() || _scanResult.style;
+    var seasonRaw = document.getElementById('scan-edit-season').value || 'Ganzjährig|s-ganzjahrig';
+    var seasonParts = seasonRaw.split('|');
+    // Große base64-Felder nicht in localStorage speichern
+    var item = {
+      id: _scanResult.id || ('item_' + Date.now()),
+      name: name,
+      brand: brand,
+      type: type,
+      color: color,
+      colorHex: _scanResult.colorHex || '#888',
+      season: seasonParts[0],
+      seasonClass: seasonParts[1] || 's-ganzjahrig',
+      style: style,
+      emoji: _scanResult.emoji || '👕',
+      imageDataUrl: _scanResult.imageDataUrl || ''
+    };
+    addToWardrobe(item);
+    renderWardrobeGrid();
+    hideScanOverlay();
+    _scanResult = null;
+    _showToast('✅ Kleidungsstück gespeichert!');
+    navigate('schrank', document.getElementById('nav-schrank'));
+  } catch (err) {
+    console.error('[confirmScanItem] Fehler:', err);
+    _showToast('❌ Speichern fehlgeschlagen: ' + err.message);
+  }
 }
 function cancelScan() { hideScanOverlay(); _scanResult = null; }
 
