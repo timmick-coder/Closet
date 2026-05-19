@@ -1370,7 +1370,7 @@ function _showToast(msg) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 function _buildRenameHtml(name) {
-  return name + ' <span class="outfit-rename-pencil">✏️</span>';
+  return name; // kein ✏️-Icon — Name direkt antippen zum Umbenennen
 }
 
 // Startet Inline-Editing auf einem beliebigen Name-Element
@@ -4396,6 +4396,18 @@ document.addEventListener('DOMContentLoaded', function() {
           _openOutfitDetail(id, col);
         }
       }
+    });
+  }
+
+  // ── Event Delegation: KI-Vorschlag Karten anklicken → Detail öffnen ──
+  var aiSugContainer = document.getElementById('ki-ai-suggestions');
+  if (aiSugContainer) {
+    aiSugContainer.addEventListener('click', function(e) {
+      if (e.target.closest('.outfit-name-editable')) return; // rename-Handler übernimmt
+      if (e.target.closest('.heart-btn')) return;            // Herz → nur liken
+      if (e.target.closest('.outfit-save-btn')) return;      // Speichern → nur Modal
+      var wrapper = e.target.closest('[data-swipe-id]');
+      if (wrapper) _openOutfitDetail(wrapper.getAttribute('data-swipe-id'), null);
     });
   }
 
