@@ -1127,6 +1127,7 @@
     .idp-field-select { flex:1; border:none; background:transparent; font-size:14px; font-weight:600; color:var(--text); outline:none; font-family:inherit; cursor:pointer; }
     .idp-color-input-wrap { flex:1; display:flex; align-items:center; gap:8px; }
     .idp-color-picker { width:28px; height:28px; border-radius:50%; border:2px solid var(--purple-border); cursor:pointer; padding:0; background:none; }
+    .idp-field-static { flex:1; font-size:14px; font-weight:600; color:var(--text2); }
     .idp-delete-btn { width:100%; padding:14px; background:none; border:2px solid #EF4444; border-radius:16px; color:#EF4444; font-size:14px; font-weight:800; cursor:pointer; margin:4px 0 20px; }
     .idp-delete-btn:active { background:#FEE2E2; }
     /* Delete confirm overlay */
@@ -2107,17 +2108,11 @@
 
   <!-- ── Item Detail Panel ── -->
   <div class="item-detail-panel" id="item-detail-panel">
-    <!-- View Mode Header -->
-    <div class="idp-header" id="idp-header-view">
+    <!-- Header -->
+    <div class="idp-header">
       <button class="idp-back" onclick="_closeItemDetail()">←</button>
       <div class="idp-title" id="idp-view-title">Artikel</div>
-      <button class="idp-edit-btn" onclick="_enterItemEditMode()">✏️</button>
-    </div>
-    <!-- Edit Mode Header -->
-    <div class="idp-header" id="idp-header-edit" style="display:none">
-      <button class="idp-cancel-btn" onclick="_cancelItemEdit()">Abbrechen</button>
-      <div class="idp-title">Bearbeiten</div>
-      <button class="idp-save-btn" onclick="_saveItemEdit()">✅ Speichern</button>
+      <div style="width:44px"></div>
     </div>
 
     <div class="idp-scroll" id="idp-scroll">
@@ -2125,87 +2120,63 @@
       <div class="idp-image-wrap">
         <img class="idp-image" id="idp-image" src="" alt="" style="display:none" />
         <div class="idp-image-emoji" id="idp-emoji"></div>
-        <button class="idp-change-img-btn" id="idp-change-img-btn" onclick="_changeItemImage()">📷 Bild ändern</button>
       </div>
 
-      <!-- View Mode Info -->
-      <div id="idp-view-content">
-        <div class="idp-info-section">
-          <div class="idp-info-row"><span class="idp-info-label">Name</span><span class="idp-info-value" id="idp-v-name"></span></div>
-          <div class="idp-info-row"><span class="idp-info-label">Kategorie</span><span class="idp-info-value" id="idp-v-type"></span></div>
-          <div class="idp-info-row">
-            <span class="idp-info-label">Farbe</span>
-            <div class="idp-color-dot" id="idp-v-colordot"></div>
-            <span class="idp-info-value" id="idp-v-color"></span>
-          </div>
-          <div class="idp-info-row"><span class="idp-info-label">Saison</span><span class="idp-info-value" id="idp-v-season"></span></div>
-          <div class="idp-info-row"><span class="idp-info-label">Stil</span><span class="idp-info-value" id="idp-v-style"></span></div>
-          <div class="idp-info-row" id="idp-v-brand-row"><span class="idp-info-label">Marke</span><span class="idp-info-value" id="idp-v-brand"></span></div>
-          <div class="idp-info-row"><span class="idp-info-label">Hinzugefügt</span><span class="idp-info-value" id="idp-v-date"></span></div>
+      <!-- Editable Fields -->
+      <div style="height:14px"></div>
+      <div class="idp-field-group" style="margin:0 16px 12px">
+        <div class="idp-field-row">
+          <span class="idp-field-label">Name</span>
+          <input class="idp-field-input" id="idp-e-name" type="text" placeholder="Name" />
         </div>
-        <div class="idp-actions">
-          <button class="idp-action-btn" id="idp-fav-btn" onclick="_toggleItemFav()">
-            <span class="idp-act-icon" id="idp-fav-icon">🤍</span>
-            <span>Favorit</span>
-          </button>
-          <button class="idp-action-btn" onclick="_postItemToFeed()">
-            <span class="idp-act-icon">📤</span>
-            <span>Posten</span>
-          </button>
+        <div class="idp-field-row">
+          <span class="idp-field-label">Kategorie</span>
+          <select class="idp-field-select" id="idp-e-type">
+            <option value="Top">Tops</option>
+            <option value="Hose">Hosen</option>
+            <option value="Kleid">Kleider</option>
+            <option value="Schuh">Schuhe</option>
+            <option value="Accessoire">Accessoires</option>
+            <option value="Jacke">Jacken</option>
+          </select>
+        </div>
+        <div class="idp-field-row">
+          <span class="idp-field-label">Farbe</span>
+          <div class="idp-color-input-wrap">
+            <input type="color" class="idp-color-picker" id="idp-e-colorhex" />
+            <input class="idp-field-input" id="idp-e-color" type="text" placeholder="z.B. Weiß" />
+          </div>
+        </div>
+        <div class="idp-field-row">
+          <span class="idp-field-label">Saison</span>
+          <select class="idp-field-select" id="idp-e-season">
+            <option value="Sommer|s-sommer">☀️ Sommer</option>
+            <option value="Winter|s-winter">❄️ Winter</option>
+            <option value="Frühling|s-fruhjahr">🌸 Frühling</option>
+            <option value="Ganzjährig|s-ganzjahrig">🍃 Ganzjährig</option>
+          </select>
+        </div>
+        <div class="idp-field-row">
+          <span class="idp-field-label">Stil</span>
+          <select class="idp-field-select" id="idp-e-style">
+            <option value="Casual">Casual</option>
+            <option value="Formal">Formal</option>
+            <option value="Sportlich">Sportlich</option>
+            <option value="Elegant">Elegant</option>
+            <option value="Streetwear">Streetwear</option>
+            <option value="Business">Business</option>
+          </select>
+        </div>
+        <div class="idp-field-row">
+          <span class="idp-field-label">Marke</span>
+          <input class="idp-field-input" id="idp-e-brand" type="text" placeholder="Optional" />
+        </div>
+        <div class="idp-field-row">
+          <span class="idp-field-label">Hinzugefügt</span>
+          <span class="idp-field-static" id="idp-v-date">—</span>
         </div>
       </div>
-
-      <!-- Edit Mode Form -->
-      <div id="idp-edit-content" style="display:none" class="idp-edit-form">
-        <div style="height:14px"></div>
-        <div class="idp-field-group">
-          <div class="idp-field-row">
-            <span class="idp-field-label">Name</span>
-            <input class="idp-field-input" id="idp-e-name" type="text" placeholder="z.B. Weißes T-Shirt" />
-          </div>
-          <div class="idp-field-row">
-            <span class="idp-field-label">Kategorie</span>
-            <select class="idp-field-select" id="idp-e-type">
-              <option value="Top">Tops</option>
-              <option value="Hose">Hosen</option>
-              <option value="Kleid">Kleider</option>
-              <option value="Schuh">Schuhe</option>
-              <option value="Accessoire">Accessoires</option>
-              <option value="Jacke">Jacken</option>
-            </select>
-          </div>
-          <div class="idp-field-row">
-            <span class="idp-field-label">Farbe</span>
-            <div class="idp-color-input-wrap">
-              <input type="color" class="idp-color-picker" id="idp-e-colorhex" oninput="_syncColorName(this.value)" />
-              <input class="idp-field-input" id="idp-e-color" type="text" placeholder="z.B. Weiß" />
-            </div>
-          </div>
-          <div class="idp-field-row">
-            <span class="idp-field-label">Saison</span>
-            <select class="idp-field-select" id="idp-e-season">
-              <option value="Sommer|s-sommer">☀️ Sommer</option>
-              <option value="Winter|s-winter">❄️ Winter</option>
-              <option value="Frühling|s-fruhjahr">🌸 Frühling</option>
-              <option value="Ganzjährig|s-ganzjahrig">🍃 Ganzjährig</option>
-            </select>
-          </div>
-          <div class="idp-field-row">
-            <span class="idp-field-label">Stil</span>
-            <select class="idp-field-select" id="idp-e-style">
-              <option value="Casual">Casual</option>
-              <option value="Formal">Formal</option>
-              <option value="Sportlich">Sportlich</option>
-              <option value="Elegant">Elegant</option>
-              <option value="Streetwear">Streetwear</option>
-              <option value="Business">Business</option>
-            </select>
-          </div>
-          <div class="idp-field-row">
-            <span class="idp-field-label">Marke</span>
-            <input class="idp-field-input" id="idp-e-brand" type="text" placeholder="Optional" />
-          </div>
-        </div>
+      <div style="padding:0 16px 28px">
         <button class="idp-delete-btn" onclick="_showDeleteConfirm()">🗑️ Artikel löschen</button>
       </div>
     </div>
@@ -2221,9 +2192,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Hidden file input for image change -->
-    <input type="file" id="idp-img-input" accept="image/*" style="display:none" onchange="_onItemImageSelected(this)" />
   </div>
 
   <!-- ── Streak Reminder Banner ── -->
