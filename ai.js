@@ -1,8 +1,11 @@
-// ai.js — StyleSync KI-Features (Gemini + @imgly/background-removal)
+// ai.js — StyleSync KI-Features (Gemini + Remove.bg)
 
 // ── API Keys ──────────────────────────────────────────────────────────────────
 function getGeminiKey() {
   return (window.__ENV && window.__ENV.EXPO_PUBLIC_GEMINI_API_KEY) || '';
+}
+function getRemoveBgKey() {
+  return (window.__ENV && window.__ENV.EXPO_PUBLIC_REMOVEBG_API_KEY) || '';
 }
 
 // ── Bild komprimieren (max 1024px, JPEG 0.82) ─────────────────────────────────
@@ -182,10 +185,15 @@ function _openCropScreen(imageDataUrl, mimeType) {
   };
   var screen = document.getElementById('crop-screen');
   if (screen) screen.classList.add('active');
-  // Wait for DOM to render before sizing canvas
+  // Warte bis Layout berechnet ist — rAF reicht manchmal nicht auf Mobilgeräten
   requestAnimationFrame(function() {
     requestAnimationFrame(function() {
-      _initCropCanvas();
+      var wrap = document.getElementById('crop-canvas-wrap');
+      if (wrap && wrap.clientHeight > 10) {
+        _initCropCanvas();
+      } else {
+        setTimeout(_initCropCanvas, 120); // Fallback wenn Layout noch nicht bereit
+      }
     });
   });
 }
@@ -204,6 +212,11 @@ function _initCropCanvas() {
     _cropDrawAll();
     _initCropDrag();
   };
+  img.onerror = function() {
+    console.error('[crop] Bild konnte nicht geladen werden');
+    _showToast('❌ Bild konnte nicht geladen werden');
+    _closeCropScreen();
+  };
   img.src = _cropState.imageDataUrl;
 }
 
@@ -216,9 +229,11 @@ function _cropSizeCanvas() {
   var isRotated = rot % 180 !== 0;
   var imgW = isRotated ? img.naturalHeight : img.naturalWidth;
   var imgH = isRotated ? img.naturalWidth : img.naturalHeight;
-  var maxW = wrap.clientWidth - 20;
-  var maxH = wrap.clientHeight - 20;
+  // Fallback auf Fenster-Größe wenn wrap noch kein Layout hat
+  var maxW = (wrap.clientWidth > 20 ? wrap.clientWidth : window.innerWidth) - 20;
+  var maxH = (wrap.clientHeight > 20 ? wrap.clientHeight : window.innerHeight - 160) - 20;
   var scale = Math.min(maxW / imgW, maxH / imgH, 1);
+  if (!scale || scale <= 0) scale = 0.5;
   canvas.width = Math.round(imgW * scale);
   canvas.height = Math.round(imgH * scale);
   _cropState.dispScale = scale;
