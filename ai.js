@@ -247,6 +247,17 @@ function _initCropCanvas() {
     _cropState.img = img;
     _cropDrawAll();
     _initCropDrag();
+    // Zweiter Draw nach Layout-Stabilisierung (erster kann canvas.width=0 treffen)
+    setTimeout(function() {
+      if (!_cropState) return;
+      _cropState.cropRect = null; // CropRect zurücksetzen damit es neu berechnet wird
+      _cropDrawAll();
+    }, 80);
+    setTimeout(function() {
+      if (!_cropState) return;
+      _cropState.cropRect = null;
+      _cropDrawAll();
+    }, 250);
   };
   img.onerror = function() {
     console.error('[crop] Bild konnte nicht geladen werden');
