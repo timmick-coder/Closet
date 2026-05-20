@@ -41,7 +41,43 @@ function loadWardrobe() {
   catch { return []; }
 }
 function saveWardrobe(items) {
-  localStorage.setItem('stylesync_wardrobe', JSON.stringify(items));
+  try {
+    localStorage.setItem('stylesync_wardrobe', JSON.stringify(items));
+  } catch (e) {
+    // Quota überschritten → Bilder der ältesten Artikel entfernen und nochmal versuchen
+    console.warn('[saveWardrobe] Quota voll, entferne Bilder alter Artikel…');
+    var trimmed = items.map(function(item, idx) {
+      if (idx < items.length - 5) return Object.assign({}, item, { imageDataUrl: '' });
+      return item;
+    });
+    try { localStorage.setItem('stylesync_wardrobe', JSON.stringify(trimmed)); } catch (e2) { console.error('[saveWardrobe] Auch nach Komprimierung voll:', e2); }
+  }
+}
+
+// Bild für localStorage komprimieren (max 400px, JPEG 0.72)
+function _compressForStorage(dataUrl) {
+  return new Promise(function(resolve) {
+    if (!dataUrl || dataUrl.length < 100) { resolve(dataUrl); return; }
+    var img = new Image();
+    img.onload = function() {
+      var maxSize = 400;
+      var w = img.naturalWidth, h = img.naturalHeight;
+      if (w > maxSize || h > maxSize) {
+        var scale = Math.min(maxSize / w, maxSize / h);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff'; // weißer Hintergrund für transparente PNGs
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror = function() { resolve(dataUrl); };
+    img.src = dataUrl;
+  });
 }
 function addToWardrobe(item) {
   var items = loadWardrobe();
@@ -497,7 +533,7 @@ async function _processCroppedImage(base64, mimeType) {
       var updateItems = loadWardrobe();
       var updateIdx = updateItems.findIndex(function(i) { return i.id === updateId; });
       if (updateIdx >= 0) {
-        updateItems[updateIdx].imageDataUrl = imageDataUrl;
+        updateItems[updateIdx].imageDataUrl = await _compressForStorage(imageDataUrl);
         saveWardrobe(updateItems);
         renderWardrobeGrid();
         _showToast('✅ Bild aktualisiert!');
@@ -585,7 +621,7 @@ async function processScanFile(file) {
   };
   reader.readAsDataURL(file);
 }
-function confirmScanItem() {
+async function confirmScanItem() {
   if (!_scanResult) return;
   try {
     var name = (document.getElementById('scan-edit-name').value || '').trim() || _scanResult.name;
@@ -595,19 +631,15 @@ function confirmScanItem() {
     var style = (document.getElementById('scan-edit-style').value || '').trim() || _scanResult.style;
     var seasonRaw = document.getElementById('scan-edit-season').value || 'Ganzjährig|s-ganzjahrig';
     var seasonParts = seasonRaw.split('|');
-    // Große base64-Felder nicht in localStorage speichern
+    // Bild auf 400px/JPEG komprimieren bevor in localStorage
+    var storedImage = await _compressForStorage(_scanResult.imageDataUrl || '');
     var item = {
       id: _scanResult.id || ('item_' + Date.now()),
-      name: name,
-      brand: brand,
-      type: type,
-      color: color,
+      name: name, brand: brand, type: type, color: color,
       colorHex: _scanResult.colorHex || '#888',
-      season: seasonParts[0],
-      seasonClass: seasonParts[1] || 's-ganzjahrig',
-      style: style,
-      emoji: _scanResult.emoji || '👕',
-      imageDataUrl: _scanResult.imageDataUrl || ''
+      season: seasonParts[0], seasonClass: seasonParts[1] || 's-ganzjahrig',
+      style: style, emoji: _scanResult.emoji || '👕',
+      imageDataUrl: storedImage
     };
     addToWardrobe(item);
     renderWardrobeGrid();
