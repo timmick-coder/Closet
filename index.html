@@ -1262,6 +1262,94 @@
       </div>
     </div>
 
+    <!-- ── Item Detail Panel ── -->
+    <div class="item-detail-panel" id="item-detail-panel">
+      <!-- Header -->
+      <div class="idp-header">
+        <button class="idp-back" onclick="_closeItemDetail()">←</button>
+        <div class="idp-title" id="idp-view-title">Artikel</div>
+        <div style="width:44px"></div>
+      </div>
+
+      <div class="idp-scroll" id="idp-scroll">
+        <!-- Image -->
+        <div class="idp-image-wrap">
+          <img class="idp-image" id="idp-image" src="" alt="" style="display:none" />
+          <div class="idp-image-emoji" id="idp-emoji"></div>
+        </div>
+
+        <!-- Editable Fields -->
+        <div style="height:14px"></div>
+        <div class="idp-field-group" style="margin:0 16px 12px">
+          <div class="idp-field-row">
+            <span class="idp-field-label">Name</span>
+            <input class="idp-field-input" id="idp-e-name" type="text" placeholder="Name" />
+          </div>
+          <div class="idp-field-row">
+            <span class="idp-field-label">Kategorie</span>
+            <select class="idp-field-select" id="idp-e-type">
+              <option value="Top">Tops</option>
+              <option value="Hose">Hosen</option>
+              <option value="Kleid">Kleider</option>
+              <option value="Schuh">Schuhe</option>
+              <option value="Accessoire">Accessoires</option>
+              <option value="Jacke">Jacken</option>
+            </select>
+          </div>
+          <div class="idp-field-row">
+            <span class="idp-field-label">Farbe</span>
+            <div class="idp-color-input-wrap">
+              <input type="color" class="idp-color-picker" id="idp-e-colorhex" />
+              <input class="idp-field-input" id="idp-e-color" type="text" placeholder="z.B. Weiß" />
+            </div>
+          </div>
+          <div class="idp-field-row">
+            <span class="idp-field-label">Saison</span>
+            <select class="idp-field-select" id="idp-e-season">
+              <option value="Sommer|s-sommer">☀️ Sommer</option>
+              <option value="Winter|s-winter">❄️ Winter</option>
+              <option value="Frühling|s-fruhjahr">🌸 Frühling</option>
+              <option value="Ganzjährig|s-ganzjahrig">🍃 Ganzjährig</option>
+            </select>
+          </div>
+          <div class="idp-field-row">
+            <span class="idp-field-label">Stil</span>
+            <select class="idp-field-select" id="idp-e-style">
+              <option value="Casual">Casual</option>
+              <option value="Formal">Formal</option>
+              <option value="Sportlich">Sportlich</option>
+              <option value="Elegant">Elegant</option>
+              <option value="Streetwear">Streetwear</option>
+              <option value="Business">Business</option>
+            </select>
+          </div>
+          <div class="idp-field-row">
+            <span class="idp-field-label">Marke</span>
+            <input class="idp-field-input" id="idp-e-brand" type="text" placeholder="Optional" />
+          </div>
+          <div class="idp-field-row">
+            <span class="idp-field-label">Hinzugefügt</span>
+            <span class="idp-field-static" id="idp-v-date">—</span>
+          </div>
+        </div>
+        <div style="padding:0 16px 28px">
+          <button class="idp-delete-btn" onclick="_showDeleteConfirm()">Artikel löschen</button>
+        </div>
+      </div>
+
+      <!-- Delete Confirmation -->
+      <div class="idp-confirm-overlay" id="idp-confirm-overlay">
+        <div class="idp-confirm-sheet">
+          <div class="idp-confirm-title">Artikel löschen?</div>
+          <div class="idp-confirm-sub">Möchtest du diesen Artikel wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</div>
+          <div class="idp-confirm-btns">
+            <button class="idp-confirm-cancel" onclick="_hideDeleteConfirm()">Abbrechen</button>
+            <button class="idp-confirm-delete" onclick="_deleteItem()">Löschen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══════════ SCANNEN ═══════════ -->
     <div id="scannen" class="screen">
       <div class="screen-header">
@@ -2106,93 +2194,7 @@
     </div>
   </div>
 
-  <!-- ── Item Detail Panel ── -->
-  <div class="item-detail-panel" id="item-detail-panel">
-    <!-- Header -->
-    <div class="idp-header">
-      <button class="idp-back" onclick="_closeItemDetail()">←</button>
-      <div class="idp-title" id="idp-view-title">Artikel</div>
-      <div style="width:44px"></div>
-    </div>
 
-    <div class="idp-scroll" id="idp-scroll">
-      <!-- Image -->
-      <div class="idp-image-wrap">
-        <img class="idp-image" id="idp-image" src="" alt="" style="display:none" />
-        <div class="idp-image-emoji" id="idp-emoji"></div>
-      </div>
-
-      <!-- Editable Fields -->
-      <div style="height:14px"></div>
-      <div class="idp-field-group" style="margin:0 16px 12px">
-        <div class="idp-field-row">
-          <span class="idp-field-label">Name</span>
-          <input class="idp-field-input" id="idp-e-name" type="text" placeholder="Name" />
-        </div>
-        <div class="idp-field-row">
-          <span class="idp-field-label">Kategorie</span>
-          <select class="idp-field-select" id="idp-e-type">
-            <option value="Top">Tops</option>
-            <option value="Hose">Hosen</option>
-            <option value="Kleid">Kleider</option>
-            <option value="Schuh">Schuhe</option>
-            <option value="Accessoire">Accessoires</option>
-            <option value="Jacke">Jacken</option>
-          </select>
-        </div>
-        <div class="idp-field-row">
-          <span class="idp-field-label">Farbe</span>
-          <div class="idp-color-input-wrap">
-            <input type="color" class="idp-color-picker" id="idp-e-colorhex" />
-            <input class="idp-field-input" id="idp-e-color" type="text" placeholder="z.B. Weiß" />
-          </div>
-        </div>
-        <div class="idp-field-row">
-          <span class="idp-field-label">Saison</span>
-          <select class="idp-field-select" id="idp-e-season">
-            <option value="Sommer|s-sommer">☀️ Sommer</option>
-            <option value="Winter|s-winter">❄️ Winter</option>
-            <option value="Frühling|s-fruhjahr">🌸 Frühling</option>
-            <option value="Ganzjährig|s-ganzjahrig">🍃 Ganzjährig</option>
-          </select>
-        </div>
-        <div class="idp-field-row">
-          <span class="idp-field-label">Stil</span>
-          <select class="idp-field-select" id="idp-e-style">
-            <option value="Casual">Casual</option>
-            <option value="Formal">Formal</option>
-            <option value="Sportlich">Sportlich</option>
-            <option value="Elegant">Elegant</option>
-            <option value="Streetwear">Streetwear</option>
-            <option value="Business">Business</option>
-          </select>
-        </div>
-        <div class="idp-field-row">
-          <span class="idp-field-label">Marke</span>
-          <input class="idp-field-input" id="idp-e-brand" type="text" placeholder="Optional" />
-        </div>
-        <div class="idp-field-row">
-          <span class="idp-field-label">Hinzugefügt</span>
-          <span class="idp-field-static" id="idp-v-date">—</span>
-        </div>
-      </div>
-      <div style="padding:0 16px 28px">
-        <button class="idp-delete-btn" onclick="_showDeleteConfirm()">Artikel löschen</button>
-      </div>
-    </div>
-
-    <!-- Delete Confirmation -->
-    <div class="idp-confirm-overlay" id="idp-confirm-overlay">
-      <div class="idp-confirm-sheet">
-        <div class="idp-confirm-title">Artikel löschen?</div>
-        <div class="idp-confirm-sub">Möchtest du diesen Artikel wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</div>
-        <div class="idp-confirm-btns">
-          <button class="idp-confirm-cancel" onclick="_hideDeleteConfirm()">Abbrechen</button>
-          <button class="idp-confirm-delete" onclick="_deleteItem()">Löschen</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- ── Streak Reminder Banner ── -->
   <div id="streak-reminder">
