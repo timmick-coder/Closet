@@ -7,7 +7,7 @@
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#6D28D9" />
+  <meta name="theme-color" content="#D4637A" />
 
   <!-- iOS PWA -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,19 +20,19 @@
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
     :root {
-      --bg: #F7F3FF;
+      --bg: #FFF8F5;
       --card: #FFFFFF;
-      --purple: #6B47FF;
-      --purple-mid: #8B6FFF;
-      --purple-light: #EDE9FF;
-      --purple-border: #D8CFFF;
-      --text: #18181B;
-      --text2: #9090A0;
-      --shadow: 0 2px 12px rgba(107,71,255,0.07);
+      --purple: #D4637A;
+      --purple-mid: #E0899A;
+      --purple-light: #FFF0F3;
+      --purple-border: #F9D9DF;
+      --text: #1C1C1E;
+      --text2: #9E8C8E;
+      --shadow: 0 2px 14px rgba(212,99,122,0.06);
     }
 
     html, body {
-      height: 100%; background: #1a0a2e;
+      height: 100%; background: #1a0e10;
       display: flex; justify-content: center; align-items: center;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       overflow: hidden;
@@ -104,7 +104,7 @@
       width: 56px; height: 56px; border-radius: 50%;
       background: var(--purple);
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 6px 20px rgba(107,71,255,0.4);
+      box-shadow: 0 6px 20px rgba(212,99,122,0.35);
       transition: transform 0.15s;
     }
     .nav-center-circle:active { transform: scale(0.93); }
@@ -125,12 +125,12 @@
     }
     .header-icon-btn svg { width: 20px; height: 20px; stroke: var(--purple); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
-    .big-title { font-size: 28px; font-weight: 800; color: var(--text); line-height: 1.15; }
-    .big-sub { font-size: 14px; font-weight: 700; color: var(--purple); margin-top: 2px; }
-    .big-sub-gray { font-size: 13px; color: var(--text2); margin-top: 2px; }
+    .big-title { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1.2; letter-spacing: -0.01em; }
+    .big-sub { font-size: 13px; font-weight: 600; color: var(--purple); margin-top: 3px; }
+    .big-sub-gray { font-size: 13px; color: var(--text2); margin-top: 3px; }
 
     .section-label {
-      font-size: 17px; font-weight: 800; color: var(--text);
+      font-size: 16px; font-weight: 700; color: var(--text);
       padding: 0 20px 12px;
       display: flex; align-items: center; justify-content: space-between;
     }
@@ -169,7 +169,7 @@
       width: 48px; height: 48px; border-radius: 50%;
       background: var(--purple); border: none; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 6px 18px rgba(107,71,255,0.35);
+      box-shadow: 0 6px 18px rgba(212,99,122,0.30);
       flex-shrink: 0;
     }
     .plus-btn svg { width: 24px; height: 24px; stroke: white; fill: none; stroke-width: 2.5; stroke-linecap: round; }
@@ -202,7 +202,7 @@
       border: 2px dashed var(--purple-mid);
       border-radius: 20px; padding: 32px 20px;
       display: flex; flex-direction: column; align-items: center; gap: 12px;
-      background: rgba(107,71,255,0.03); cursor: pointer;
+      background: rgba(212,99,122,0.03); cursor: pointer;
     }
     .scan-img-circle {
       width: 72px; height: 72px; border-radius: 50%;
@@ -397,7 +397,7 @@
       width: 100%; height: 54px; border-radius: 16px; background: var(--purple);
       border: none; color: white; font-size: 16px; font-weight: 800; cursor: pointer;
       display: flex; align-items: center; justify-content: center; gap: 8px;
-      box-shadow: 0 6px 18px rgba(107,71,255,0.3); transition: transform 0.15s;
+      box-shadow: 0 6px 18px rgba(212,99,122,0.22); transition: transform 0.15s;
     }
     .ki-generate-confirm:active { transform: scale(0.97); }
     .ki-generate-confirm svg { width: 18px; height: 18px; stroke: white; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -405,16 +405,16 @@
     .generate-btn {
       margin: 16px 20px 4px;
       height: 56px; border-radius: 18px;
-      background: linear-gradient(135deg, #6B47FF 0%, #C84B9E 100%);
+      background: #D4637A;
       border: none; color: white;
       font-size: 16px; font-weight: 800; cursor: pointer;
       display: flex; align-items: center; justify-content: center; gap: 10px;
-      box-shadow: 0 8px 24px rgba(107,71,255,0.35);
+      box-shadow: 0 8px 24px rgba(212,99,122,0.30);
       width: calc(100% - 40px);
       transition: transform 0.15s, box-shadow 0.15s;
       letter-spacing: 0.01em;
     }
-    .generate-btn:active { transform: scale(0.97); box-shadow: 0 4px 14px rgba(107,71,255,0.25); }
+    .generate-btn:active { transform: scale(0.97); box-shadow: 0 4px 14px rgba(212,99,122,0.18); }
     .generate-btn svg { width: 20px; height: 20px; stroke: white; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .generate-btn-more { margin:8px 20px 16px; height:50px; border-radius:18px; background:var(--bg); border:2px solid var(--purple-border); color:var(--purple); font-size:15px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; width:calc(100% - 40px); transition:transform 0.15s; }
     .generate-btn-more:active { transform:scale(0.97); }
@@ -438,7 +438,7 @@
     }
     .outfit-item-circle.highlighted { background: #DDD8FF; }
     .outfit-item-label { font-size: 11px; font-weight: 600; color: var(--text2); text-align: center; }
-    .outfit-card-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid #F0EBFF; }
+    .outfit-card-footer { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid #F9D9DF; }
     .outfit-weather { font-size: 12px; color: var(--text2); font-weight: 500; }
     .outfit-footer-btns { display: flex; align-items: center; gap: 10px; }
     .icon-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--bg); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -469,7 +469,7 @@
     .friend-search-placeholder { padding:48px 20px; text-align:center; color:var(--text2); font-size:14px; font-weight:600; }
     .search-result-card { display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--card); border-radius:18px; margin-bottom:10px; cursor:pointer; transition:transform 0.15s; }
     .search-result-card:active { transform:scale(0.98); }
-    .search-result-avatar { width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; border:2px solid rgba(107,71,255,0.15); }
+    .search-result-avatar { width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; border:2px solid rgba(212,99,122,0.10); }
     .search-result-info { flex:1; min-width:0; }
     .search-result-name { font-size:15px; font-weight:800; color:var(--text); }
     .search-result-handle { font-size:12px; color:var(--text2); margin-top:1px; }
@@ -576,7 +576,7 @@
     .inspo-detail-info { flex:1; }
     .inspo-detail-from { font-size:11px; font-weight:800; color:#856404; text-transform:uppercase; letter-spacing:0.05em; }
     .inspo-detail-name { font-size:14px; font-weight:800; color:var(--text); }
-    .inspo-my-version-btn { width:100%; height:48px; border-radius:14px; background:linear-gradient(135deg,#6B47FF 0%,#C84B9E 100%); border:none; color:white; font-size:14px; font-weight:800; cursor:pointer; margin-top:10px; box-shadow:0 4px 16px rgba(107,71,255,0.3); }
+    .inspo-my-version-btn { width:100%; height:48px; border-radius:14px; background:#D4637A; border:none; color:white; font-size:14px; font-weight:800; cursor:pointer; margin-top:10px; box-shadow:0 4px 16px rgba(212,99,122,0.22); }
     /* Inspo Modal */
     .inspo-col-item { display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--bg); border-radius:14px; margin-bottom:8px; cursor:pointer; border:1.5px solid transparent; transition:all 0.15s; }
     .inspo-col-item.selected { border-color:var(--purple); background:var(--purple-light); }
@@ -637,9 +637,9 @@
     .fp-avatar { width:62px; height:62px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:30px; border:3px solid rgba(255,255,255,0.4); flex-shrink:0; }
     .fp-name { font-size:20px; font-weight:800; color:white; }
     .fp-handle { font-size:13px; color:rgba(255,255,255,0.7); margin-top:3px; }
-    .fp-stats { margin:0 20px 14px; background:var(--card); border-radius:20px; padding:14px; box-shadow:0 8px 24px rgba(107,71,255,0.15); display:flex; }
+    .fp-stats { margin:0 20px 14px; background:var(--card); border-radius:20px; padding:14px; box-shadow:0 8px 24px rgba(212,99,122,0.10); display:flex; }
     .fp-stat { flex:1; text-align:center; }
-    .fp-stat+.fp-stat { border-left:1px solid #F0EBFF; }
+    .fp-stat+.fp-stat { border-left:1px solid #F9D9DF; }
     .fp-stat .fpnum { font-size:18px; font-weight:800; color:var(--text); }
     .fp-stat .fplbl { font-size:11px; color:var(--text2); margin-top:2px; font-weight:600; }
     .fp-actions { display:flex; gap:10px; margin:0 20px 16px; }
@@ -668,7 +668,7 @@
     .fp-wardrobe-emoji { font-size:36px; margin-bottom:4px; }
     .fp-wardrobe-name { font-size:11px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .fp-wardrobe-type { font-size:10px; color:var(--text2); margin-top:1px; }
-    .fp-ki-btn { margin:0 20px 16px; width:calc(100% - 40px); height:48px; border-radius:16px; background:linear-gradient(135deg,#6B47FF 0%,#C84B9E 100%); border:none; color:white; font-size:14px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .fp-ki-btn { margin:0 20px 16px; width:calc(100% - 40px); height:48px; border-radius:16px; background:#D4637A; border:none; color:white; font-size:14px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
     .fp-ki-panel { position:absolute; inset:0; background:var(--bg); z-index:10; transform:translateX(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); display:flex; flex-direction:column; overflow:hidden; }
     .fp-ki-panel.active { transform:translateX(0); }
     .fp-ki-header { display:flex; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid var(--purple-border); background:var(--card); flex-shrink:0; }
@@ -683,9 +683,9 @@
     .fp-ki-tausch-btn { background:var(--purple-light); border:1.5px solid var(--purple-border); color:var(--purple); font-size:12px; font-weight:800; border-radius:10px; padding:7px 11px; cursor:pointer; flex-shrink:0; white-space:nowrap; }
     .fp-head-tappable { cursor:pointer; display:flex; align-items:center; gap:10px; flex:1; }
 
-    .profil-stats { margin: 0 20px 16px; background: var(--card); border-radius: 20px; padding: 16px; box-shadow: 0 8px 24px rgba(107,71,255,0.15); display: flex; }
+    .profil-stats { margin: 0 20px 16px; background: var(--card); border-radius: 20px; padding: 16px; box-shadow: 0 8px 24px rgba(212,99,122,0.10); display: flex; }
     .profil-stat { flex: 1; text-align: center; }
-    .profil-stat + .profil-stat { border-left: 1px solid #F0EBFF; }
+    .profil-stat + .profil-stat { border-left: 1px solid #F9D9DF; }
     .profil-stat .pnum { font-size: 20px; font-weight: 800; color: var(--text); }
     .profil-stat .plbl { font-size: 11px; color: var(--text2); margin-top: 2px; font-weight: 600; }
 
@@ -716,7 +716,7 @@
     .outfit-card-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; }
     .heart-btn { background:none; border:none; font-size:24px; cursor:pointer; padding:0; line-height:1; transition:transform 0.18s; flex-shrink:0; }
     .heart-btn:active { transform:scale(1.35); }
-    .outfit-items-vertical { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; border-top:1px solid #F0EBFF; border-bottom:1px solid #F0EBFF; padding:14px 0; }
+    .outfit-items-vertical { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; border-top:1px solid #F9D9DF; border-bottom:1px solid #F9D9DF; padding:14px 0; }
     .outfit-item-row { display:flex; align-items:center; gap:12px; }
     .outfit-item-photo { width:56px; height:56px; border-radius:14px; background:#F7F3FF; display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; background-size:cover; background-position:center; border:1.5px solid #EEE8FF; overflow:hidden; }
     .outfit-item-row-name { font-size:14px; font-weight:700; color:var(--text); }
@@ -789,7 +789,7 @@
     .ki-gen-col-chip.active { background:var(--purple); color:white; border-color:var(--purple); }
     .ki-gen-actions { display:flex; gap:12px; margin-top:22px; }
     .ki-gen-cancel { flex:1; height:52px; border-radius:16px; background:var(--bg); border:1.5px solid var(--purple-border); font-size:15px; font-weight:700; color:var(--text2); cursor:pointer; }
-    .ki-gen-confirm { flex:2; height:52px; border-radius:16px; background:linear-gradient(135deg,#6B47FF 0%,#C84B9E 100%); border:none; font-size:15px; font-weight:800; color:white; cursor:pointer; box-shadow:0 6px 20px rgba(107,71,255,0.3); }
+    .ki-gen-confirm { flex:2; height:52px; border-radius:16px; background:#D4637A; border:none; font-size:15px; font-weight:800; color:white; cursor:pointer; box-shadow:0 6px 20px rgba(212,99,122,0.22); }
 
     /* ── KI Panel Ansichten ── */
     .ki-panel { position:absolute; inset:0; z-index:50; background:var(--bg); display:none; flex-direction:column; animation:kiPanelIn 0.22s ease; }
@@ -809,7 +809,7 @@
     .crop-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; background:#000; flex-shrink:0; }
     .crop-cancel-btn { background:none; border:none; color:rgba(255,255,255,0.8); font-size:15px; font-weight:600; cursor:pointer; padding:8px; }
     .crop-title { color:white; font-size:16px; font-weight:800; }
-    .crop-continue-btn { background:#6B47FF; color:white; border:none; border-radius:20px; padding:8px 18px; font-size:15px; font-weight:700; cursor:pointer; }
+    .crop-continue-btn { background:#D4637A; color:white; border:none; border-radius:20px; padding:8px 18px; font-size:15px; font-weight:700; cursor:pointer; }
     .crop-canvas-wrap { flex:1; position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden; padding:10px; }
     #crop-canvas { display:block; max-width:100%; max-height:100%; touch-action:none; }
     .crop-tools { display:flex; justify-content:center; gap:16px; padding:14px 16px 20px; background:#000; flex-shrink:0; }
@@ -834,7 +834,7 @@
     .inspo-card-from-label { font-size:10px; font-weight:800; color:#856404; text-transform:uppercase; letter-spacing:0.05em; }
     .inspo-card-from-name { font-size:14px; font-weight:800; color:var(--text); }
     .inspo-card-title { font-size:15px; font-weight:800; color:var(--text); margin-bottom:8px; }
-    .inspo-version-btn { width:100%; height:44px; border-radius:14px; background:linear-gradient(135deg,#6B47FF 0%,#C84B9E 100%); border:none; color:white; font-size:13px; font-weight:800; cursor:pointer; margin-top:10px; box-shadow:0 4px 14px rgba(107,71,255,0.28); }
+    .inspo-version-btn { width:100%; height:44px; border-radius:14px; background:#D4637A; border:none; color:white; font-size:13px; font-weight:800; cursor:pointer; margin-top:10px; box-shadow:0 4px 14px rgba(212,99,122,0.20); }
     /* Empty state */
     .ki-empty-state { text-align:center; padding:52px 24px; }
     .ki-empty-icon { font-size:48px; margin-bottom:14px; }
@@ -903,7 +903,7 @@
     .post-detail-vis-badge { display:inline-flex; align-items:center; gap:6px; background:var(--purple-light); color:var(--purple); border-radius:20px; padding:5px 12px; font-size:12px; font-weight:700; margin-bottom:10px; cursor:pointer; border:1.5px solid var(--purple-border); }
     .post-detail-caption { font-size:15px; color:var(--text); line-height:1.6; margin-bottom:12px; font-weight:500; }
     .post-detail-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
-    .post-detail-stats { display:flex; gap:18px; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid #F0EBFF; }
+    .post-detail-stats { display:flex; gap:18px; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid #F9D9DF; }
     .post-detail-stat { font-size:13px; color:var(--text2); }
     .post-detail-stat strong { color:var(--text); font-weight:800; }
     .post-detail-actions { display:flex; gap:10px; }
@@ -963,7 +963,7 @@
     .item-detail-sub { font-size:13px; color:var(--text2); margin-top:3px; }
     .item-detail-chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
     .item-detail-chip { background:var(--bg); border:1.5px solid var(--purple-border); border-radius:20px; padding:4px 12px; font-size:12px; font-weight:700; color:var(--text2); }
-    .item-shop-btn { width:100%; height:50px; border-radius:16px; background:linear-gradient(135deg,#6B47FF 0%,#C84B9E 100%); border:none; color:white; font-size:15px; font-weight:800; cursor:pointer; }
+    .item-shop-btn { width:100%; height:50px; border-radius:16px; background:#D4637A; border:none; color:white; font-size:15px; font-weight:800; cursor:pointer; }
     .item-detail-close-btn { width:100%; height:46px; border-radius:16px; background:var(--bg); border:1.5px solid var(--purple-border); font-size:14px; font-weight:700; color:var(--text2); cursor:pointer; margin-top:10px; }
 
     /* ─── COMMENT SHEET ─── */
@@ -972,7 +972,7 @@
     .comment-sheet { background:var(--card); border-radius:24px 24px 0 0; display:flex; flex-direction:column; max-height:82%; transform:translateY(100%); transition:transform 0.3s cubic-bezier(0.4,0,0.2,1); }
     .comment-sheet-overlay.open .comment-sheet { transform:translateY(0); }
     .comment-sheet-handle { width:40px; height:4px; border-radius:2px; background:var(--purple-border); margin:14px auto 0; flex-shrink:0; }
-    .comment-sheet-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px 10px; flex-shrink:0; border-bottom:1px solid #F0EBFF; }
+    .comment-sheet-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px 10px; flex-shrink:0; border-bottom:1px solid #F9D9DF; }
     .comment-sheet-title { font-size:16px; font-weight:800; color:var(--text); }
     .comment-sheet-close { width:32px; height:32px; border-radius:50%; background:var(--bg); border:none; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--text2); line-height:1; }
     .comment-list { flex:1; overflow-y:auto; padding:6px 0 4px; scrollbar-width:none; }
@@ -990,7 +990,7 @@
     .comment-delete-popup.show { display:block; }
     .comment-delete-item { padding:12px 20px; font-size:14px; font-weight:700; color:#EF4444; cursor:pointer; white-space:nowrap; }
     .comment-delete-item:active { background:var(--bg); }
-    .comment-input-row { display:flex; align-items:center; gap:10px; padding:10px 14px 14px; border-top:1px solid #F0EBFF; flex-shrink:0; background:var(--card); }
+    .comment-input-row { display:flex; align-items:center; gap:10px; padding:10px 14px 14px; border-top:1px solid #F9D9DF; flex-shrink:0; background:var(--card); }
     .comment-my-avatar { width:32px; height:32px; border-radius:50%; background:var(--purple-light); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
     .comment-input { flex:1; height:38px; border:1.5px solid var(--purple-border); border-radius:20px; padding:0 14px; font-size:14px; color:var(--text); background:var(--bg); outline:none; font-family:inherit; transition:border-color 0.15s; }
     .comment-input:focus { border-color:var(--purple); }
@@ -1059,14 +1059,14 @@
     /* ── Milestone Modal ── */
     .milestone-overlay { position:absolute; inset:0; z-index:800; background:rgba(0,0,0,0.65); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.3s; }
     .milestone-overlay.show { opacity:1; pointer-events:all; }
-    .milestone-card { background:var(--card); border-radius:28px; padding:36px 28px; text-align:center; width:270px; transform:scale(0.75); transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1); box-shadow:0 24px 60px rgba(107,71,255,0.3); }
+    .milestone-card { background:var(--card); border-radius:28px; padding:36px 28px; text-align:center; width:270px; transform:scale(0.75); transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1); box-shadow:0 24px 60px rgba(212,99,122,0.22); }
     .milestone-overlay.show .milestone-card { transform:scale(1); }
     .milestone-emoji { font-size:72px; display:block; margin-bottom:12px; animation:mFloat 1.6s ease-in-out infinite; }
     @keyframes mFloat { 0%,100%{transform:translateY(0) rotate(-3deg)} 50%{transform:translateY(-10px) rotate(3deg)} }
-    .milestone-days { font-size:48px; font-weight:900; background:linear-gradient(135deg,#6B47FF,#C84B9E); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; line-height:1; margin-bottom:4px; }
+    .milestone-days { font-size:48px; font-weight:900; background:#D4637A; -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; line-height:1; margin-bottom:4px; }
     .milestone-title { font-size:18px; font-weight:900; color:var(--text); margin-bottom:6px; }
     .milestone-sub { font-size:13px; color:var(--text2); font-weight:600; margin-bottom:22px; line-height:1.4; }
-    .milestone-btn { width:100%; height:50px; border-radius:16px; background:linear-gradient(135deg,#6B47FF,#C84B9E); border:none; color:white; font-size:15px; font-weight:800; cursor:pointer; }
+    .milestone-btn { width:100%; height:50px; border-radius:16px; background:#D4637A; border:none; color:white; font-size:15px; font-weight:800; cursor:pointer; }
 
     /* ── Streak Reminder Banner ── */
     #streak-reminder { position:absolute; top:0; left:0; right:0; z-index:700; background:linear-gradient(135deg,#EF4444,#F59E0B); padding:11px 14px; display:flex; align-items:center; gap:10px; transform:translateY(-100%); transition:transform 0.3s; pointer-events:none; }
@@ -1309,11 +1309,11 @@
         </button>
 
         <!-- Vorgeschlagene Outfits: 2–3 random aus Gespeicherten, kein API -->
-        <div class="ki-section-label" id="ki-preview-label">✨ Vorgeschlagene Outfits</div>
+        <div class="ki-section-label" id="ki-preview-label">Vorgeschlagene Outfits</div>
         <div id="ki-preview-suggestions" style="padding:0 20px 8px;"></div>
 
         <!-- KI Vorschläge: erscheinen nach unterem Button -->
-        <div class="ki-section-label" id="ki-suggestions-label" style="display:none;">🤖 KI Vorschläge</div>
+        <div class="ki-section-label" id="ki-suggestions-label" style="display:none;">KI-Vorschläge</div>
         <div class="outfit-cards" id="ki-ai-suggestions" style="padding:0 20px 8px;display:none;"></div>
 
         <!-- Unterer Button: öffnet Modal + macht API Call nach Bestätigung -->
@@ -1324,7 +1324,7 @@
 
         <!-- Alle gespeicherten Outfits -->
         <div class="ki-section-label" id="ki-saved-label">
-          <span id="ki-saved-label-text">📁 Gespeicherte Outfits</span>
+          <span id="ki-saved-label-text">Gespeicherte Outfits</span>
         </div>
         <div id="ki-saved-outfits" style="padding:0 20px 20px;"></div>
       </div>
@@ -1347,12 +1347,12 @@
         <div class="ki-panel-header">
           <button class="ki-back-btn" onclick="_closeCollection()">←</button>
           <div class="ki-panel-title" id="ki-col-title">Kollektion</div>
-          <button class="ki-panel-rename-btn" id="ki-col-rename-btn" title="Name ändern" onclick="_startCollectionRename(_currentCollectionName)">✏️</button>
+          <button class="ki-panel-rename-btn" id="ki-col-rename-btn" title="Name ändern" onclick="_startCollectionRename(_currentCollectionName)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
         </div>
         <div class="ki-panel-sub" id="ki-col-sub">0 Outfits</div>
         <div class="col-tab-row" id="ki-col-tabs">
-          <button class="col-tab active" data-col-tab="fits" onclick="_selectColTab('fits')">✨ Meine Fits</button>
-          <button class="col-tab" data-col-tab="inspo" onclick="_selectColTab('inspo')">💡 Inspo</button>
+          <button class="col-tab active" data-col-tab="fits" onclick="_selectColTab('fits')">Meine Fits</button>
+          <button class="col-tab" data-col-tab="inspo" onclick="_selectColTab('inspo')">Inspo</button>
         </div>
         <div class="ki-panel-scroll" id="ki-col-list"></div>
       </div>
@@ -1367,15 +1367,15 @@
         <div class="ki-panel-scroll" id="ki-outfit-detail-content"></div>
         <!-- Optionen-Menü -->
         <div id="ki-options-menu">
-          <div class="ki-menu-item ki-menu-danger" onclick="_removeCurrentOutfit()">🗑️ Aus Kollektion entfernen</div>
+          <div class="ki-menu-item ki-menu-danger" onclick="_removeCurrentOutfit()">Aus Kollektion entfernen</div>
         </div>
       </div>
 
       <!-- ── Generate Modal ── -->
       <div class="ki-gen-overlay" id="ki-generate-modal" onclick="_closeGenerateModalOutside(event)">
         <div class="ki-gen-modal">
-          <div class="ki-gen-title" id="ki-gen-title">✨ Outfit generieren</div>
-          <div class="ki-gen-label">📝 Beschreibung (optional)</div>
+          <div class="ki-gen-title" id="ki-gen-title">Outfit generieren</div>
+          <div class="ki-gen-label">Beschreibung (optional)</div>
           <textarea class="ki-gen-textarea" id="ki-gen-description" placeholder="z.B. Casual für den Alltag, elegant für ein Date…" rows="3"></textarea>
           <div class="ki-gen-divider">
             <div class="ki-gen-divider-line"></div>
@@ -1393,7 +1393,7 @@
           <div class="ki-gen-cols" id="ki-gen-inspo-outfits"></div>
           <div class="ki-gen-actions">
             <button class="ki-gen-cancel" onclick="_closeGenerateModal()">Abbrechen</button>
-            <button class="ki-gen-confirm" id="ki-gen-confirm-btn" onclick="_confirmGenerate()">✨ Anzeigen</button>
+            <button class="ki-gen-confirm" id="ki-gen-confirm-btn" onclick="_confirmGenerate()">Anzeigen</button>
           </div>
         </div>
       </div>
@@ -1428,7 +1428,7 @@
                   <div class="post-time-new">Vor 1 Stunde</div>
                 </div>
               </div>
-              <button class="feed-follow-btn" data-feed-follow="sophie">➕ Folgen</button>
+              <button class="feed-follow-btn" data-feed-follow="sophie">Folgen</button>
             </div>
             <div class="post-title-new">Frühlings-Chic</div>
             <div class="outfit-chips">
@@ -1462,7 +1462,7 @@
               <button class="post-act-like" data-feed-like="feed_sophie_fruehlings_chic"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="like-cnt">34</span></button>
               <button class="post-act-comment" data-feed-comment="feed_sophie_fruehlings_chic"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="comment-cnt">7</span></button>
               <button class="post-act-share" data-feed-share="feed_sophie_fruehlings_chic"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span class="share-cnt">0</span></button>
-              <button class="inspo-btn" onclick="_openInspoModal(this)">💡 Inspo ✨</button>
+              <button class="inspo-btn" onclick="_openInspoModal(this)">Inspo</button>
             </div>
           </div>
 
@@ -1512,7 +1512,7 @@
               <button class="post-act-like" data-feed-like="feed_lara_festival_ready"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="like-cnt">112</span></button>
               <button class="post-act-comment" data-feed-comment="feed_lara_festival_ready"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="comment-cnt">33</span></button>
               <button class="post-act-share" data-feed-share="feed_lara_festival_ready"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span class="share-cnt">0</span></button>
-              <button class="inspo-btn" onclick="_openInspoModal(this)">💡 Inspo ✨</button>
+              <button class="inspo-btn" onclick="_openInspoModal(this)">Inspo</button>
             </div>
           </div>
 
@@ -1568,7 +1568,7 @@
               <button class="post-act-like" data-feed-like="feed_lena_herbst_layering"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="like-cnt">24</span></button>
               <button class="post-act-comment" data-feed-comment="feed_lena_herbst_layering"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="comment-cnt">8</span></button>
               <button class="post-act-share" data-feed-share="feed_lena_herbst_layering"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span class="share-cnt">0</span></button>
-              <button class="inspo-btn" onclick="_openInspoModal(this)">💡 Inspo ✨</button>
+              <button class="inspo-btn" onclick="_openInspoModal(this)">Inspo</button>
             </div>
           </div>
 
@@ -1584,7 +1584,7 @@
                   <div class="post-time-new">Vor 5 Stunden</div>
                 </div>
               </div>
-              <button class="feed-follow-btn" data-feed-follow="marie">➕ Folgen</button>
+              <button class="feed-follow-btn" data-feed-follow="marie">Folgen</button>
             </div>
             <div class="post-title-new">Sommer-Chic</div>
             <div class="outfit-chips">
@@ -1618,7 +1618,7 @@
               <button class="post-act-like" data-feed-like="feed_marie_sommer_chic"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="like-cnt">61</span></button>
               <button class="post-act-comment" data-feed-comment="feed_marie_sommer_chic"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="comment-cnt">14</span></button>
               <button class="post-act-share" data-feed-share="feed_marie_sommer_chic"><svg viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg><span class="share-cnt">0</span></button>
-              <button class="inspo-btn" onclick="_openInspoModal(this)">💡 Inspo ✨</button>
+              <button class="inspo-btn" onclick="_openInspoModal(this)">Inspo</button>
             </div>
           </div>
 
@@ -1669,7 +1669,7 @@
           <div class="profil-stat"><div class="pnum">284</div><div class="plbl">Follower</div></div>
           <div class="profil-stat"><div class="pnum" id="profil-posts-count">0</div><div class="plbl">Posts</div></div>
         </div>
-        <div class="profil-posts-label"><span>📤 Meine Posts</span><button class="new-post-btn" onclick="_openNewPostModal()">➕ Neuer Beitrag</button></div>
+        <div class="profil-posts-label"><span>Meine Posts</span><button class="new-post-btn" onclick="_openNewPostModal()">+ Neuer Beitrag</button></div>
         <div id="profil-posts-grid"></div>
       </div>
       <!-- Post Detail Panel -->
@@ -1738,7 +1738,7 @@
       <div class="new-post-modal">
         <div class="new-post-modal-handle"></div>
         <div class="new-post-modal-header">
-          <div class="new-post-modal-title">➕ Neuer Beitrag</div>
+          <div class="new-post-modal-title">Neuer Beitrag</div>
           <button class="new-post-modal-close" onclick="_closeNewPostModal()">✕</button>
         </div>
         <!-- Bild -->
@@ -1753,7 +1753,7 @@
             <button class="new-post-img-remove" id="new-post-img-remove-btn" style="display:none;" onclick="event.stopPropagation();_removeNewPostImg()">✕</button>
           </div>
           <div class="new-post-img-btn-row">
-            <button class="new-post-img-btn" onclick="document.getElementById('new-post-camera-input').click()">📷 Foto aufnehmen</button>
+            <button class="new-post-img-btn" onclick="document.getElementById('new-post-camera-input').click()">Foto aufnehmen</button>
             <button class="new-post-img-btn" onclick="document.getElementById('new-post-gallery-input').click()">🖼️ Hochladen</button>
           </div>
           <input type="file" id="new-post-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="_handleNewPostImg(this)">
@@ -1780,7 +1780,7 @@
         </div>
         <!-- Actions -->
         <div class="new-post-modal-actions">
-          <button class="new-post-submit-btn" onclick="_submitNewPost()">📤 Posten</button>
+          <button class="new-post-submit-btn" onclick="_submitNewPost()">Posten</button>
         </div>
       </div>
     </div>
@@ -1814,7 +1814,7 @@
         <div class="comment-input-row">
           <div class="comment-my-avatar">👩‍🦱</div>
           <input class="comment-input" id="comment-input" placeholder="Schreibe einen Kommentar…" maxlength="300" />
-          <button class="comment-send-btn" onclick="_sendComment()">📤</button>
+          <button class="comment-send-btn" onclick="_sendComment()">→</button>
         </div>
       </div>
     </div>
@@ -1823,7 +1823,7 @@
     <div class="post-modal-overlay" id="post-modal-overlay" onclick="_closePostModalOutside(event)">
       <div class="post-modal">
         <div class="post-modal-handle"></div>
-        <div class="post-modal-title" id="post-modal-title">📤 Outfit posten</div>
+        <div class="post-modal-title" id="post-modal-title">Outfit posten</div>
 
         <div class="post-modal-label">🖼️ BILD</div>
         <div class="post-img-preview-wrap" id="post-img-preview-wrap">
@@ -1831,7 +1831,7 @@
           <button class="post-img-remove-btn" onclick="_removePostImg()">✕</button>
         </div>
         <div class="post-img-row" id="post-img-btn-row">
-          <button class="post-img-btn" onclick="document.getElementById('post-camera-input').click()">📷 Foto aufnehmen</button>
+          <button class="post-img-btn" onclick="document.getElementById('post-camera-input').click()">Foto aufnehmen</button>
           <button class="post-img-btn" onclick="document.getElementById('post-gallery-input').click()">🖼️ Bild hochladen</button>
         </div>
         <input type="file" id="post-camera-input" accept="image/*" capture="environment" style="display:none;" onchange="_handlePostImg(this)">
@@ -1853,7 +1853,7 @@
 
         <div class="post-modal-actions">
           <button class="post-modal-cancel" onclick="_closePostModal()">Abbrechen</button>
-          <button class="post-modal-confirm" id="post-modal-confirm-btn" onclick="_confirmPost()">📤 Posten</button>
+          <button class="post-modal-confirm" id="post-modal-confirm-btn" onclick="_confirmPost()">Posten</button>
         </div>
       </div>
     </div>
@@ -1890,7 +1890,7 @@
   <div class="ki-modal-overlay" id="ki-modal-overlay" onclick="closeKiModalOutside(event)">
     <div class="ki-modal-sheet">
       <div class="ki-modal-handle"></div>
-      <div class="ki-modal-title">✨ Outfit generieren</div>
+      <div class="ki-modal-title">Outfit generieren</div>
       <div class="ki-modal-sub">Beschreibe deinen Wunsch oder lade ein Bild hoch</div>
 
       <div class="ki-input-label">Beschreibung für die KI</div>
@@ -1979,7 +1979,7 @@
   <!-- Toast Benachrichtigung -->
   <div id="ki-toast"></div>
   <!-- Swipe-Delete Undo Toast -->
-  <div id="swipe-undo-toast"><span id="swipe-undo-text">Outfit gelöscht 🗑️</span><button id="swipe-undo-btn" onclick="_swipeUndo()">Rückgängig</button></div>
+  <div id="swipe-undo-toast"><span id="swipe-undo-text">Outfit gelöscht</span><button id="swipe-undo-btn" onclick="_swipeUndo()">Rückgängig</button></div>
 
   <!-- Speichern in Kollektion Modal -->
   <div class="modal-overlay" id="save-modal-overlay" onclick="_closeSaveModalOutside(event)">
@@ -2015,7 +2015,7 @@
       </button>
       <div class="inspo-modal-actions">
         <button class="inspo-modal-cancel" onclick="_closeInspoModal()">Abbrechen</button>
-        <button class="inspo-modal-save" onclick="_confirmInspoSave()">💾 Speichern</button>
+        <button class="inspo-modal-save" onclick="_confirmInspoSave()">Speichern</button>
       </div>
     </div>
   </div>
@@ -2040,7 +2040,7 @@
   <div id="scan-overlay" style="display:none">
     <!-- Lade-Zustand -->
     <div id="scan-loading">
-      <div class="ai-spin">✨</div>
+      <div class="ai-spin"></div>
       <div class="ai-load-title" id="scan-loading-text">KI analysiert…</div>
       <div class="ai-load-sub">Bitte warte einen Moment</div>
     </div>
@@ -2089,7 +2089,7 @@
         </div>
 
       </div>
-      <button class="scan-recrop-btn" onclick="_recropImage()">✂️ Nochmal zuschneiden</button>
+      <button class="scan-recrop-btn" onclick="_recropImage()">Nochmal zuschneiden</button>
       <div class="scan-result-btns">
         <button class="scan-cancel-btn" onclick="cancelScan()">Abbrechen</button>
         <button class="scan-confirm-btn" onclick="confirmScanItem()">✓ Speichern</button>
@@ -2177,7 +2177,7 @@
         </div>
       </div>
       <div style="padding:0 16px 28px">
-        <button class="idp-delete-btn" onclick="_showDeleteConfirm()">🗑️ Artikel löschen</button>
+        <button class="idp-delete-btn" onclick="_showDeleteConfirm()">Artikel löschen</button>
       </div>
     </div>
 
@@ -2188,7 +2188,7 @@
         <div class="idp-confirm-sub">Möchtest du diesen Artikel wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</div>
         <div class="idp-confirm-btns">
           <button class="idp-confirm-cancel" onclick="_hideDeleteConfirm()">Abbrechen</button>
-          <button class="idp-confirm-delete" onclick="_deleteItem()">🗑️ Löschen</button>
+          <button class="idp-confirm-delete" onclick="_deleteItem()">Löschen</button>
         </div>
       </div>
     </div>
@@ -2217,7 +2217,7 @@
       <div class="milestone-days" id="milestone-days">7</div>
       <div class="milestone-title" id="milestone-title">Eine Woche!</div>
       <div class="milestone-sub" id="milestone-sub">Du hast 7 Tage am Stück gepostet. Weiter so!</div>
-      <button class="milestone-btn" onclick="_closeMilestone()">🔥 Weiter so!</button>
+      <button class="milestone-btn" onclick="_closeMilestone()">Weiter so!</button>
     </div>
   </div>
 
@@ -2247,11 +2247,11 @@
         <div class="fp-stat"><div class="fpnum" id="fp-stat-posts">8</div><div class="fplbl">Posts</div></div>
       </div>
       <div class="fp-actions">
-        <button class="fp-follow-btn not-following" id="fp-follow-btn" onclick="_toggleFollow()">➕ Folgen</button>
+        <button class="fp-follow-btn not-following" id="fp-follow-btn" onclick="_toggleFollow()">Folgen</button>
         <button class="fp-msg-btn" onclick="_showToast('💬 Nachrichten kommen bald!')">💬</button>
       </div>
       <div class="fp-tabs">
-        <button class="fp-tab active" id="fp-tab-posts" onclick="_switchFriendTab('posts')">📤 Posts</button>
+        <button class="fp-tab active" id="fp-tab-posts" onclick="_switchFriendTab('posts')">Posts</button>
         <button class="fp-tab" id="fp-tab-schrank" onclick="_switchFriendTab('schrank')">🧥 Schrank</button>
       </div>
       <!-- Posts Tab -->
@@ -2276,7 +2276,7 @@
     <div class="fp-ki-panel" id="fp-ki-panel">
       <div class="fp-ki-header">
         <button class="settings-back" onclick="_closeFriendKI()">←</button>
-        <div class="settings-title">🤖 KI Vergleich</div>
+        <div class="settings-title">KI Vergleich</div>
       </div>
       <div class="fp-ki-scroll" id="fp-ki-scroll"></div>
     </div>
