@@ -673,7 +673,7 @@ function _wardrobeCategory(item) {
   if (type === 'kleid' || /\b(kleid|kleider|dress)\b/.test(name)) return 'kleider';
   if (type === 'schuh' || /\b(schuh|sneaker|stiefel|sandal|boot|pumps|slipper|loafer)\b/.test(name)) return 'schuhe';
   if (type === 'accessoire' || /\b(sonnenbrille|brille|uhr|tasche|schal|schmuck|gürtel|handschuh|hut|mütze|kappe|kette|ring|armband)\b/.test(name)) return 'accessoires';
-  // Default: Tops (T-Shirts, Hemden, Hoodies, Jacken, Pullover …)
+  if (type === 'jacke' || /\b(jacke|mantel|coat|blazer|parka|windbreaker|bomberjacke|trenchcoat)\b/.test(name)) return 'jacken';
   return 'tops';
 }
 
@@ -840,7 +840,7 @@ function renderWardrobeGrid() {
     card.onclick = (function(id) { return function() { _openItemDetail(id); }; })(item.id);
     card.setAttribute('data-category', _wardrobeCategory(item));
     var brandLine = item.brand
-      ? '<div class="cloth-color-name" style="font-size:10px;color:var(--purple);font-weight:700;margin-bottom:3px;">' + item.brand + '</div>'
+      ? '<div class="cloth-brand" style="font-size:10px;color:var(--purple);font-weight:700;margin-bottom:3px;">' + item.brand + '</div>'
       : '';
     var iconStyle = hasImg
       ? 'background-image:url(\'' + item.imageDataUrl + '\');background-size:cover;background-position:center;font-size:0;'
@@ -854,6 +854,22 @@ function renderWardrobeGrid() {
     grid.insertBefore(card, grid.firstChild);
   });
 
+  // Leer-Zustand anzeigen wenn keine localStorage-Items vorhanden
+  var existing = grid.querySelectorAll('.ai-wardrobe-item');
+  var hasStatic = grid.querySelectorAll('.cloth-card:not(.ai-wardrobe-item)').length > 0;
+  var emptyHint = document.getElementById('wardrobe-scan-hint');
+  if (emptyHint) emptyHint.remove();
+  if (existing.length === 0 && !hasStatic) {
+    var hint = document.createElement('div');
+    hint.id = 'wardrobe-scan-hint';
+    hint.style.cssText = 'grid-column:1/-1;text-align:center;padding:44px 16px 24px;';
+    hint.innerHTML = '<div style="font-size:52px;">👚</div>'
+      + '<div style="font-size:16px;font-weight:800;color:var(--text);margin-top:14px;">Dein Schrank ist leer</div>'
+      + '<div style="font-size:13px;color:var(--text2);margin-top:6px;line-height:1.5;">Scanne dein erstes Kleidungsstück!</div>'
+      + '<button onclick="navigate(\'scannen\', document.getElementById(\'nav-scannen\'))" '
+      + 'style="margin-top:18px;background:var(--purple);color:white;border:none;border-radius:14px;padding:13px 28px;font-size:14px;font-weight:700;cursor:pointer;">Jetzt scannen</button>';
+    grid.appendChild(hint);
+  }
   // Aktiven Filter neu anwenden + Anzahl aktualisieren
   if (typeof _updateWardrobeSubtitle === 'function') _updateWardrobeSubtitle();
 }
@@ -876,8 +892,8 @@ async function confirmKiGenerate() {
   var outfitCards = document.getElementById('ki-ai-suggestions') || document.querySelector('.outfit-cards');
   if (outfitCards) {
     outfitCards.innerHTML = '<div style="text-align:center;padding:40px 16px;">'
-      + '<div style="font-size:44px;display:inline-block;animation:aiPulse 1.2s ease-in-out infinite;">✨</div>'
-      + '<div style="font-size:16px;font-weight:800;color:var(--text);margin-top:14px;">KI erstellt deine Outfits…</div>'
+      + '<div class="ai-spin" style="width:44px;height:44px;border-radius:50%;border:3px solid var(--purple-border);border-top-color:var(--purple);animation:aiSpin 0.75s linear infinite;display:inline-block;"></div>'
+      + '<div style="font-size:16px;font-weight:800;color:var(--text);margin-top:16px;">KI erstellt deine Outfits…</div>'
       + '<div style="font-size:13px;color:var(--text2);margin-top:6px;">Einen Moment bitte</div></div>';
     _ensureAiStyles();
   }

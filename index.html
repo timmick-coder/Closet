@@ -1099,26 +1099,10 @@
     .idp-header { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 12px; background:var(--card); border-bottom:1px solid var(--purple-border); flex-shrink:0; }
     .idp-back { background:none; border:none; font-size:22px; cursor:pointer; color:var(--purple); padding:4px 8px 4px 0; line-height:1; font-weight:700; }
     .idp-title { font-size:16px; font-weight:800; color:var(--text); }
-    .idp-edit-btn { background:none; border:none; font-size:20px; cursor:pointer; padding:4px; }
-    .idp-save-btn { background:var(--purple); color:white; border:none; border-radius:20px; padding:7px 16px; font-size:14px; font-weight:700; cursor:pointer; }
-    .idp-cancel-btn { background:none; border:none; color:var(--text2); font-size:14px; font-weight:600; cursor:pointer; padding:4px 8px; }
     .idp-scroll { flex:1; overflow-y:auto; }
     .idp-image-wrap { background:white; display:flex; align-items:center; justify-content:center; height:260px; position:relative; flex-shrink:0; }
     .idp-image { width:100%; height:100%; object-fit:contain; padding:12px; }
     .idp-image-emoji { font-size:100px; line-height:1; }
-    .idp-change-img-btn { position:absolute; bottom:10px; right:10px; background:rgba(0,0,0,0.55); color:white; border:none; border-radius:20px; padding:6px 14px; font-size:12px; font-weight:700; cursor:pointer; display:none; }
-    .idp-change-img-btn.visible { display:block; }
-    .idp-info-section { background:var(--card); margin:14px 16px 0; border-radius:18px; overflow:hidden; box-shadow:var(--shadow); }
-    .idp-info-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--purple-border); }
-    .idp-info-row:last-child { border-bottom:none; }
-    .idp-info-label { font-size:12px; font-weight:700; color:var(--text2); width:80px; flex-shrink:0; }
-    .idp-info-value { font-size:14px; font-weight:600; color:var(--text); flex:1; }
-    .idp-color-dot { width:16px; height:16px; border-radius:50%; border:1.5px solid var(--purple-border); flex-shrink:0; }
-    .idp-actions { display:flex; gap:10px; margin:14px 16px; }
-    .idp-action-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; background:var(--card); border:1.5px solid var(--purple-border); border-radius:16px; padding:14px 8px; font-size:12px; font-weight:700; color:var(--text); cursor:pointer; box-shadow:var(--shadow); }
-    .idp-action-btn .idp-act-icon { font-size:22px; }
-    .idp-action-btn.active-fav { border-color:var(--purple); color:var(--purple); background:var(--purple-light); }
-    .idp-edit-form { padding:0 16px 16px; }
     .idp-field-group { background:var(--card); border-radius:18px; overflow:hidden; box-shadow:var(--shadow); margin-bottom:12px; }
     .idp-field-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--purple-border); }
     .idp-field-row:last-child { border-bottom:none; }
@@ -1182,83 +1166,11 @@
           <div class="chip" data-filter="hosen" onclick="filterChip(this)"><span>👖</span> Hosen</div>
           <div class="chip" data-filter="kleider" onclick="filterChip(this)"><span>👗</span> Kleider</div>
           <div class="chip" data-filter="schuhe" onclick="filterChip(this)"><span>👟</span> Schuhe</div>
+          <div class="chip" data-filter="jacken" onclick="filterChip(this)"><span>🧥</span> Jacken</div>
           <div class="chip" data-filter="accessoires" onclick="filterChip(this)"><span>🧣</span> Accessoires</div>
         </div>
 
-        <div class="clothes-grid" id="clothes-grid">
-          <div class="cloth-card" data-category="tops">
-            <div class="cloth-icon">👕</div>
-            <div class="cloth-name">Weißes T-Shirt</div>
-            <div class="cloth-color-row"><div class="color-dot" style="background:#E0E0E0;"></div><span class="cloth-color-name">Weiß</span></div>
-            <span class="season-tag s-sommer">Sommer</span>
-          </div>
-          <div class="cloth-card" data-category="hosen">
-            <div class="cloth-icon">👖</div>
-            <div class="cloth-name">Jeans</div>
-            <div class="cloth-color-row"><div class="color-dot" style="background:#1565C0;"></div><span class="cloth-color-name">Blau</span></div>
-            <span class="season-tag s-ganzjahrig">Ganzjährig</span>
-          </div>
-          <div class="cloth-card" data-category="schuhe">
-            <div class="cloth-icon">👟</div>
-            <div class="cloth-name">Sneaker</div>
-            <div class="cloth-color-row"><div class="color-dot" style="background:#EEEEEE; border:1px solid #ddd;"></div><span class="cloth-color-name">Weiß</span></div>
-            <span class="season-tag s-ganzjahrig">Ganzjährig</span>
-          </div>
-          <div class="cloth-card" data-category="kleider">
-            <div class="cloth-icon">👗</div>
-            <div class="cloth-name">Sommerkleid</div>
-            <div class="cloth-color-row"><div class="color-dot" style="background:#EC407A;"></div><span class="cloth-color-name">Rosa</span></div>
-            <span class="season-tag s-sommer">Sommer</span>
-          </div>
-          <div class="cloth-card" data-category="tops">
-            <div class="cloth-icon">🧥</div>
-            <div class="cloth-name">Lederjacke</div>
-            <div class="cloth-color-row"><div class="color-dot" style="background:#212121;"></div><span class="cloth-color-name">Schwarz</span></div>
-            <span class="season-tag s-winter">Winter</span>
-          </div>
-          <div class="cloth-card" data-category="hosen">
-            <div class="cloth-icon">👖</div>
-            <div class="cloth-name">Chino-Hose</div>
-            <div class="cloth-color-row"><div class="color-dot" style="background:#D7BC8D;"></div><span class="cloth-color-name">Beige</span></div>
-            <span class="season-tag s-sommer">Sommer</span>
-          </div>
-          <div class="cloth-card" data-category="schuhe">
-            <div class="cloth-icon">👢</div>
-            <div class="cloth-name">Stiefel</div>
-            <div class="cloth-color-row"><div class="color-dot" style="background:#795548;"></div><span class="cloth-color-name">Braun</span></div>
-            <span class="season-tag s-winter">Winter</span>
-          </div>
-          <div class="cloth-card" data-category="accessoires">
-            <div class="cloth-icon">🕶️</div>
-            <div class="cloth-name">Sonnenbrille</div>
-            <div class="cloth-color-row"><div class="color-dot" style="background:#212121;"></div><span class="cloth-color-name">Schwarz</span></div>
-            <span class="season-tag s-sommer">Sommer</span>
-          </div>
-          <div class="cloth-card" data-category="tops">
-            <div class="cloth-icon">🧶</div>
-            <div class="cloth-name">Strickpullover</div>
-            <div class="cloth-color-row"><div class="color-dot" style="background:#9E9E9E;"></div><span class="cloth-color-name">Grau</span></div>
-            <span class="season-tag s-winter">Winter</span>
-          </div>
-          <div class="cloth-card" data-category="hosen">
-            <div class="cloth-icon">👖</div>
-            <div class="cloth-name">Jogginghose</div>
-            <div class="cloth-color-row"><div class="color-dot" style="background:#212121;"></div><span class="cloth-color-name">Schwarz</span></div>
-            <span class="season-tag s-ganzjahrig">Ganzjährig</span>
-          </div>
-          <div class="cloth-card" data-category="schuhe">
-            <div class="cloth-icon">🩴</div>
-            <div class="cloth-name">Sandalen</div>
-            <div class="cloth-color-row"><div class="color-dot" style="background:#795548;"></div><span class="cloth-color-name">Braun</span></div>
-            <span class="season-tag s-sommer">Sommer</span>
-          </div>
-          <div class="cloth-card" data-category="accessoires">
-            <div class="cloth-icon">🧣</div>
-            <div class="cloth-name">Schal</div>
-            <div class="cloth-color-row"><div class="color-dot" style="background:#E53935;"></div><span class="cloth-color-name">Rot</span></div>
-            <span class="season-tag s-winter">Winter</span>
-          </div>
-        </div>
+        <div class="clothes-grid" id="clothes-grid"></div>
       </div>
     </div>
 
@@ -2304,7 +2216,7 @@
     document.querySelectorAll('.nav-item, .nav-center').forEach(n => n.classList.remove('active'));
     if (btn) btn.classList.add('active');
     // Rembg-Modul im Hintergrund vorwärmen wenn Scan-Screen geöffnet wird
-    if (id === 'scan' && typeof _loadRembgModule === 'function') {
+    if (id === 'scannen' && typeof _loadRembgModule === 'function') {
       _loadRembgModule().catch(function() {});
     }
   }
@@ -2319,7 +2231,7 @@
   // Kategorie-Label für Untertitel und Leerzustand
   var _filterLabels = {
     alle: 'Artikel', tops: 'Tops', hosen: 'Hosen',
-    kleider: 'Kleider', schuhe: 'Schuhe', accessoires: 'Accessoires'
+    kleider: 'Kleider', schuhe: 'Schuhe', jacken: 'Jacken', accessoires: 'Accessoires'
   };
 
   function filterChip(el) {
@@ -2373,10 +2285,11 @@
 
   // Erweiterter Suchtext je Kategorie (für "Schuh" → findet schuhe-Karten)
   var _catSearchText = {
-    tops: 'top tops shirt hemd bluse pullover jacke hoodie oberteil',
+    tops: 'top tops shirt hemd bluse pullover hoodie oberteil',
     hosen: 'hose hosen jeans chino jogginghose shorts rock',
     kleider: 'kleid kleider dress',
     schuhe: 'schuh schuhe sneaker stiefel sandalen boot pumps',
+    jacken: 'jacke jacken mantel coat blazer parka windbreaker bomberjacke trenchcoat',
     accessoires: 'accessoire accessoires sonnenbrille brille uhr tasche schal schmuck'
   };
 
@@ -2412,6 +2325,7 @@
       var searchText = [
         (card.querySelector('.cloth-name')?.textContent || '').toLowerCase(),
         (card.querySelector('.cloth-color-name')?.textContent || '').toLowerCase(),
+        (card.querySelector('.cloth-brand')?.textContent || '').toLowerCase(),
         (card.querySelector('.season-tag')?.textContent || '').toLowerCase(),
         cat,
         (_catSearchText[cat] || '')
