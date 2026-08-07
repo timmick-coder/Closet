@@ -1639,7 +1639,7 @@ function _updateColTabCounts(fitsCount, inspoCount) {
   if (!tabRow) return;
   tabRow.querySelectorAll('[data-col-tab]').forEach(function(btn) {
     var t = btn.getAttribute('data-col-tab');
-    if (t === 'fits') btn.textContent = '✨ Meine Fits (' + fitsCount + ')';
+    if (t === 'fits') btn.textContent = 'Meine Fits (' + fitsCount + ')';
     if (t === 'inspo') btn.textContent = '💡 Inspo (' + inspoCount + ')';
     btn.classList.toggle('active', t === _colActiveTab);
   });
@@ -1663,8 +1663,8 @@ function _renderColTabContent(name, tab, fits, inspos) {
   if (!list) return;
   if (tab === 'fits') {
     if (fits.length === 0) {
-      list.innerHTML = '<div class="ki-empty-state"><div class="ki-empty-icon">✨</div>'
-        + '<div class="ki-empty-text">Noch keine eigenen Fits hier ✨</div>'
+      list.innerHTML = '<div class="ki-empty-state"><div class="ki-empty-icon">👗</div>'
+        + '<div class="ki-empty-text">Noch keine eigenen Fits hier</div>'
         + '<button onclick="_openGenerateModal()" style="margin-top:16px;background:var(--purple);color:white;border:none;border-radius:14px;padding:12px 24px;font-size:14px;font-weight:800;cursor:pointer;">Outfit generieren</button>'
         + '</div>';
     } else {
@@ -1713,7 +1713,7 @@ function _createMyVersionInCol(id) {
   var list = document.getElementById('ki-col-list');
   if (list) {
     list.innerHTML = '<div class="ki-empty-state">'
-      + '<div style="font-size:40px;animation:aiSpin 2s linear infinite;display:inline-block;">✨</div>'
+      + '<div style="width:40px;height:40px;border-radius:50%;border:3px solid rgba(77,141,255,0.25);border-top-color:#4d8dff;animation:aiSpin 0.75s linear infinite;display:inline-block;margin:0 auto;"></div>'
       + '<div style="font-size:15px;font-weight:700;color:var(--text2);margin-top:14px;">KI erstellt deine Version…</div>'
       + '<div style="font-size:12px;color:var(--text2);margin-top:6px;">Einen Moment bitte</div>'
       + '</div>';
@@ -1731,7 +1731,7 @@ function _createMyVersionInCol(id) {
     newOutfit.isInspo = false;
     newOutfit.id = _outfitId(newOutfit);
     if (colName) _saveOutfitToCollection(colName, newOutfit);
-    _showToast('✨ Deine Version wurde erstellt und in Meine Fits gespeichert!');
+    _showToast('Deine Version wurde erstellt und in Meine Fits gespeichert!');
     if (_currentCollectionName === colName) {
       _colActiveTab = 'fits';
       var allOutfits = _loadOutfits().filter(function(o) {
@@ -1910,7 +1910,7 @@ function _renderKiPills() {
   var wrap = document.getElementById('ki-pills-wrap');
   if (!wrap) return;
 
-  var pills = [{ label: '🌟 Alle', key: '__all__' }];
+  var pills = [{ label: 'Alle', key: '__all__' }];
 
   var favCount = _loadFavs().length;
   if (favCount > 0) pills.push({ label: '❤️ Favoriten (' + favCount + ')', key: '__favoriten__' });
@@ -2019,8 +2019,8 @@ function _openGenerateModal(mode) {
 
   var title = document.getElementById('ki-gen-title');
   var confirmBtn = document.getElementById('ki-gen-confirm-btn');
-  if (title) title.textContent = _genMode === 'generate' ? '⭐ Mehr Vorschläge generieren' : '✨ Outfit generieren';
-  if (confirmBtn) confirmBtn.textContent = _genMode === 'generate' ? '✨ Generieren' : '✨ Anzeigen';
+  if (title) title.textContent = _genMode === 'generate' ? 'Mehr Vorschläge generieren' : 'Outfit generieren';
+  if (confirmBtn) confirmBtn.textContent = _genMode === 'generate' ? 'Generieren' : 'Anzeigen';
 
   modal.classList.add('active');
 }
@@ -2173,8 +2173,8 @@ function _showKiIdlePlaceholder() {
   var suggestions = document.getElementById('ki-ai-suggestions');
   if (suggestions) {
     suggestions.innerHTML = '<div id="ki-ai-placeholder" style="text-align:center;padding:40px 20px 16px;">'
-      + '<div style="font-size:48px;margin-bottom:12px;">✨</div>'
-      + '<div style="font-size:15px;font-weight:700;color:var(--text2);line-height:1.6;">Tippe auf <strong style="color:var(--purple);">Outfit generieren</strong><br>für neue Vorschläge ✨</div>'
+      + '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:14px;opacity:0.6;"><path d="M20.38 3.46L16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/></svg>'
+      + '<div style="font-size:15px;font-weight:700;color:var(--text2);line-height:1.6;">Tippe auf <strong style="color:var(--purple);">Outfit generieren</strong><br>für neue Vorschläge</div>'
       + '</div>';
   }
 }
@@ -2205,7 +2205,7 @@ function _autoLoadKiSuggestions(force, customDesc, colContext) {
   // Spinner ins suggestions-div schreiben (placeholder könnte nach erstem Erfolg fehlen)
   var spinMsg = customDesc ? 'KI erstellt deinen Wunsch-Look…' : 'KI analysiert deinen Kleiderschrank…';
   var spinnerHtml = '<div id="ki-ai-placeholder" style="text-align:center;padding:32px 16px 8px;">'
-    + '<div style="font-size:40px;animation:aiSpin 2s linear infinite;display:inline-block;">✨</div>'
+    + '<div style="width:40px;height:40px;border-radius:50%;border:3px solid rgba(77,141,255,0.25);border-top-color:#4d8dff;animation:aiSpin 0.75s linear infinite;display:inline-block;margin:0 auto;"></div>'
     + '<div style="font-size:15px;font-weight:700;color:var(--text2);margin-top:14px;">' + spinMsg + '</div>'
     + '<div style="font-size:12px;color:var(--text2);margin-top:6px;">Einen Moment bitte</div>'
     + '</div>';
