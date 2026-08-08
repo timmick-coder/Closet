@@ -1635,10 +1635,10 @@ function _openCollection(name) {
 
   var displayName = (name === '__favoriten__') ? '❤️ Favoriten' : name;
   var titleEl = document.getElementById('ki-col-title');
-  if (titleEl) titleEl.textContent = displayName;
-  // ✏️-Button nur bei echten Kollektionen sichtbar (nicht bei Favoriten)
-  var colRenameBtn = document.getElementById('ki-col-rename-btn');
-  if (colRenameBtn) colRenameBtn.style.display = (name === '__favoriten__') ? 'none' : '';
+  if (titleEl) {
+    titleEl.textContent = displayName;
+    titleEl.style.cursor = (name === '__favoriten__') ? 'default' : 'pointer';
+  }
 
   var fits = allOutfits.filter(function(o) { return !o.isInspo; });
   var inspos = allOutfits.filter(function(o) { return !!o.isInspo; });
