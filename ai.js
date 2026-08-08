@@ -4588,6 +4588,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // ── Preview-Sektion + Saved initial befüllen ──
   _renderPreviewSuggestions(null);
   _renderKiSavedSection();
+  _autoLoadKiSuggestions(false);
 
   // ── Event Delegation: Post Detail Kommentare ──
   var postDetailScroll = document.getElementById('post-detail-content');
@@ -4696,8 +4697,8 @@ document.addEventListener('DOMContentLoaded', function() {
           _renderKiPills();
           _renderPreviewSuggestions(null);
           _renderKiSavedSection();
-          // KI-Sektion nur zeigen wenn schon generiert wurde
           _setKiSuggestionsVisible(_kiSuggestionsLoaded || _kiLoadingActive);
+          _autoLoadKiSuggestions(false);
         }
       });
     });
