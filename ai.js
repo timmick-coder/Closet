@@ -1968,12 +1968,16 @@ function _renderKiOrdnerGrid() {
   }).join('');
 }
 
-// KI-Vorschläge-Sektion ein-/ausblenden (nur die KI-generierten, nicht den Button)
-function _setKiSuggestionsVisible(visible) {
-  var label = document.getElementById('ki-suggestions-label');
-  var section = document.getElementById('ki-ai-suggestions');
-  if (label) label.style.display = visible ? 'flex' : 'none';
-  if (section) section.style.display = visible ? '' : 'none';
+function _setKiSuggestionsVisible() { /* no-op: KI suggestions now live in ki-results-panel */ }
+
+function _openKiResultsPanel() {
+  var panel = document.getElementById('ki-results-panel');
+  if (panel) panel.classList.add('active');
+}
+
+function _closeKiResults() {
+  var panel = document.getElementById('ki-results-panel');
+  if (panel) panel.classList.remove('active');
 }
 
 function _selectKiPill(key) {
@@ -2241,8 +2245,7 @@ function _autoLoadKiSuggestions(force, customDesc, colContext) {
   _kiLoadingActive = true;
   _kiSuggestionsLoaded = false;
 
-  // Immer Suggestions-Section zeigen beim Generieren
-  _setKiSuggestionsVisible(true);
+  _openKiResultsPanel();
 
   // Spinner ins suggestions-div schreiben (placeholder könnte nach erstem Erfolg fehlen)
   var spinMsg = customDesc ? 'KI erstellt deinen Wunsch-Look…' : 'KI analysiert deinen Kleiderschrank…';
@@ -4302,7 +4305,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // KI Styling: Pills + Saved Section initial rendern
   _renderKiPills();
-  _setKiSuggestionsVisible(_kiActivePill === null);
   _renderKiSavedSection();
 
   // ── Event Delegation: Kollektions-Pills ──
@@ -4588,7 +4590,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // ── Preview-Sektion + Saved initial befüllen ──
   _renderPreviewSuggestions(null);
   _renderKiSavedSection();
-  _autoLoadKiSuggestions(false);
 
   // ── Event Delegation: Post Detail Kommentare ──
   var postDetailScroll = document.getElementById('post-detail-content');
@@ -4697,8 +4698,6 @@ document.addEventListener('DOMContentLoaded', function() {
           _renderKiPills();
           _renderPreviewSuggestions(null);
           _renderKiSavedSection();
-          _setKiSuggestionsVisible(_kiSuggestionsLoaded || _kiLoadingActive);
-          _autoLoadKiSuggestions(false);
         }
       });
     });
@@ -4714,6 +4713,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var SWIPE_PANELS = [
     { id: 'fp-ki-panel',          close: function() { _closeFriendKI(); } },
     { id: 'item-detail-panel',    close: function() { _closeItemDetail(); } },
+    { id: 'ki-results-panel',     close: function() { _closeKiResults(); } },
     { id: 'ki-collection-panel',  close: function() { _closeCollection(); } },
     { id: 'ki-outfit-panel',      close: function() { _closeOutfitDetail(); } },
     { id: 'post-detail-panel',    close: function() { _closePostDetail(); } },

@@ -1345,10 +1345,6 @@
         <div class="ki-section-label" id="ki-preview-label">Vorgeschlagene Outfits</div>
         <div id="ki-preview-suggestions" style="padding:0 20px 8px;"></div>
 
-        <!-- KI Vorschläge -->
-        <div class="ki-section-label" id="ki-suggestions-label" style="display:none;">KI-Vorschläge</div>
-        <div class="outfit-cards" id="ki-ai-suggestions" style="padding:0 20px 8px;display:none;"></div>
-
         <!-- Gespeicherte Outfits -->
         <div class="ki-section-label" id="ki-saved-label">
           <span id="ki-saved-label-text">Gespeicherte Outfits</span>
@@ -1387,6 +1383,15 @@
           <button class="col-tab" data-col-tab="inspo" onclick="_selectColTab('inspo')">Inspo</button>
         </div>
         <div class="ki-panel-scroll" id="ki-col-list"></div>
+      </div>
+
+      <!-- ── KI Ergebnisse Panel ── -->
+      <div class="ki-panel" id="ki-results-panel">
+        <div class="ki-panel-header">
+          <button class="ki-back-btn" onclick="_closeKiResults()">←</button>
+          <div class="ki-panel-title">KI-Vorschläge</div>
+        </div>
+        <div class="ki-panel-scroll outfit-cards" id="ki-ai-suggestions" style="padding:16px 16px 32px;"></div>
       </div>
 
       <!-- ── Outfit Detail Panel ── -->
