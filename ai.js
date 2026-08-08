@@ -1310,6 +1310,23 @@ function _swipeDeleteOutfit(wrapper) {
       _swipeUndoFn = null;
       _hideUndoToast();
     }, 3000);
+  } else if (type === 'saved') {
+    var snapshots2 = _loadOutfits();
+    undoFn = function() {
+      _storeOutfits(snapshots2);
+      _renderKiSavedSection();
+      _hideUndoToast();
+    };
+    clearTimeout(_swipeUndoTimer);
+    _swipeUndoTimer = setTimeout(function() {
+      var outfits2 = _loadOutfits();
+      outfits2 = outfits2.filter(function(x) { return x.id !== outfitId; });
+      _storeOutfits(outfits2);
+      _renderKiPills();
+      _updateFavoritenCard();
+      _swipeUndoFn = null;
+      _hideUndoToast();
+    }, 3000);
   } else {
     // KI suggestion — just remove DOM, no undo needed
     clearTimeout(_swipeUndoTimer);
@@ -1529,37 +1546,40 @@ function _doRenameCollection(oldName, newName) {
   _showToast('✅ Name geändert!');
 }
 
+// ── 4-Bild-Gitter-Zellen ─────────────────────────────────────────────────────
+function _make4Cells(outfit) {
+  var items = (outfit.items || []).slice(0, 4);
+  return [0, 1, 2, 3].map(function(i) {
+    var item = items[i];
+    if (!item) return '<div class="col-grid-photo col-grid-empty"></div>';
+    var photo = _findWardrobePhoto(item.name);
+    var style = photo ? 'background-image:url(\'' + photo + '\');background-size:cover;background-position:center;font-size:0;' : '';
+    return '<div class="col-grid-photo" style="' + style + '">' + (photo ? '' : (item.emoji || '👕')) + '</div>';
+  }).join('');
+}
+
 // ── renderKiOutfits (KI-Vorschläge rendern) ───────────────────────────────────
 function renderKiOutfits(outfits) {
   var container = document.getElementById('ki-ai-suggestions') || document.querySelector('.outfit-cards');
   if (!container || !Array.isArray(outfits)) return;
 
-  container.innerHTML = outfits.map(function(outfit) {
+  container.innerHTML = '<div class="ki-col-grid">' + outfits.map(function(outfit) {
     var id = _regOutfit(outfit);
     var fav = _isFav(id);
-    var items = [].concat(outfit.items || []).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); });
-    var itemsHtml = items.slice(0, 6).map(function(item) {
-      var photo = _findWardrobePhoto(item.name);
-      var photoStyle = photo ? 'background-image:url(\'' + photo + '\');background-size:cover;background-position:center;font-size:0;' : '';
-      return '<div class="outfit-item-row">'
-        + '<div class="outfit-item-photo" style="' + photoStyle + '">' + (photo ? '' : (item.emoji || '👕')) + '</div>'
-        + '<div class="outfit-item-row-name">' + (item.name || '') + '</div>'
-        + '</div>';
-    }).join('');
-    return '<div class="swipe-wrapper" data-swipe-id="' + _escAttr(id) + '" data-swipe-type="suggestion">'
+    var cells = _make4Cells(outfit);
+    return '<div class="swipe-wrapper col-wrap-grid" data-swipe-id="' + _escAttr(id) + '" data-swipe-type="suggestion" data-swipe-name="' + _escAttr(outfit.name || 'Outfit') + '">'
       + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
-      + '<div class="swipe-inner outfit-card-ki">'
-      + '<div class="outfit-card-header">'
-      + '<div><div class="outfit-card-name">' + (outfit.name || 'Outfit') + '</div>'
-      + '<div class="outfit-card-style">' + (outfit.style || '') + '</div></div>'
-      + '<div style="display:flex;align-items:center;gap:8px;">'
-      + '<span class="match-badge">' + (outfit.match || 90) + '% ✅</span>'
-      + '<button class="heart-btn" data-heart-id="' + _escAttr(id) + '" onclick="_toggleFav(\'' + id + '\', this)">' + (fav ? '🩷' : '🤍') + '</button>'
-      + '</div></div>'
-      + '<div class="outfit-items-vertical">' + itemsHtml + '</div>'
-      + '<button class="outfit-save-btn" onclick="_openSaveModal(\'' + id + '\')">💾 Speichern</button>'
+      + '<div class="swipe-inner col-grid-card">'
+      + '<div class="col-grid-preview">' + cells + '</div>'
+      + '<div class="col-grid-footer" style="flex-direction:column;align-items:stretch;gap:6px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;">'
+      + '<div class="col-grid-name">' + (outfit.name || 'Outfit') + '</div>'
+      + '<button class="col-grid-heart heart-btn" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
+      + '</div>'
+      + '<button class="outfit-save-btn" onclick="_openSaveModal(\'' + id + '\')" style="height:30px;font-size:12px;margin:0;border-radius:10px;">💾 Speichern</button>'
+      + '</div>'
       + '</div></div>';
-  }).join('');
+  }).join('') + '</div>';
 
   _initSwipeToDelete(container);
   _updateFavoritenCard();
@@ -2128,33 +2148,22 @@ function _renderKiSavedSection() {
     return;
   }
 
-  savedContainer.innerHTML = all.map(function(outfit) {
+  savedContainer.innerHTML = '<div class="ki-col-grid">' + all.map(function(outfit) {
     var id = _regOutfit(outfit);
     _savedCardRegistry[id] = { collection: (outfit.kollektionen || [])[0] || '__all__' };
     var fav = _isFav(id);
-    var items = (outfit.items || []).slice(0, 3);
-    var col = (outfit.kollektionen || []).filter(function(c) { return c !== '__favoriten__'; })[0]
-      || (fav ? '❤️ Favoriten' : '');
-
-    var photosHtml = items.map(function(item) {
-      var photo = _findWardrobePhoto(item.name);
-      var bgStyle = photo ? 'background-image:url(\'' + photo + '\');background-size:cover;background-position:center;font-size:0;' : '';
-      return '<div class="ki-saved-photo" style="' + bgStyle + '">' + (photo ? '' : (item.emoji || '👕')) + '</div>';
-    }).join('');
-
-    var inspoBadge = outfit.isInspo ? '<span class="inspo-badge">💡 Inspo</span>' : '';
-    var inspoFromLine = outfit.isInspo ? '<div class="inspo-from">von ' + (outfit.inspoFrom || '') + '</div>' : '';
-    return '<div class="ki-saved-card" data-saved-id="' + _escAttr(id) + '">'
-      + '<div class="ki-saved-photos">' + photosHtml + '</div>'
-      + '<div class="ki-saved-meta">'
-      + (col ? '<div class="ki-saved-from">' + col + '</div>' : '')
-      + '<div class="ki-saved-name" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' + (outfit.name || 'Outfit') + inspoBadge + '</div>'
-      + inspoFromLine
-      + '<div class="ki-saved-match">' + (outfit.match || 90) + '% Passend · ' + (outfit.style || '') + '</div>'
+    var cells = _make4Cells(outfit);
+    return '<div class="swipe-wrapper col-wrap-grid" data-swipe-id="' + _escAttr(id) + '" data-swipe-type="saved" data-swipe-name="' + _escAttr(outfit.name || 'Outfit') + '">'
+      + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
+      + '<div class="swipe-inner col-grid-card" data-saved-id="' + _escAttr(id) + '">'
+      + '<div class="col-grid-preview">' + cells + '</div>'
+      + '<div class="col-grid-footer">'
+      + '<div class="col-grid-name">' + (outfit.name || 'Outfit') + '</div>'
+      + '<button class="col-grid-heart" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
       + '</div>'
-      + '<button class="ki-saved-heart" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
-      + '</div>';
-  }).join('');
+      + '</div></div>';
+  }).join('') + '</div>';
+  _initSwipeToDelete(savedContainer);
 }
 
 // ── Generate Modal ────────────────────────────────────────────────────────────
@@ -2297,28 +2306,18 @@ function _renderPreviewSuggestions(collectionFilter) {
   // Zufällige 2–3 Auswahl
   var shuffled = pool.slice().sort(function() { return Math.random() - 0.5; });
   var picks = shuffled.slice(0, 3);
-  container.innerHTML = picks.map(function(outfit) {
+  container.innerHTML = '<div class="ki-col-grid">' + picks.map(function(outfit) {
     var id = _regOutfit(outfit);
-    var isFav = (outfit.kollektionen || []).indexOf('__favoriten__') >= 0;
-    var col = (outfit.kollektionen || []).filter(function(c) { return c !== '__favoriten__'; })[0];
-    var source = isFav ? '❤️ Favorit' : (col ? '📁 aus ' + col : '📁 Gespeichert');
-    var items = (outfit.items || []).slice(0, 3);
-    var photosHtml = items.map(function(item) {
-      var photo = _findWardrobePhoto(item.name);
-      var bgStyle = photo ? 'background-image:url(\'' + photo + '\');background-size:cover;background-position:center;font-size:0;' : '';
-      return '<div class="ki-saved-photo" style="' + bgStyle + '">' + (photo ? '' : (item.emoji || '👕')) + '</div>';
-    }).join('');
     var fav = _isFav(id);
-    return '<div class="ki-saved-card" data-saved-id="' + _escAttr(id) + '">'
-      + '<div class="ki-saved-photos">' + photosHtml + '</div>'
-      + '<div class="ki-saved-meta">'
-      + '<div class="ki-saved-from">' + source + '</div>'
-      + '<div class="ki-saved-name">' + (outfit.name || 'Outfit') + '</div>'
-      + '<div class="ki-saved-match">' + (outfit.match || 90) + '% Passend · ' + (outfit.style || '') + '</div>'
+    var cells = _make4Cells(outfit);
+    return '<div class="col-grid-card" data-saved-id="' + _escAttr(id) + '" style="cursor:pointer;">'
+      + '<div class="col-grid-preview">' + cells + '</div>'
+      + '<div class="col-grid-footer">'
+      + '<div class="col-grid-name">' + (outfit.name || 'Outfit') + '</div>'
+      + '<button class="col-grid-heart" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
       + '</div>'
-      + '<button class="ki-saved-heart" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
       + '</div>';
-  }).join('');
+  }).join('') + '</div>';
 }
 
 // ── KI Vorschläge ─────────────────────────────────────────────────────────────
@@ -4462,7 +4461,8 @@ document.addEventListener('DOMContentLoaded', function() {
   var aiSugContainer = document.getElementById('ki-ai-suggestions');
   if (aiSugContainer) {
     aiSugContainer.addEventListener('click', function(e) {
-      if (e.target.closest('.heart-btn')) return;       // Herz → nur liken
+      var heartBtn = e.target.closest('[data-heart-id]');
+      if (heartBtn) { e.stopPropagation(); _toggleFav(heartBtn.getAttribute('data-heart-id'), heartBtn); return; }
       if (e.target.closest('.outfit-save-btn')) return; // Speichern → nur Modal
       var wrapper = e.target.closest('[data-swipe-id]');
       if (wrapper) _openOutfitDetail(wrapper.getAttribute('data-swipe-id'), null);
