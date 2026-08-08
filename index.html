@@ -424,23 +424,28 @@
     .ki-generate-confirm:active { transform: scale(0.97); }
     .ki-generate-confirm svg { width: 18px; height: 18px; stroke: white; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-    .generate-btn {
-      margin: 16px 20px 4px;
-      height: 56px; border-radius: 18px;
-      background: linear-gradient(135deg, #4d8dff 0%, #2f5fcf 100%);
-      border: none; color: white;
-      font-size: 16px; font-weight: 800; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      box-shadow: 0 8px 24px rgba(45,95,207,0.45);
-      width: calc(100% - 40px);
-      transition: transform 0.15s, box-shadow 0.15s;
-      letter-spacing: 0.01em;
-    }
-    .generate-btn:active { transform: scale(0.97); box-shadow: 0 4px 14px rgba(107,71,255,0.25); }
-    .generate-btn svg { width: 20px; height: 20px; stroke: white; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .generate-btn-more { margin:8px 20px 16px; height:50px; border-radius:18px; background:var(--bg); border:2px solid var(--purple-border); color:var(--purple); font-size:15px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; width:calc(100% - 40px); transition:transform 0.15s; }
-    .generate-btn-more:active { transform:scale(0.97); }
-    .generate-btn-more svg { width:18px; height:18px; stroke:var(--purple); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+    .generate-btn { display:none; }
+    .generate-btn-more { display:none; }
+
+    /* ── FAB ── */
+    .ki-fab { position:absolute; bottom:16px; right:20px; width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg,#4d8dff,#2f5fcf); border:none; color:white; font-size:22px; cursor:pointer; box-shadow:0 8px 28px rgba(45,95,207,0.6); z-index:50; display:flex; align-items:center; justify-content:center; transition:transform 0.15s; }
+    .ki-fab:active { transform:scale(0.90); }
+
+    /* ── Ordner grid on main KI screen ── */
+    .ki-pills-wrap { display:none; }
+    .ki-ordner-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:0 20px 4px; }
+
+    /* ── 2-col fit grid inside collection panel ── */
+    .ki-col-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:16px; }
+    .col-grid-card { background:#0e2240; border-radius:16px; overflow:hidden; cursor:pointer; transition:transform 0.15s; border:1px solid rgba(255,255,255,0.12); }
+    .col-grid-card:active { transform:scale(0.97); }
+    .col-grid-preview { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; aspect-ratio:1; gap:2px; background:rgba(0,0,0,0.25); }
+    .col-grid-photo { display:flex; align-items:center; justify-content:center; font-size:22px; background:rgba(255,255,255,0.06); background-size:cover; background-position:center; overflow:hidden; }
+    .col-grid-empty { background:rgba(255,255,255,0.03); }
+    .col-grid-footer { padding:8px 10px 10px; display:flex; align-items:center; justify-content:space-between; gap:4px; }
+    .col-grid-name { font-size:12px; font-weight:800; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; font-family:'Playfair Display',Georgia,serif; }
+    .col-grid-heart { background:none; border:none; font-size:16px; cursor:pointer; padding:0; flex-shrink:0; line-height:1; }
+    .swipe-wrapper.col-wrap-grid { border-radius:16px; margin-bottom:0; }
 
     .outfit-cards { padding: 0 20px; }
     .outfit-card-ki {
@@ -1328,35 +1333,33 @@
       <div class="ki-pills-wrap" id="ki-pills-wrap"></div>
 
       <!-- Haupt-Scroll-Bereich -->
-      <div class="scroll-content" id="ki-scroll" style="flex:1;overflow-y:auto;padding:0;">
+      <div class="scroll-content" id="ki-scroll" style="flex:1;overflow-y:auto;padding:0 0 80px;">
 
-        <!-- Oberer Button: öffnet Modal, kein API Call -->
-        <button class="generate-btn" id="ki-generate-btn" onclick="_openGenerateModal('browse')">
-          <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
-          Outfit generieren
-          <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-        </button>
+        <!-- Ordner Grid (oben) -->
+        <div id="ki-ordner-section">
+          <div class="ki-section-label" style="padding-top:16px;">Meine Ordner</div>
+          <div class="ki-ordner-grid" id="ki-ordner-grid"></div>
+        </div>
 
-        <!-- Vorgeschlagene Outfits: 2–3 random aus Gespeicherten, kein API -->
+        <!-- Vorgeschlagene Outfits -->
         <div class="ki-section-label" id="ki-preview-label">Vorgeschlagene Outfits</div>
         <div id="ki-preview-suggestions" style="padding:0 20px 8px;"></div>
 
-        <!-- KI Vorschläge: erscheinen nach unterem Button -->
+        <!-- KI Vorschläge -->
         <div class="ki-section-label" id="ki-suggestions-label" style="display:none;">KI-Vorschläge</div>
         <div class="outfit-cards" id="ki-ai-suggestions" style="padding:0 20px 8px;display:none;"></div>
 
-        <!-- Unterer Button: öffnet Modal + macht API Call nach Bestätigung -->
-        <button class="generate-btn-more" id="ki-more-btn" onclick="_openGenerateModal('generate')">
-          <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
-          Mehr Vorschläge generieren
-        </button>
-
-        <!-- Alle gespeicherten Outfits -->
+        <!-- Gespeicherte Outfits -->
         <div class="ki-section-label" id="ki-saved-label">
           <span id="ki-saved-label-text">Gespeicherte Outfits</span>
         </div>
         <div id="ki-saved-outfits" style="padding:0 20px 20px;"></div>
       </div>
+
+      <!-- FAB: Outfit generieren -->
+      <button class="ki-fab" onclick="_openGenerateModal('browse')" title="Outfit generieren">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>
+      </button>
 
       <!-- Verstecktes ordner-grid (für Rückwärtskompatibilität) -->
       <div id="ordner-grid" style="display:none;">

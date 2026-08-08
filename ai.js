@@ -1668,7 +1668,7 @@ function _renderColTabContent(name, tab, fits, inspos) {
         + '<button onclick="_openGenerateModal()" style="margin-top:16px;background:var(--purple);color:white;border:none;border-radius:14px;padding:12px 24px;font-size:14px;font-weight:800;cursor:pointer;">Outfit generieren</button>'
         + '</div>';
     } else {
-      list.innerHTML = fits.map(function(o) { return _renderCollectionCard(o, name); }).join('');
+      list.innerHTML = '<div class="ki-col-grid">' + fits.map(function(o) { return _renderCollectionCard(o, name); }).join('') + '</div>';
       _initSwipeToDelete(list);
     }
   } else {
@@ -1767,26 +1767,24 @@ function _closeCollection() {
 function _renderCollectionCard(outfit, collectionName) {
   var id = _regOutfit(outfit);
   var fav = _isFav(id);
-  var items = (outfit.items || []).slice(0, 3);
+  var items = (outfit.items || []).slice(0, 4);
 
-  var previewHtml = items.map(function(item) {
+  var cells = [0, 1, 2, 3].map(function(i) {
+    var item = items[i];
+    if (!item) return '<div class="col-grid-photo col-grid-empty"></div>';
     var photo = _findWardrobePhoto(item.name);
     var style = photo ? 'background-image:url(\'' + photo + '\');background-size:cover;background-position:center;font-size:0;' : '';
-    return '<div class="col-card-photo" style="' + style + '">' + (photo ? '' : (item.emoji || '👕')) + '</div>';
+    return '<div class="col-grid-photo" style="' + style + '">' + (photo ? '' : (item.emoji || '👕')) + '</div>';
   }).join('');
 
-  var inspoMeta = outfit.isInspo
-    ? '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><span class="inspo-badge">💡 Inspo</span><span style="font-size:11px;color:#856404;font-weight:700;">von ' + (outfit.inspoFrom || '') + '</span></div>'
-    : '';
-  return '<div class="swipe-wrapper col-wrap" data-swipe-id="' + _escAttr(id) + '" data-swipe-type="collection" data-swipe-col="' + _escAttr(collectionName) + '" data-swipe-name="' + _escAttr(outfit.name || 'Outfit') + '">'
+  return '<div class="swipe-wrapper col-wrap-grid" data-swipe-id="' + _escAttr(id) + '" data-swipe-type="collection" data-swipe-col="' + _escAttr(collectionName) + '" data-swipe-name="' + _escAttr(outfit.name || 'Outfit') + '">'
     + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
-    + '<div class="swipe-inner col-outfit-card" data-col-id="' + _escAttr(id) + '" data-col-name="' + _escAttr(collectionName) + '">'
-    + '<div class="col-outfit-header">'
-    + '<div>' + inspoMeta + '<div class="col-outfit-name">' + (outfit.name || 'Outfit') + '</div>'
-    + '<span class="match-badge">' + (outfit.match || 90) + '% ✅</span></div>'
-    + '<button class="heart-btn" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
+    + '<div class="swipe-inner col-grid-card" data-col-id="' + _escAttr(id) + '" data-col-name="' + _escAttr(collectionName) + '">'
+    + '<div class="col-grid-preview">' + cells + '</div>'
+    + '<div class="col-grid-footer">'
+    + '<div class="col-grid-name">' + (outfit.name || 'Outfit') + '</div>'
+    + '<button class="col-grid-heart" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
     + '</div>'
-    + '<div class="col-outfit-preview">' + previewHtml + '</div>'
     + '</div></div>';
 }
 
@@ -1909,20 +1907,64 @@ var _savedCardRegistry = {}; // id → { collection }
 function _renderKiPills() {
   var wrap = document.getElementById('ki-pills-wrap');
   if (!wrap) return;
-
   var pills = [{ label: 'Alle', key: '__all__' }];
-
   var favCount = _loadFavs().length;
   if (favCount > 0) pills.push({ label: '❤️ Favoriten (' + favCount + ')', key: '__favoriten__' });
-
   _getCollections().forEach(function(name) {
     var count = _getCollectionCount(name);
     if (count > 0) pills.push({ label: name + ' (' + count + ')', key: name });
   });
-
   var activeKey = _kiActivePill === null ? '__all__' : _kiActivePill;
   wrap.innerHTML = pills.map(function(p) {
     return '<button class="ki-pill' + (activeKey === p.key ? ' active' : '') + '" data-pill-key="' + _escAttr(p.key) + '">' + p.label + '</button>';
+  }).join('');
+  _renderKiOrdnerGrid();
+}
+
+function _renderKiOrdnerGrid() {
+  var grid = document.getElementById('ki-ordner-grid');
+  var section = document.getElementById('ki-ordner-section');
+  if (!grid) return;
+
+  var entries = [];
+  var favCount = _loadFavs().length;
+  if (favCount > 0) entries.push({ key: '__favoriten__', label: '❤️ Favoriten', count: favCount });
+  _getCollections().forEach(function(name) {
+    var count = _getCollectionCount(name);
+    if (count > 0) entries.push({ key: name, label: name, count: count });
+  });
+
+  if (section) section.style.display = entries.length === 0 ? 'none' : '';
+
+  grid.innerHTML = entries.map(function(e) {
+    var outfits = _loadOutfits().filter(function(o) {
+      return e.key === '__favoriten__'
+        ? _isFav(_regOutfit(o))
+        : (o.kollektionen || []).indexOf(e.key) >= 0;
+    });
+
+    var cells;
+    if (outfits.length === 0) {
+      cells = '<div class="ordner-preview-cell" style="grid-column:1/-1;grid-row:1/-1;font-size:36px;background:var(--purple-light);">'
+        + (e.key === '__favoriten__' ? '❤️' : '📁') + '</div>';
+    } else {
+      cells = [0, 1, 2, 3].map(function(i) {
+        var o = outfits[i];
+        if (!o) return '<div class="ordner-preview-cell ordner-preview-empty" style="background:rgba(255,255,255,0.03);"></div>';
+        var item = (o.items || [])[0];
+        if (!item) return '<div class="ordner-preview-cell ordner-preview-empty"></div>';
+        var photo = _findWardrobePhoto(item.name);
+        var style = photo ? 'background-image:url(\'' + photo + '\');background-size:cover;background-position:center;font-size:0;' : '';
+        return '<div class="ordner-preview-cell" style="' + style + '">' + (photo ? '' : (item.emoji || '👕')) + '</div>';
+      }).join('');
+    }
+
+    return '<div class="ordner-card" onclick="_openCollection(\'' + _escAttr(e.key) + '\')">'
+      + '<div class="ordner-preview">' + cells + '</div>'
+      + '<div class="ordner-info">'
+      + '<div class="ordner-name">' + e.label + '</div>'
+      + '<div class="ordner-count">' + e.count + (e.count === 1 ? ' Outfit' : ' Outfits') + '</div>'
+      + '</div></div>';
   }).join('');
 }
 
