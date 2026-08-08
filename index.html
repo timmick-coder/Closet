@@ -1166,6 +1166,21 @@
     .outfit-name-edit-confirm { background:none; border:none; font-size:15px; cursor:pointer; padding:0 2px; flex-shrink:0; line-height:1; }
     .ki-panel-rename-btn { background:none; border:none; font-size:16px; cursor:pointer; padding:4px 6px; opacity:0.45; flex-shrink:0; line-height:1; }
     .ki-panel-rename-btn:active { opacity:1; }
+
+    /* ── Outfit erstellen ── */
+    .ki-create-name-wrap { padding:12px 16px 8px; flex-shrink:0; }
+    .ki-create-name-input { width:100%; background:rgba(255,255,255,0.07); border:1.5px solid rgba(255,255,255,0.12); border-radius:14px; padding:12px 14px; font-size:15px; color:var(--text); outline:none; font-family:inherit; box-sizing:border-box; }
+    .ki-create-name-input::placeholder { color:var(--text2); }
+    .ki-create-name-input:focus { border-color:#4d8dff; }
+    .ki-create-save-btn { background:linear-gradient(135deg,#4d8dff,#2f5fcf); border:none; color:white; font-size:13px; font-weight:800; padding:7px 16px; border-radius:10px; cursor:pointer; flex-shrink:0; }
+    .ki-create-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:8px 16px 32px; }
+    .ki-create-item { border-radius:14px; aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(255,255,255,0.07); border:2px solid transparent; cursor:pointer; position:relative; overflow:hidden; transition:border-color 0.15s,background 0.15s; -webkit-tap-highlight-color:transparent; }
+    .ki-create-item.selected { border-color:#4d8dff; background:rgba(77,141,255,0.12); }
+    .ki-create-item-photo { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    .ki-create-item-emoji { font-size:34px; line-height:1; position:relative; z-index:1; }
+    .ki-create-item-name { font-size:10px; font-weight:700; color:var(--text2); margin-top:5px; text-align:center; padding:0 4px; line-height:1.2; position:relative; z-index:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+    .ki-create-item-check { position:absolute; top:5px; right:5px; width:20px; height:20px; border-radius:50%; background:#4d8dff; display:none; align-items:center; justify-content:center; z-index:3; }
+    .ki-create-item.selected .ki-create-item-check { display:flex; }
   </style>
 </head>
 <body>
@@ -1370,12 +1385,28 @@
         </div>
       </div>
 
+      <!-- ── Outfit erstellen Panel ── -->
+      <div class="ki-panel" id="ki-create-outfit-panel" style="z-index:60;">
+        <div class="ki-panel-header">
+          <button class="ki-back-btn" onclick="_closeCreateOutfitPanel()">←</button>
+          <div class="ki-panel-title">Outfit erstellen</div>
+          <button class="ki-create-save-btn" onclick="_saveManualOutfit()">Speichern</button>
+        </div>
+        <div class="ki-create-name-wrap">
+          <input class="ki-create-name-input" id="ki-create-name" placeholder="Outfit benennen…" maxlength="40" />
+        </div>
+        <div class="ki-panel-scroll" style="padding-top:0;">
+          <div class="ki-create-grid" id="ki-create-grid"></div>
+        </div>
+      </div>
+
       <!-- ── Kollektion Detail Panel ── -->
       <div class="ki-panel" id="ki-collection-panel">
         <div class="ki-panel-header">
           <button class="ki-back-btn" onclick="_closeCollection()">←</button>
           <div class="ki-panel-title" id="ki-col-title">Kollektion</div>
           <button class="ki-panel-rename-btn" id="ki-col-rename-btn" title="Name ändern" onclick="_startCollectionRename(_currentCollectionName)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="ki-panel-rename-btn" id="ki-col-add-btn" title="Outfit erstellen" onclick="_openCreateOutfitPanel()" style="font-size:22px;opacity:1;color:#4d8dff;font-weight:300;line-height:1;">+</button>
         </div>
         <div class="ki-panel-sub" id="ki-col-sub">0 Outfits</div>
         <div class="col-tab-row" id="ki-col-tabs">

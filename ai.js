@@ -1988,6 +1988,86 @@ function _fabAction() {
   }
 }
 
+// ── Outfit manuell erstellen ───────────────────────────────────────────────────
+var _createOutfitSelected = {};
+
+function _openCreateOutfitPanel() {
+  _createOutfitSelected = {};
+  var nameInput = document.getElementById('ki-create-name');
+  if (nameInput) nameInput.value = '';
+
+  var grid = document.getElementById('ki-create-grid');
+  if (grid) {
+    var items = loadWardrobe();
+    if (items.length === 0) {
+      grid.innerHTML = '<div style="text-align:center;padding:40px 20px;grid-column:1/-1;">'
+        + '<div style="font-size:40px;">👗</div>'
+        + '<div style="font-size:14px;font-weight:700;color:var(--text2);margin-top:10px;">Noch keine Kleidung im Schrank</div>'
+        + '</div>';
+    } else {
+      grid.innerHTML = items.map(function(item) {
+        var id = String(item.id || item.name);
+        var photo = item.imageDataUrl;
+        var photoHtml = photo
+          ? '<img class="ki-create-item-photo" src="' + photo + '" />'
+          : '<span class="ki-create-item-emoji">' + (item.emoji || '👕') + '</span>';
+        return '<div class="ki-create-item" data-create-id="' + _escAttr(id) + '" onclick="_toggleCreateItem(this)">'
+          + photoHtml
+          + '<div class="ki-create-item-name">' + (item.name || '') + '</div>'
+          + '<div class="ki-create-item-check"><svg viewBox="0 0 12 10" width="10" height="8" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,5 4,8 11,1"/></svg></div>'
+          + '</div>';
+      }).join('');
+    }
+  }
+
+  var panel = document.getElementById('ki-create-outfit-panel');
+  if (panel) panel.classList.add('active');
+}
+
+function _closeCreateOutfitPanel() {
+  var panel = document.getElementById('ki-create-outfit-panel');
+  if (panel) panel.classList.remove('active');
+}
+
+function _toggleCreateItem(el) {
+  var id = el.getAttribute('data-create-id');
+  if (_createOutfitSelected[id]) {
+    delete _createOutfitSelected[id];
+    el.classList.remove('selected');
+  } else {
+    var item = loadWardrobe().find(function(w) { return String(w.id || w.name) === id; });
+    if (item) _createOutfitSelected[id] = item;
+    el.classList.add('selected');
+  }
+}
+
+function _saveManualOutfit() {
+  var selectedItems = Object.keys(_createOutfitSelected).map(function(k) { return _createOutfitSelected[k]; });
+  if (selectedItems.length === 0) {
+    var grid = document.getElementById('ki-create-grid');
+    if (grid) { grid.style.outline = '2px solid #ef4444'; setTimeout(function() { grid.style.outline = ''; }, 800); }
+    return;
+  }
+  var nameInput = document.getElementById('ki-create-name');
+  var name = (nameInput && nameInput.value.trim()) || 'Mein Outfit';
+  var outfit = {
+    id: 'manual_' + Date.now(),
+    name: name,
+    style: 'Manuell erstellt',
+    match: 95,
+    items: selectedItems.map(function(item) { return { name: item.name, emoji: item.emoji || '👕' }; }),
+    kollektionen: _currentCollectionName ? [_currentCollectionName] : []
+  };
+  var outfits = _loadOutfits();
+  outfits.push(outfit);
+  _storeOutfits(outfits);
+  _closeCreateOutfitPanel();
+  _openCollection(_currentCollectionName);
+  _renderKiPills();
+  _renderKiSavedSection();
+  _updateFavoritenCard();
+}
+
 function _selectKiPill(key) {
   if (key === '__all__') {
     _kiActivePill = null;
@@ -4721,9 +4801,10 @@ document.addEventListener('DOMContentLoaded', function() {
   var SWIPE_PANELS = [
     { id: 'fp-ki-panel',          close: function() { _closeFriendKI(); } },
     { id: 'item-detail-panel',    close: function() { _closeItemDetail(); } },
-    { id: 'ki-results-panel',     close: function() { _closeKiResults(); } },
-    { id: 'ki-outfit-panel',      close: function() { _closeOutfitDetail(); } },
-    { id: 'ki-collection-panel',  close: function() { _closeCollection(); } },
+    { id: 'ki-results-panel',       close: function() { _closeKiResults(); } },
+    { id: 'ki-create-outfit-panel', close: function() { _closeCreateOutfitPanel(); } },
+    { id: 'ki-outfit-panel',        close: function() { _closeOutfitDetail(); } },
+    { id: 'ki-collection-panel',    close: function() { _closeCollection(); } },
     { id: 'post-detail-panel',    close: function() { _closePostDetail(); } },
     { id: 'friend-search-panel',  close: function() { _closeFriendSearch(); } },
     { id: 'friend-profile-panel', close: function() { _closeFriendProfile(); } },
