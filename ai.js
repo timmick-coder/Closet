@@ -1230,8 +1230,14 @@ function _initSwipeToDelete(container) {
           inner.style.transition = '';
           inner.style.transform = '';
           inner.style.opacity = '';
-          _animateDeleteWrapper(wrapper);
-        }, 180);
+          _showContextMenu({
+            type: 'outfit',
+            id: wrapper.getAttribute('data-swipe-id'),
+            name: wrapper.getAttribute('data-swipe-name') || 'Outfit',
+            currentCol: wrapper.getAttribute('data-swipe-col') || _currentCollectionName || null,
+            wrapper: wrapper
+          });
+        }, 130);
       }, 550);
     }
     function onMove(x, y) {
@@ -2043,6 +2049,124 @@ function _deleteCollection(name) {
   _showUndoToast('🗑️ "' + name + '" gelöscht', true);
 }
 
+// ── Context Menu (Long-Press Action Sheet) ────────────────────────────────────
+var _ctxTarget = null;
+
+function _showContextMenu(target) {
+  _ctxTarget = target;
+  var label = document.getElementById('lp-sheet-label');
+  if (label) label.textContent = target.name || '';
+  var sheet = document.getElementById('lp-sheet');
+  if (sheet) sheet.classList.add('active');
+}
+
+function _closeContextMenu() {
+  var sheet = document.getElementById('lp-sheet');
+  if (sheet) sheet.classList.remove('active');
+}
+
+function _lpOverlayClick(e) {
+  if (e.target === document.getElementById('lp-sheet')) _closeContextMenu();
+}
+
+function _ctxDelete() {
+  _closeContextMenu();
+  if (!_ctxTarget) return;
+  if (_ctxTarget.type === 'outfit') {
+    var wrapper = _ctxTarget.wrapper;
+    if (wrapper) _animateDeleteWrapper(wrapper);
+  } else if (_ctxTarget.type === 'folder') {
+    _deleteCollection(_ctxTarget.colKey);
+  }
+  _ctxTarget = null;
+}
+
+function _ctxMove() {
+  _closeContextMenu();
+  if (!_ctxTarget) return;
+  _showFolderPicker();
+}
+
+function _showFolderPicker() {
+  var list = document.getElementById('lp-folder-list');
+  if (!list) return;
+  var cols = _getCollections();
+  var currentCol = _ctxTarget
+    ? (_ctxTarget.type === 'folder' ? _ctxTarget.colKey : _ctxTarget.currentCol)
+    : null;
+  var available = cols.filter(function(c) { return c !== currentCol; });
+
+  if (available.length === 0) {
+    list.innerHTML = '<div class="lp-empty-msg">Keine anderen Ordner vorhanden.</div>'
+      + '<button class="lp-folder-item lp-folder-item-new" onclick="_moveToNewFolder()"><span>+</span> Neuer Ordner</button>';
+  } else {
+    list.innerHTML = available.map(function(name) {
+      return '<button class="lp-folder-item" onclick="_moveToCollection(\'' + _escAttr(name) + '\')">'
+        + '<span style="font-size:18px;">📁</span><span>' + name + '</span>'
+        + '</button>';
+    }).join('')
+      + '<button class="lp-folder-item lp-folder-item-new" onclick="_moveToNewFolder()"><span style="font-size:18px;font-weight:300;">+</span><span>Neuer Ordner</span></button>';
+  }
+
+  var picker = document.getElementById('lp-picker');
+  if (picker) picker.classList.add('active');
+}
+
+function _closeFolderPicker() {
+  var picker = document.getElementById('lp-picker');
+  if (picker) picker.classList.remove('active');
+}
+
+function _lpPickerOverlayClick(e) {
+  if (e.target === document.getElementById('lp-picker')) _closeFolderPicker();
+}
+
+function _moveToNewFolder() {
+  _closeFolderPicker();
+  var name = prompt('Name des neuen Ordners:');
+  if (!name || !name.trim()) return;
+  _moveToCollection(name.trim());
+}
+
+function _moveToCollection(targetCol) {
+  _closeFolderPicker();
+  if (!_ctxTarget) return;
+  var t = _ctxTarget;
+  _ctxTarget = null;
+
+  if (t.type === 'outfit') {
+    var outfits = _loadOutfits();
+    var o = outfits.find(function(x) { return x.id === t.id; });
+    if (o) {
+      if (t.currentCol) {
+        o.kollektionen = (o.kollektionen || []).filter(function(c) { return c !== t.currentCol; });
+      }
+      if ((o.kollektionen || []).indexOf(targetCol) < 0) {
+        o.kollektionen = (o.kollektionen || []).concat([targetCol]);
+      }
+      _storeOutfits(outfits);
+    }
+    if (t.wrapper) t.wrapper.remove();
+    _renderKiOrdnerGrid();
+    _renderKiPills();
+    _renderKiSavedSection();
+    _showToast('✅ Verschoben nach "' + targetCol + '"');
+  } else if (t.type === 'folder') {
+    var outfits2 = _loadOutfits();
+    outfits2.forEach(function(o) {
+      if ((o.kollektionen || []).indexOf(t.colKey) >= 0) {
+        o.kollektionen = o.kollektionen.filter(function(c) { return c !== t.colKey; });
+        if (o.kollektionen.indexOf(targetCol) < 0) o.kollektionen.push(targetCol);
+      }
+    });
+    _storeOutfits(outfits2);
+    _renderKiOrdnerGrid();
+    _renderKiPills();
+    _renderKiSavedSection();
+    _showToast('✅ Ordner nach "' + targetCol + '" verschoben');
+  }
+}
+
 function _initOrdnerLongPress(grid) {
   if (!grid) return;
   grid.querySelectorAll('.ordner-card[data-col-key]').forEach(function(card) {
@@ -2063,7 +2187,8 @@ function _initOrdnerLongPress(grid) {
           card.style.transition = '';
           card.style.transform = '';
           card.style.opacity = '';
-          _deleteCollection(key);
+          if (key === '__favoriten__') return;
+          _showContextMenu({ type: 'folder', colKey: key, name: key });
         }, 180);
       }, 550);
     }

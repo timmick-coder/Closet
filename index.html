@@ -1181,6 +1181,20 @@
     .ki-create-item-name { font-size:10px; font-weight:700; color:var(--text2); margin-top:5px; text-align:center; padding:0 4px; line-height:1.2; position:relative; z-index:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
     .ki-create-item-check { position:absolute; top:5px; right:5px; width:20px; height:20px; border-radius:50%; background:#4d8dff; display:none; align-items:center; justify-content:center; z-index:3; }
     .ki-create-item.selected .ki-create-item-check { display:flex; }
+
+    /* ── Long-Press Action Sheet ── */
+    .lp-overlay { position:fixed; inset:0; z-index:400; background:rgba(0,0,0,0.55); display:none; align-items:flex-end; }
+    .lp-overlay.active { display:flex; }
+    .lp-sheet { width:100%; background:#0d1b2e; border-radius:22px 22px 0 0; border-top:1px solid rgba(255,255,255,0.12); padding:14px 14px 36px; display:flex; flex-direction:column; gap:10px; animation:slideUp 0.22s cubic-bezier(0.4,0,0.2,1); }
+    @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+    .lp-sheet-label { font-size:12px; font-weight:700; color:rgba(255,255,255,0.4); text-align:center; padding:2px 0 4px; letter-spacing:0.06em; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .lp-btn { display:flex; align-items:center; gap:12px; border-radius:14px; padding:15px 16px; font-size:15px; font-weight:700; color:#fff; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.11); cursor:pointer; font-family:inherit; }
+    .lp-btn-delete { background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.22); color:#ef4444; }
+    .lp-btn-cancel { background:transparent; border-color:rgba(255,255,255,0.07); color:rgba(255,255,255,0.45); justify-content:center; margin-top:2px; }
+    .lp-folder-list { display:flex; flex-direction:column; gap:8px; max-height:42vh; overflow-y:auto; }
+    .lp-folder-item { display:flex; align-items:center; gap:12px; border-radius:14px; padding:14px 16px; font-size:15px; font-weight:700; color:#fff; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.11); cursor:pointer; font-family:inherit; }
+    .lp-folder-item-new { color:#4d8dff; border-color:rgba(77,141,255,0.2); background:rgba(77,141,255,0.07); }
+    .lp-empty-msg { text-align:center; padding:20px; color:rgba(255,255,255,0.4); font-size:14px; }
   </style>
 </head>
 <body>
@@ -2039,6 +2053,25 @@
   <div id="ki-toast"></div>
   <!-- Swipe-Delete Undo Toast -->
   <div id="swipe-undo-toast"><span id="swipe-undo-text">Outfit gelöscht</span><button id="swipe-undo-btn" onclick="_swipeUndo()">Rückgängig</button></div>
+
+  <!-- Long-Press Action Sheet -->
+  <div id="lp-sheet" class="lp-overlay" onclick="_lpOverlayClick(event)">
+    <div class="lp-sheet">
+      <div class="lp-sheet-label" id="lp-sheet-label"></div>
+      <button class="lp-btn" onclick="_ctxMove()">📁 Verschieben</button>
+      <button class="lp-btn lp-btn-delete" onclick="_ctxDelete()">🗑️ Löschen</button>
+      <button class="lp-btn lp-btn-cancel" onclick="_closeContextMenu()">Abbrechen</button>
+    </div>
+  </div>
+
+  <!-- Folder Picker Sheet -->
+  <div id="lp-picker" class="lp-overlay" onclick="_lpPickerOverlayClick(event)">
+    <div class="lp-sheet">
+      <div class="lp-sheet-label">In Ordner verschieben</div>
+      <div class="lp-folder-list" id="lp-folder-list"></div>
+      <button class="lp-btn lp-btn-cancel" onclick="_closeFolderPicker()">Abbrechen</button>
+    </div>
+  </div>
 
   <!-- Speichern in Kollektion Modal -->
   <div class="modal-overlay" id="save-modal-overlay" onclick="_closeSaveModalOutside(event)">
