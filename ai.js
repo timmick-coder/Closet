@@ -1205,13 +1205,34 @@ function _initSwipeToDelete(container) {
     if (!wrapper) return;
 
     var startX = 0, startY = 0, currentX = 0, dragging = false, dirLocked = false, isHoriz = false;
-    var THRESHOLD = 85; // px to trigger delete
+    var THRESHOLD = 85;
     var MAX = 130;
+    var lpTimer = null, lpFired = false;
+
+    function cancelLp() {
+      clearTimeout(lpTimer); lpTimer = null;
+    }
 
     function onStart(x, y) {
       startX = x; startY = y; currentX = 0;
-      dragging = true; dirLocked = false; isHoriz = false;
+      dragging = true; dirLocked = false; isHoriz = false; lpFired = false;
       inner.classList.add('dragging');
+      lpTimer = setTimeout(function() {
+        if (!dragging || isHoriz) return;
+        lpFired = true;
+        dragging = false;
+        inner.classList.remove('dragging');
+        if (navigator.vibrate) navigator.vibrate(50);
+        inner.style.transition = 'transform 0.12s, opacity 0.12s';
+        inner.style.transform = 'scale(0.94)';
+        inner.style.opacity = '0.6';
+        setTimeout(function() {
+          inner.style.transition = '';
+          inner.style.transform = '';
+          inner.style.opacity = '';
+          _animateDeleteWrapper(wrapper);
+        }, 180);
+      }, 550);
     }
     function onMove(x, y) {
       if (!dragging) return;
@@ -1220,8 +1241,10 @@ function _initSwipeToDelete(container) {
         if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
         isHoriz = Math.abs(dx) > Math.abs(dy);
         dirLocked = true;
+        if (isHoriz) cancelLp();
       }
-      if (!isHoriz || dx > 0) return; // only left swipe
+      if (!isHoriz || dx > 0) return;
+      cancelLp();
       currentX = Math.max(dx, -MAX);
       inner.style.transform = 'translateX(' + currentX + 'px)';
       var pct = Math.abs(currentX) / MAX;
@@ -1233,6 +1256,7 @@ function _initSwipeToDelete(container) {
       }
     }
     function onEnd() {
+      cancelLp();
       if (!dragging) return;
       dragging = false;
       inner.classList.remove('dragging');
@@ -1246,7 +1270,6 @@ function _initSwipeToDelete(container) {
       }
     }
 
-    // Touch
     inner.addEventListener('touchstart', function(e) { onStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
     inner.addEventListener('touchmove',  function(e) {
       if (isHoriz && dirLocked) e.preventDefault();
@@ -1255,10 +1278,14 @@ function _initSwipeToDelete(container) {
     inner.addEventListener('touchend',    function() { onEnd(); });
     inner.addEventListener('touchcancel', function() { onEnd(); });
 
-    // Mouse (Desktop)
     inner.addEventListener('mousedown', function(e) { onStart(e.clientX, e.clientY); });
     window.addEventListener('mousemove', function(e) { if (dragging) onMove(e.clientX, e.clientY); });
     window.addEventListener('mouseup',   function()  { if (dragging) onEnd(); });
+
+    // Block click after long-press fired
+    inner.addEventListener('click', function(e) {
+      if (lpFired) { e.stopImmediatePropagation(); lpFired = false; }
+    }, true);
   });
 }
 
@@ -1979,13 +2006,86 @@ function _renderKiOrdnerGrid() {
       }).join('');
     }
 
-    return '<div class="ordner-card" onclick="_openCollection(\'' + _escAttr(e.key) + '\')">'
+    return '<div class="ordner-card" data-col-key="' + _escAttr(e.key) + '" onclick="_openCollection(\'' + _escAttr(e.key) + '\')">'
       + '<div class="ordner-preview">' + cells + '</div>'
       + '<div class="ordner-info">'
       + '<div class="ordner-name">' + e.label + '</div>'
       + '<div class="ordner-count">' + e.count + (e.count === 1 ? ' Outfit' : ' Outfits') + '</div>'
       + '</div></div>';
   }).join('');
+
+  _initOrdnerLongPress(grid);
+}
+
+function _deleteCollection(name) {
+  if (!name || name === '__favoriten__') return;
+  var snapshots = _loadOutfits();
+  _swipeUndoFn = function() {
+    _storeOutfits(snapshots);
+    _renderKiOrdnerGrid();
+    _renderKiPills();
+    _renderKiSavedSection();
+    _hideUndoToast();
+  };
+  clearTimeout(_swipeUndoTimer);
+  _swipeUndoTimer = setTimeout(function() {
+    _swipeUndoFn = null;
+    _hideUndoToast();
+  }, 3000);
+  var outfits = _loadOutfits().map(function(o) {
+    o.kollektionen = (o.kollektionen || []).filter(function(c) { return c !== name; });
+    return o;
+  });
+  _storeOutfits(outfits);
+  _renderKiOrdnerGrid();
+  _renderKiPills();
+  _renderKiSavedSection();
+  _showUndoToast('🗑️ "' + name + '" gelöscht', true);
+}
+
+function _initOrdnerLongPress(grid) {
+  if (!grid) return;
+  grid.querySelectorAll('.ordner-card[data-col-key]').forEach(function(card) {
+    if (card.getAttribute('data-lp-init')) return;
+    card.setAttribute('data-lp-init', '1');
+    var key = card.getAttribute('data-col-key');
+    var timer = null, fired = false;
+
+    function start() {
+      fired = false;
+      timer = setTimeout(function() {
+        fired = true;
+        if (navigator.vibrate) navigator.vibrate(50);
+        card.style.transition = 'transform 0.12s, opacity 0.12s';
+        card.style.transform = 'scale(0.93)';
+        card.style.opacity = '0.55';
+        setTimeout(function() {
+          card.style.transition = '';
+          card.style.transform = '';
+          card.style.opacity = '';
+          _deleteCollection(key);
+        }, 180);
+      }, 550);
+    }
+    function cancel() {
+      clearTimeout(timer);
+      timer = null;
+      if (!fired) {
+        card.style.transform = '';
+        card.style.opacity = '';
+      }
+    }
+
+    card.addEventListener('touchstart', start, { passive: true });
+    card.addEventListener('touchend', cancel);
+    card.addEventListener('touchmove', cancel);
+    card.addEventListener('mousedown', start);
+    card.addEventListener('mouseup', cancel);
+    card.addEventListener('mouseleave', cancel);
+    card.addEventListener('click', function(e) {
+      if (fired) { e.stopImmediatePropagation(); e.preventDefault(); fired = false; }
+    }, true);
+  });
 }
 
 function _setKiSuggestionsVisible() { /* no-op: KI suggestions now live in ki-results-panel */ }
