@@ -1395,6 +1395,15 @@
         <div class="ki-create-name-wrap">
           <input class="ki-create-name-input" id="ki-create-name" placeholder="Outfit benennen…" maxlength="40" />
         </div>
+        <div class="chip-row" id="ki-create-chips" style="padding:4px 16px 10px;">
+          <div class="chip active" data-create-filter="alle" onclick="_filterCreateGrid(this)">Alle</div>
+          <div class="chip" data-create-filter="tops" onclick="_filterCreateGrid(this)">Tops</div>
+          <div class="chip" data-create-filter="hosen" onclick="_filterCreateGrid(this)">Hosen</div>
+          <div class="chip" data-create-filter="kleider" onclick="_filterCreateGrid(this)">Kleider</div>
+          <div class="chip" data-create-filter="schuhe" onclick="_filterCreateGrid(this)">Schuhe</div>
+          <div class="chip" data-create-filter="jacken" onclick="_filterCreateGrid(this)">Jacken</div>
+          <div class="chip" data-create-filter="accessoires" onclick="_filterCreateGrid(this)">Accessoires</div>
+        </div>
         <div class="ki-panel-scroll" style="padding-top:0;">
           <div class="ki-create-grid" id="ki-create-grid"></div>
         </div>

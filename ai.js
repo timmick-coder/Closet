@@ -1991,37 +1991,59 @@ function _fabAction() {
 // ── Outfit manuell erstellen ───────────────────────────────────────────────────
 var _createOutfitSelected = {};
 
+var _createFilterCat = 'alle';
+var _createFilterMap = { tops:'Top', hosen:'Hose', kleider:'Kleid', schuhe:'Schuh', jacken:'Jacke', accessoires:'Accessoire' };
+
 function _openCreateOutfitPanel() {
   _createOutfitSelected = {};
+  _createFilterCat = 'alle';
   var nameInput = document.getElementById('ki-create-name');
   if (nameInput) nameInput.value = '';
-
-  var grid = document.getElementById('ki-create-grid');
-  if (grid) {
-    var items = loadWardrobe();
-    if (items.length === 0) {
-      grid.innerHTML = '<div style="text-align:center;padding:40px 20px;grid-column:1/-1;">'
-        + '<div style="font-size:40px;">👗</div>'
-        + '<div style="font-size:14px;font-weight:700;color:var(--text2);margin-top:10px;">Noch keine Kleidung im Schrank</div>'
-        + '</div>';
-    } else {
-      grid.innerHTML = items.map(function(item) {
-        var id = String(item.id || item.name);
-        var photo = item.imageDataUrl;
-        var photoHtml = photo
-          ? '<img class="ki-create-item-photo" src="' + photo + '" />'
-          : '<span class="ki-create-item-emoji">' + (item.emoji || '👕') + '</span>';
-        return '<div class="ki-create-item" data-create-id="' + _escAttr(id) + '" onclick="_toggleCreateItem(this)">'
-          + photoHtml
-          + '<div class="ki-create-item-name">' + (item.name || '') + '</div>'
-          + '<div class="ki-create-item-check"><svg viewBox="0 0 12 10" width="10" height="8" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,5 4,8 11,1"/></svg></div>'
-          + '</div>';
-      }).join('');
-    }
-  }
-
+  // reset chips
+  var chips = document.querySelectorAll('#ki-create-chips .chip');
+  chips.forEach(function(c) { c.classList.toggle('active', c.getAttribute('data-create-filter') === 'alle'); });
+  _renderCreateGrid('alle');
   var panel = document.getElementById('ki-create-outfit-panel');
   if (panel) panel.classList.add('active');
+}
+
+function _renderCreateGrid(filter) {
+  var grid = document.getElementById('ki-create-grid');
+  if (!grid) return;
+  var all = loadWardrobe();
+  var items = filter === 'alle' ? all : all.filter(function(w) {
+    return (w.type || '').toLowerCase() === (_createFilterMap[filter] || '').toLowerCase();
+  });
+  if (items.length === 0) {
+    grid.innerHTML = '<div style="text-align:center;padding:40px 20px;grid-column:1/-1;">'
+      + '<div style="font-size:40px;">👗</div>'
+      + '<div style="font-size:14px;font-weight:700;color:var(--text2);margin-top:10px;">'
+      + (all.length === 0 ? 'Noch keine Kleidung im Schrank' : 'Keine Artikel in dieser Kategorie')
+      + '</div></div>';
+    return;
+  }
+  grid.innerHTML = items.map(function(item) {
+    var id = String(item.id || item.name);
+    var isSelected = !!_createOutfitSelected[id];
+    var photo = item.imageDataUrl;
+    var photoHtml = photo
+      ? '<img class="ki-create-item-photo" src="' + photo + '" />'
+      : '<span class="ki-create-item-emoji">' + (item.emoji || '👕') + '</span>';
+    return '<div class="ki-create-item' + (isSelected ? ' selected' : '') + '" data-create-id="' + _escAttr(id) + '" onclick="_toggleCreateItem(this)">'
+      + photoHtml
+      + '<div class="ki-create-item-name">' + (item.name || '') + '</div>'
+      + '<div class="ki-create-item-check"><svg viewBox="0 0 12 10" width="10" height="8" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1,5 4,8 11,1"/></svg></div>'
+      + '</div>';
+  }).join('');
+}
+
+function _filterCreateGrid(chipEl) {
+  var filter = chipEl.getAttribute('data-create-filter');
+  _createFilterCat = filter;
+  document.querySelectorAll('#ki-create-chips .chip').forEach(function(c) {
+    c.classList.toggle('active', c === chipEl);
+  });
+  _renderCreateGrid(filter);
 }
 
 function _closeCreateOutfitPanel() {
