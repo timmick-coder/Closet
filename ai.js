@@ -1980,6 +1980,14 @@ function _closeKiResults() {
   if (panel) panel.classList.remove('active');
 }
 
+function _fabAction() {
+  if (_kiSuggestionsLoaded) {
+    _openKiResultsPanel();
+  } else {
+    _openGenerateModal('generate');
+  }
+}
+
 function _selectKiPill(key) {
   if (key === '__all__') {
     _kiActivePill = null;
