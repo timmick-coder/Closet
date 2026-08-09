@@ -1224,6 +1224,8 @@ function _initSwipeToDelete(container) {
         dragging = false;
         inner.classList.remove('dragging');
         if (navigator.vibrate) navigator.vibrate(50);
+        var bg = wrapper.querySelector('.swipe-delete-bg');
+        if (bg) bg.style.visibility = 'hidden';
         inner.style.transition = 'transform 0.12s, opacity 0.12s';
         inner.style.transform = 'scale(0.94)';
         inner.style.opacity = '0.6';
@@ -1231,6 +1233,7 @@ function _initSwipeToDelete(container) {
           inner.style.transition = '';
           inner.style.transform = '';
           inner.style.opacity = '';
+          if (bg) bg.style.visibility = '';
           _showContextMenu({
             type: 'outfit',
             id: wrapper.getAttribute('data-swipe-id'),
