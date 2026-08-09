@@ -5344,13 +5344,37 @@ function _kofferCodeToEmoji(code) {
   return '⛈️';
 }
 
+function _kofferWeatherSummary(days) {
+  var n = days.length || 1;
+  var clearDays  = days.filter(function(d) { return d.code <= 3; }).length;
+  var rainDays   = days.filter(function(d) { return d.code >= 51 && d.code < 71; }).length;
+  var snowDays   = days.filter(function(d) { return d.code >= 71 && d.code < 80; }).length;
+  var stormDays  = days.filter(function(d) { return d.code >= 95; }).length;
+  var showerDays = days.filter(function(d) { return d.code >= 80 && d.code < 95; }).length;
+  var avgMax = Math.round(days.reduce(function(s,d){ return s+d.maxC; },0) / n);
+
+  if (stormDays >= 2) return 'Gewitter erwartet';
+  if (snowDays >= Math.ceil(n / 2)) return 'Winterliches Wetter';
+  if (rainDays >= Math.ceil(n * 0.6)) return 'Überwiegend regnerisch';
+  if ((rainDays + showerDays) >= Math.ceil(n / 2)) return 'Wechselhaft mit Schauern';
+  if (clearDays >= Math.ceil(n * 0.6) && avgMax >= 28) return 'Heiss und sonnig';
+  if (clearDays >= Math.ceil(n * 0.6) && avgMax >= 20) return 'Sonnig und angenehm';
+  if (clearDays >= Math.ceil(n * 0.6)) return 'Größtenteils klar';
+  if (rainDays >= 1 || showerDays >= 1) return 'Meist bewölkt, einzelne Schauer';
+  return 'Wechselhafte Bewölkung';
+}
+
 function _kofferRenderWeatherBanner(banner) {
   if (!banner || !_kofferWeatherData) return;
   var w = _kofferWeatherData;
-  var rainNote = w.rainDays > 0 ? ' · ' + w.rainDays + ' Regentag' + (w.rainDays > 1 ? 'e' : '') : '';
-  var topHtml = '<div class="koffer-weather-top">'
-    + '<span style="font-size:20px;">' + _kofferCodeToEmoji(w.days[0] ? w.days[0].code : 0) + '</span>'
-    + '<span><strong>' + w.city + '</strong> · ' + w.minTempC + '–' + w.maxTempC + '°C' + rainNote + '</span>'
+  var summary = _kofferWeatherSummary(w.days);
+  var dominantCode = w.days.reduce(function(best, d) { return d.code > best ? d.code : best; }, 0);
+  var topHtml = '<div class="koffer-weather-top" style="flex-direction:column;align-items:flex-start;gap:2px;padding-bottom:4px;">'
+    + '<div style="display:flex;align-items:center;gap:8px;">'
+    + '<span style="font-size:22px;">' + _kofferCodeToEmoji(dominantCode > 3 ? dominantCode : (w.days[0]||{code:0}).code) + '</span>'
+    + '<strong style="font-size:14px;">' + w.city + '</strong>'
+    + '</div>'
+    + '<div style="font-size:13px;color:var(--text2);padding-left:2px;">' + summary + ' · ' + w.minTempC + '–' + w.maxTempC + '°C</div>'
     + '</div>';
   var daysHtml = '<div class="koffer-weather-days">'
     + w.days.map(function(d) {
@@ -5362,7 +5386,7 @@ function _kofferRenderWeatherBanner(banner) {
         return '<div class="koffer-weather-day ' + cls + '">'
           + '<div class="koffer-weather-day-name">' + name + '</div>'
           + '<div class="koffer-weather-day-icon">' + _kofferCodeToEmoji(d.code) + '</div>'
-          + '<div class="koffer-weather-day-temp">' + d.maxC + '°</div>'
+          + '<div class="koffer-weather-day-temp">' + d.minC + '–' + d.maxC + '°</div>'
           + '</div>';
       }).join('')
     + '</div>';
