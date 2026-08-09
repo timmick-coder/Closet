@@ -35,22 +35,108 @@ function _compressImage(base64, mimeType) {
   });
 }
 
-// ── Garderobe (LocalStorage) ──────────────────────────────────────────────────
+// ── IndexedDB für Bilder ──────────────────────────────────────────────────────
+var _idbConn = null;
+function _idbOpen() {
+  if (_idbConn) return Promise.resolve(_idbConn);
+  return new Promise(function(resolve, reject) {
+    var req = indexedDB.open('stylesync_images', 1);
+    req.onupgradeneeded = function(e) {
+      e.target.result.createObjectStore('images', { keyPath: 'id' });
+    };
+    req.onsuccess = function(e) { _idbConn = e.target.result; resolve(_idbConn); };
+    req.onerror   = function(e) { reject(e.target.error); };
+  });
+}
+function idbPutImage(id, dataUrl) {
+  return _idbOpen().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx  = db.transaction('images', 'readwrite');
+      var req = tx.objectStore('images').put({ id: String(id), dataUrl: dataUrl });
+      req.onsuccess = function() { resolve(); };
+      req.onerror   = function(e) { reject(e.target.error); };
+    });
+  });
+}
+function idbGetAllImages() {
+  return _idbOpen().then(function(db) {
+    return new Promise(function(resolve) {
+      var tx  = db.transaction('images', 'readonly');
+      var req = tx.objectStore('images').getAll();
+      req.onsuccess = function(e) {
+        var map = {};
+        (e.target.result || []).forEach(function(r) { map[r.id] = r.dataUrl; });
+        resolve(map);
+      };
+      req.onerror = function() { resolve({}); };
+    });
+  });
+}
+function idbDeleteImage(id) {
+  return _idbOpen().then(function(db) {
+    return new Promise(function(resolve) {
+      var tx = db.transaction('images', 'readwrite');
+      tx.objectStore('images').delete(String(id));
+      tx.oncomplete = function() { resolve(); };
+      tx.onerror    = function() { resolve(); };
+    });
+  });
+}
+
+// Einmalige Migration: Bilder aus localStorage → IndexedDB verschieben
+function _idbMigrate() {
+  try {
+    var items = JSON.parse(localStorage.getItem('stylesync_wardrobe') || '[]');
+    var needsSave = false;
+    var promises = items.map(function(item) {
+      if (item.imageDataUrl && item.imageDataUrl.length > 20) {
+        needsSave = true;
+        return idbPutImage(item.id, item.imageDataUrl);
+      }
+      return Promise.resolve();
+    });
+    if (!needsSave) return;
+    Promise.all(promises).then(function() {
+      var stripped = items.map(function(i) {
+        var c = Object.assign({}, i); delete c.imageDataUrl; return c;
+      });
+      localStorage.setItem('stylesync_wardrobe', JSON.stringify(stripped));
+    }).catch(function(e) { console.warn('[idb migrate]', e); });
+  } catch(e) {}
+}
+
+// ── Garderobe (LocalStorage für Metadaten, IndexedDB für Bilder) ──────────────
 function loadWardrobe() {
   try { return JSON.parse(localStorage.getItem('stylesync_wardrobe') || '[]'); }
   catch { return []; }
 }
-function saveWardrobe(items) {
-  try {
-    localStorage.setItem('stylesync_wardrobe', JSON.stringify(items));
-  } catch (e) {
-    // Quota überschritten → Bilder der ältesten Artikel entfernen und nochmal versuchen
-    console.warn('[saveWardrobe] Quota voll, entferne Bilder alter Artikel…');
-    var trimmed = items.map(function(item, idx) {
-      if (idx < items.length - 5) return Object.assign({}, item, { imageDataUrl: '' });
-      return item;
+function loadWardrobeAsync() {
+  var items = loadWardrobe();
+  return idbGetAllImages().then(function(imgs) {
+    return items.map(function(item) {
+      var img = imgs[String(item.id)];
+      return img ? Object.assign({}, item, { imageDataUrl: img }) : item;
     });
-    try { localStorage.setItem('stylesync_wardrobe', JSON.stringify(trimmed)); } catch (e2) { console.error('[saveWardrobe] Auch nach Komprimierung voll:', e2); }
+  }).catch(function() { return items; });
+}
+function saveWardrobe(items) {
+  // Bilder in IDB speichern, Metadaten ohne Bilder in localStorage
+  items.forEach(function(item) {
+    if (item.id && item.imageDataUrl && item.imageDataUrl.length > 20) {
+      idbPutImage(item.id, item.imageDataUrl).catch(function(e) {
+        console.warn('[idb] put failed', e);
+      });
+    }
+  });
+  var stripped = items.map(function(i) {
+    if (!i.imageDataUrl) return i;
+    var c = Object.assign({}, i); delete c.imageDataUrl; return c;
+  });
+  try {
+    localStorage.setItem('stylesync_wardrobe', JSON.stringify(stripped));
+  } catch (e) {
+    console.warn('[saveWardrobe] localStorage voll');
+    try { localStorage.setItem('stylesync_wardrobe', JSON.stringify(stripped)); } catch(e2) {}
   }
 }
 
@@ -61,9 +147,7 @@ function _compressForStorage(dataUrl) {
     var isPng = dataUrl.startsWith('data:image/png');
     var img = new Image();
     img.onload = function() {
-      // PNG vom Background-Removal: klein skalieren, Transparenz als PNG erhalten
-      // (iOS Safari unterstützt kein canvas WebP-Export)
-      var maxSize = isPng ? 280 : 400;
+      var maxSize = 400;
       var w = img.naturalWidth, h = img.naturalHeight;
       if (w > maxSize || h > maxSize) {
         var scale = Math.min(maxSize / w, maxSize / h);
@@ -695,6 +779,15 @@ function _openItemDetail(itemId) {
   _populateItemDetail(item);
   var panel = document.getElementById('item-detail-panel');
   if (panel) panel.classList.add('active');
+  // Bild aus IDB nachladen
+  idbGetAllImages().then(function(imgs) {
+    var dataUrl = imgs[String(itemId)];
+    if (!dataUrl) return;
+    var imgEl = document.getElementById('idp-image');
+    var emojiEl = document.getElementById('idp-emoji');
+    if (imgEl) { imgEl.src = dataUrl; imgEl.style.display = ''; }
+    if (emojiEl) emojiEl.style.display = 'none';
+  }).catch(function() {});
 }
 
 function _closeItemDetail() {
@@ -824,6 +917,7 @@ function _hideDeleteConfirm() {
 
 function _deleteItem() {
   if (!_currentItemId) return;
+  idbDeleteImage(_currentItemId).catch(function() {});
   var items = loadWardrobe();
   var filtered = items.filter(function(i) { return i.id !== _currentItemId; });
   saveWardrobe(filtered);
@@ -834,34 +928,56 @@ function _deleteItem() {
 
 
 // ── Garderobe-Grid rendern ────────────────────────────────────────────────────
+function _renderWardrobeCard(item, imgDataUrl, grid) {
+  var hasImg = imgDataUrl && imgDataUrl.length > 20;
+  var card = document.createElement('div');
+  card.className = 'cloth-card ai-wardrobe-item';
+  card.style.cursor = 'pointer';
+  card.setAttribute('data-item-id', String(item.id || item.name));
+  card.onclick = (function(id) { return function() { _openItemDetail(id); }; })(item.id);
+  card.setAttribute('data-category', _wardrobeCategory(item));
+  var brandLine = item.brand
+    ? '<div class="cloth-brand" style="font-size:10px;color:var(--purple);font-weight:700;margin-bottom:3px;">' + item.brand + '</div>'
+    : '';
+  var iconStyle = hasImg
+    ? 'background-image:url(\'' + imgDataUrl + '\');background-size:contain;background-repeat:no-repeat;background-position:center;font-size:0;'
+    : '';
+  card.innerHTML = '<div class="cloth-icon" style="' + iconStyle + '">' + (hasImg ? '' : (item.emoji || '👕')) + '</div>'
+    + brandLine
+    + '<div class="cloth-name">' + (item.name || 'Unbekannt') + '</div>'
+    + '<div class="cloth-color-row"><div class="color-dot" style="background:' + (item.colorHex || '#888') + ';"></div>'
+    + '<span class="cloth-color-name">' + (item.color || '') + '</span></div>'
+    + '<span class="season-tag ' + (item.seasonClass || 's-ganzjahrig') + '">' + (item.season || 'Ganzjährig') + '</span>';
+  grid.insertBefore(card, grid.firstChild);
+}
+
 function renderWardrobeGrid() {
   var grid = document.getElementById('clothes-grid');
   if (!grid) return;
   grid.querySelectorAll('.ai-wardrobe-item').forEach(function(el) { el.remove(); });
   var items = loadWardrobe();
   if (items.length === 0) return;
+  // Erst ohne Bilder rendern (sofort sichtbar)
   [].concat(items).reverse().forEach(function(item) {
-    var hasImg = item.imageDataUrl && item.imageDataUrl.length > 20;
-    var card = document.createElement('div');
-    card.className = 'cloth-card ai-wardrobe-item';
-    card.style.cursor = 'pointer';
-    card.setAttribute('data-item-id', String(item.id || item.name));
-    card.onclick = (function(id) { return function() { _openItemDetail(id); }; })(item.id);
-    card.setAttribute('data-category', _wardrobeCategory(item));
-    var brandLine = item.brand
-      ? '<div class="cloth-brand" style="font-size:10px;color:var(--purple);font-weight:700;margin-bottom:3px;">' + item.brand + '</div>'
-      : '';
-    var iconStyle = hasImg
-      ? 'background-image:url(\'' + item.imageDataUrl + '\');background-size:cover;background-position:center;font-size:0;'
-      : '';
-    card.innerHTML = '<div class="cloth-icon" style="' + iconStyle + '">' + (hasImg ? '' : (item.emoji || '👕')) + '</div>'
-      + brandLine
-      + '<div class="cloth-name">' + (item.name || 'Unbekannt') + '</div>'
-      + '<div class="cloth-color-row"><div class="color-dot" style="background:' + (item.colorHex || '#888') + ';"></div>'
-      + '<span class="cloth-color-name">' + (item.color || '') + '</span></div>'
-      + '<span class="season-tag ' + (item.seasonClass || 's-ganzjahrig') + '">' + (item.season || 'Ganzjährig') + '</span>';
-    grid.insertBefore(card, grid.firstChild);
+    _renderWardrobeCard(item, null, grid);
   });
+  // Dann Bilder aus IDB nachladen und Karten aktualisieren
+  idbGetAllImages().then(function(imgs) {
+    grid.querySelectorAll('.ai-wardrobe-item').forEach(function(card) {
+      var id = card.getAttribute('data-item-id');
+      var dataUrl = imgs[id];
+      if (!dataUrl) return;
+      var iconEl = card.querySelector('.cloth-icon');
+      if (iconEl) {
+        iconEl.style.backgroundImage = 'url(\'' + dataUrl + '\')';
+        iconEl.style.backgroundSize = 'contain';
+        iconEl.style.backgroundRepeat = 'no-repeat';
+        iconEl.style.backgroundPosition = 'center';
+        iconEl.style.fontSize = '0';
+        iconEl.textContent = '';
+      }
+    });
+  }).catch(function() {});
 
   // Leer-Zustand anzeigen wenn keine localStorage-Items vorhanden
   var existing = grid.querySelectorAll('.ai-wardrobe-item');
@@ -4684,6 +4800,8 @@ function _renderLeaderboard() {
 document.addEventListener('DOMContentLoaded', function() {
   // Einmalig: altes Datenformat migrieren
   _migrateOldData();
+  // Bilder aus localStorage → IndexedDB migrieren
+  _idbMigrate();
 
   _ensureAiStyles();
   renderWardrobeGrid();
@@ -5479,15 +5597,30 @@ function _renderKofferWardrobeItems() {
     var itemId = String(item.id || item.name);
     _kofferWardrobeMap[itemId] = item;
     var selected = !!_kofferSelectedWardrobeIds[itemId];
-    var photoStyle = item.imageDataUrl ? 'background-image:url(\'' + item.imageDataUrl + '\');' : '';
     return '<div class="koffer-wardrobe-card' + (selected ? ' selected' : '') + '" onclick="_toggleKofferItem(\'' + _escAttr(itemId) + '\')" data-koffer-item-id="' + _escAttr(itemId) + '">'
       + '<div class="koffer-wardrobe-check"></div>'
-      + (item.imageDataUrl
-          ? '<div class="koffer-wardrobe-photo" style="' + photoStyle + '"></div>'
-          : '<div class="koffer-wardrobe-emoji">' + (item.emoji || '👕') + '</div>')
+      + '<div class="koffer-wardrobe-emoji">' + (item.emoji || '👕') + '</div>'
       + '<div class="koffer-wardrobe-name">' + (item.name || '') + '</div>'
       + '</div>';
   }).join('');
+  // Bilder aus IDB nachladen
+  idbGetAllImages().then(function(imgs) {
+    grid.querySelectorAll('[data-koffer-item-id]').forEach(function(card) {
+      var id = card.getAttribute('data-koffer-item-id');
+      var dataUrl = imgs[id];
+      if (!dataUrl) return;
+      var emojiEl = card.querySelector('.koffer-wardrobe-emoji');
+      if (emojiEl) {
+        var photoDiv = document.createElement('div');
+        photoDiv.className = 'koffer-wardrobe-photo';
+        photoDiv.style.backgroundImage = 'url(\'' + dataUrl + '\')';
+        photoDiv.style.backgroundSize = 'contain';
+        photoDiv.style.backgroundRepeat = 'no-repeat';
+        photoDiv.style.backgroundPosition = 'center';
+        card.replaceChild(photoDiv, emojiEl);
+      }
+    });
+  }).catch(function() {});
 }
 
 function _toggleKofferOutfit(id) {
