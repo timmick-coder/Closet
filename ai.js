@@ -5222,3 +5222,184 @@ document.addEventListener('DOMContentLoaded', function() {
     _reset(true);
   }, { passive: true });
 })();
+
+// ── Koffer packen ─────────────────────────────────────────────────────────────
+
+var _kofferDays = 7;
+var _kofferSelectedOutfits = {}; // id → outfit object
+var _kofferSelectedWardrobeIds = {}; // id/name → item object
+
+function _openKofferPanel() {
+  var panel = document.getElementById('ki-koffer-panel');
+  if (!panel) return;
+  _kofferShowStep('input');
+  panel.classList.add('active');
+}
+
+function _closeKofferPanel() {
+  var panel = document.getElementById('ki-koffer-panel');
+  if (panel) panel.classList.remove('active');
+}
+
+function _kofferShowStep(step) {
+  var map = { input: 'block', select: 'flex', list: 'flex' };
+  ['input','select','list'].forEach(function(s) {
+    var el = document.getElementById('koffer-step-' + s);
+    if (el) el.style.display = (s === step) ? map[s] : 'none';
+  });
+}
+
+function _kofferDaysDown() {
+  if (_kofferDays > 1) { _kofferDays--; _kofferUpdateDaysDisplay(); }
+}
+function _kofferDaysUp() {
+  if (_kofferDays < 30) { _kofferDays++; _kofferUpdateDaysDisplay(); }
+}
+function _kofferUpdateDaysDisplay() {
+  var el = document.getElementById('koffer-days-val');
+  if (el) el.textContent = _kofferDays;
+}
+
+function _kofferGoToSelect() {
+  _kofferSelectedOutfits = {};
+  _kofferSelectedWardrobeIds = {};
+  _renderKofferOutfits();
+  _renderKofferWardrobeItems();
+  _kofferUpdateCounter();
+  _kofferShowStep('select');
+}
+
+function _renderKofferOutfits() {
+  var grid = document.getElementById('koffer-outfits-grid');
+  if (!grid) return;
+  var outfits = _loadOutfits().filter(function(o) { return !o.isInspo; });
+  if (outfits.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;font-size:13px;color:var(--text2);">Noch keine Outfits gespeichert</div>';
+    return;
+  }
+  grid.innerHTML = outfits.map(function(outfit) {
+    var id = outfit.id || _outfitId(outfit);
+    var cells = _make4Cells(outfit);
+    var selected = !!_kofferSelectedOutfits[id];
+    return '<div class="koffer-outfit-card' + (selected ? ' selected' : '') + '" onclick="_toggleKofferOutfit(\'' + _escAttr(id) + '\')" data-koffer-outfit-id="' + _escAttr(id) + '">'
+      + '<div class="koffer-outfit-check">' + (selected ? '✓' : '') + '</div>'
+      + '<div class="col-grid-preview">' + cells + '</div>'
+      + '<div class="koffer-outfit-name">' + (outfit.name || 'Outfit') + '</div>'
+      + '</div>';
+  }).join('');
+  // store outfits by id for later lookup
+  outfits.forEach(function(o) {
+    var id = o.id || _outfitId(o);
+    _kofferOutfitMap = _kofferOutfitMap || {};
+    _kofferOutfitMap[id] = o;
+  });
+}
+
+var _kofferOutfitMap = {};
+var _kofferWardrobeMap = {};
+
+function _renderKofferWardrobeItems() {
+  var grid = document.getElementById('koffer-wardrobe-grid');
+  if (!grid) return;
+  var items = loadWardrobe();
+  _kofferWardrobeMap = {};
+  if (items.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:16px;font-size:13px;color:var(--text2);">Noch keine Kleidungsstücke im Schrank</div>';
+    return;
+  }
+  grid.innerHTML = items.map(function(item) {
+    var itemId = String(item.id || item.name);
+    _kofferWardrobeMap[itemId] = item;
+    var selected = !!_kofferSelectedWardrobeIds[itemId];
+    var photoStyle = item.imageDataUrl ? 'background-image:url(\'' + item.imageDataUrl + '\');' : '';
+    return '<div class="koffer-wardrobe-card' + (selected ? ' selected' : '') + '" onclick="_toggleKofferItem(\'' + _escAttr(itemId) + '\')" data-koffer-item-id="' + _escAttr(itemId) + '">'
+      + '<div class="koffer-wardrobe-check"></div>'
+      + (item.imageDataUrl
+          ? '<div class="koffer-wardrobe-photo" style="' + photoStyle + '"></div>'
+          : '<div class="koffer-wardrobe-emoji">' + (item.emoji || '👕') + '</div>')
+      + '<div class="koffer-wardrobe-name">' + (item.name || '') + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function _toggleKofferOutfit(id) {
+  if (_kofferSelectedOutfits[id]) {
+    delete _kofferSelectedOutfits[id];
+  } else {
+    _kofferSelectedOutfits[id] = _kofferOutfitMap[id] || { id: id };
+  }
+  var card = document.querySelector('[data-koffer-outfit-id="' + id + '"]');
+  if (card) {
+    card.classList.toggle('selected', !!_kofferSelectedOutfits[id]);
+    var check = card.querySelector('.koffer-outfit-check');
+    if (check) check.textContent = _kofferSelectedOutfits[id] ? '✓' : '';
+  }
+  _kofferUpdateCounter();
+}
+
+function _toggleKofferItem(itemId) {
+  if (_kofferSelectedWardrobeIds[itemId]) {
+    delete _kofferSelectedWardrobeIds[itemId];
+  } else {
+    _kofferSelectedWardrobeIds[itemId] = _kofferWardrobeMap[itemId] || { name: itemId };
+  }
+  var card = document.querySelector('[data-koffer-item-id="' + itemId + '"]');
+  if (card) card.classList.toggle('selected', !!_kofferSelectedWardrobeIds[itemId]);
+  _kofferUpdateCounter();
+}
+
+function _kofferUpdateCounter() {
+  var btn = document.getElementById('koffer-confirm-btn');
+  if (!btn) return;
+  var outfitCount = Object.keys(_kofferSelectedOutfits).length;
+  var itemCount = Object.keys(_kofferSelectedWardrobeIds).length;
+  var total = outfitCount + itemCount;
+  btn.disabled = total === 0;
+  btn.textContent = total === 0
+    ? 'Packliste erstellen'
+    : 'Packliste erstellen (' + total + ' ausgewählt)';
+}
+
+function _kofferGoToPackliste() {
+  _renderKofferPackliste();
+  _kofferShowStep('list');
+}
+
+function _renderKofferPackliste() {
+  var ziel = (document.getElementById('koffer-ziel-input') || {}).value || 'deine Reise';
+  var destEl = document.getElementById('koffer-list-destination');
+  var metaEl = document.getElementById('koffer-list-meta');
+  var bodyEl = document.getElementById('koffer-list-body');
+  if (destEl) destEl.textContent = '✈️ ' + ziel;
+  if (metaEl) metaEl.textContent = _kofferDays + (_kofferDays === 1 ? ' Tag' : ' Tage');
+  if (!bodyEl) return;
+
+  var html = '';
+  var outfits = Object.values(_kofferSelectedOutfits);
+  var wardrobeItems = Object.values(_kofferSelectedWardrobeIds);
+
+  if (outfits.length > 0) {
+    html += '<div class="koffer-list-section-label">Outfits (' + outfits.length + ')</div>';
+    outfits.forEach(function(outfit) {
+      html += '<div class="koffer-list-outfit-block">';
+      html += '<div class="koffer-list-outfit-name">👗 ' + (outfit.name || 'Outfit') + '</div>';
+      (outfit.items || []).forEach(function(item) {
+        html += '<div class="koffer-list-row"><div class="koffer-list-dot"></div>' + (item.emoji ? item.emoji + ' ' : '') + item.name + '</div>';
+      });
+      html += '</div>';
+    });
+  }
+
+  if (wardrobeItems.length > 0) {
+    html += '<div class="koffer-list-section-label">Einzelne Klamotten (' + wardrobeItems.length + ')</div>';
+    wardrobeItems.forEach(function(item) {
+      html += '<div class="koffer-list-row"><div class="koffer-list-dot"></div>' + (item.emoji ? item.emoji + ' ' : '') + (item.name || '') + '</div>';
+    });
+  }
+
+  bodyEl.innerHTML = html || '<div style="text-align:center;padding:40px 0;color:var(--text2);font-size:14px;">Nichts ausgewählt</div>';
+}
+
+function _kofferBackToSelect() {
+  _kofferShowStep('select');
+}

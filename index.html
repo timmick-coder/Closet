@@ -1190,6 +1190,64 @@
     .ki-create-item-check { position:absolute; top:5px; right:5px; width:20px; height:20px; border-radius:50%; background:#4d8dff; display:none; align-items:center; justify-content:center; z-index:3; }
     .ki-create-item.selected .ki-create-item-check { display:flex; }
 
+    /* ── Koffer packen ── */
+    .koffer-entry-banner { display:flex; align-items:center; gap:14px; margin:16px 20px 4px; background:rgba(77,141,255,0.10); border:1px solid rgba(77,141,255,0.25); border-radius:18px; padding:14px 16px; cursor:pointer; transition:transform 0.15s; -webkit-user-select:none; user-select:none; }
+    .koffer-entry-banner:active { transform:scale(0.97); }
+    .koffer-entry-icon { font-size:30px; flex-shrink:0; line-height:1; }
+    .koffer-entry-text { flex:1; }
+    .koffer-entry-title { font-size:15px; font-weight:800; color:var(--text); font-family:'Playfair Display',Georgia,serif; }
+    .koffer-entry-sub { font-size:12px; color:var(--text2); margin-top:2px; font-weight:500; }
+    .koffer-entry-arrow { font-size:18px; color:var(--purple); flex-shrink:0; }
+
+    .koffer-panel-scroll { flex:1; overflow-y:auto; scrollbar-width:none; }
+    .koffer-panel-scroll::-webkit-scrollbar { display:none; }
+
+    .koffer-input-section { padding:24px 20px 12px; }
+    .koffer-field-label { font-size:12px; font-weight:800; color:var(--text2); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px; }
+    .koffer-text-input { width:100%; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:16px; padding:14px 16px; font-size:16px; color:var(--text); font-family:inherit; outline:none; box-sizing:border-box; margin-bottom:20px; -webkit-appearance:none; }
+    .koffer-text-input::placeholder { color:var(--text2); }
+    .koffer-text-input:focus { border-color:rgba(77,141,255,0.5); }
+    .koffer-stepper { display:flex; align-items:center; gap:0; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); border-radius:16px; overflow:hidden; margin-bottom:28px; }
+    .koffer-stepper-btn { background:none; border:none; color:var(--purple); font-size:24px; font-weight:700; padding:12px 20px; cursor:pointer; flex-shrink:0; line-height:1; }
+    .koffer-stepper-btn:active { background:rgba(255,255,255,0.06); }
+    .koffer-stepper-val { flex:1; text-align:center; font-size:22px; font-weight:800; color:var(--text); }
+    .koffer-stepper-unit { font-size:14px; font-weight:600; color:var(--text2); padding-right:16px; flex-shrink:0; }
+    .koffer-go-btn { width:100%; background:var(--purple); color:#fff; border:none; border-radius:18px; padding:16px; font-size:16px; font-weight:800; cursor:pointer; font-family:inherit; }
+    .koffer-go-btn:active { opacity:0.85; }
+
+    .koffer-sel-section { padding:0 20px; }
+    .koffer-sel-label { font-size:17px; font-weight:800; color:var(--text); padding:14px 0 10px; font-family:'Playfair Display',Georgia,serif; }
+    .koffer-outfits-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:4px; }
+    .koffer-outfit-card { position:relative; border-radius:16px; overflow:hidden; cursor:pointer; border:2px solid transparent; transition:border-color 0.15s, background 0.15s; background:#0e2240; -webkit-user-select:none; user-select:none; }
+    .koffer-outfit-card.selected { border-color:#4d8dff; }
+    .koffer-outfit-card.selected .koffer-outfit-check { background:#4d8dff; border-color:#4d8dff; }
+    .koffer-outfit-check { position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%; border:2px solid rgba(255,255,255,0.5); background:transparent; z-index:2; display:flex; align-items:center; justify-content:center; transition:all 0.15s; font-size:12px; }
+    .koffer-outfit-name { font-size:11px; font-weight:800; color:var(--text); padding:6px 8px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family:'Playfair Display',Georgia,serif; }
+
+    .koffer-wardrobe-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+    .koffer-wardrobe-card { position:relative; border-radius:14px; overflow:hidden; cursor:pointer; border:2px solid transparent; background:rgba(255,255,255,0.07); aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; transition:border-color 0.15s, background 0.15s; -webkit-user-select:none; user-select:none; }
+    .koffer-wardrobe-card.selected { border-color:#4d8dff; background:rgba(77,141,255,0.12); }
+    .koffer-wardrobe-card.selected .koffer-wardrobe-check { background:#4d8dff; border-color:#4d8dff; }
+    .koffer-wardrobe-check { position:absolute; top:5px; right:5px; width:18px; height:18px; border-radius:50%; border:2px solid rgba(255,255,255,0.4); background:transparent; transition:all 0.15s; }
+    .koffer-wardrobe-photo { position:absolute; inset:0; background-size:cover; background-position:center; }
+    .koffer-wardrobe-emoji { font-size:26px; line-height:1; }
+    .koffer-wardrobe-name { font-size:10px; font-weight:700; color:var(--text2); text-align:center; padding:0 4px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; position:relative; z-index:1; }
+
+    .koffer-bottom-bar { padding:12px 20px 28px; flex-shrink:0; border-top:1px solid rgba(255,255,255,0.08); background:var(--bg); }
+    .koffer-confirm-btn { width:100%; background:var(--purple); color:#fff; border:none; border-radius:18px; padding:15px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; }
+    .koffer-confirm-btn:disabled { opacity:0.4; cursor:default; }
+    .koffer-confirm-btn:not(:disabled):active { opacity:0.85; }
+
+    .koffer-list-header { padding:16px 20px 6px; }
+    .koffer-list-destination { font-size:20px; font-weight:800; color:var(--text); font-family:'Playfair Display',Georgia,serif; }
+    .koffer-list-meta { font-size:13px; color:var(--text2); margin-top:4px; }
+    .koffer-list-body { padding:8px 20px 24px; }
+    .koffer-list-section-label { font-size:12px; font-weight:800; color:var(--text2); text-transform:uppercase; letter-spacing:0.08em; margin:14px 0 8px; }
+    .koffer-list-outfit-block { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:12px 14px; margin-bottom:8px; }
+    .koffer-list-outfit-name { font-size:13px; font-weight:800; color:var(--text); margin-bottom:8px; font-family:'Playfair Display',Georgia,serif; }
+    .koffer-list-row { display:flex; align-items:center; gap:10px; padding:3px 0; font-size:13px; color:var(--text); }
+    .koffer-list-dot { width:6px; height:6px; border-radius:50%; background:var(--purple); flex-shrink:0; }
+
     /* ── Long-Press Action Sheet ── */
     .lp-overlay { position:fixed; inset:0; z-index:400; background:rgba(0,0,0,0.55); display:none; align-items:flex-end; }
     .lp-overlay.active { display:flex; }
@@ -1377,6 +1435,16 @@
       <!-- Haupt-Scroll-Bereich -->
       <div class="scroll-content" id="ki-scroll" style="flex:1;overflow-y:auto;padding:0 0 80px;">
 
+        <!-- Koffer packen Banner -->
+        <div class="koffer-entry-banner" onclick="_openKofferPanel()">
+          <div class="koffer-entry-icon">🧳</div>
+          <div class="koffer-entry-text">
+            <div class="koffer-entry-title">Koffer packen</div>
+            <div class="koffer-entry-sub">Packliste aus deinen Outfits & Klamotten</div>
+          </div>
+          <div class="koffer-entry-arrow">›</div>
+        </div>
+
         <!-- Ordner Grid (oben) -->
         <div id="ki-ordner-section">
           <div class="ki-section-label" style="padding-top:16px;">Meine Ordner</div>
@@ -1392,6 +1460,62 @@
           <span id="ki-saved-label-text">Gespeicherte Outfits</span>
         </div>
         <div id="ki-saved-outfits" style="padding:0 20px 20px;"></div>
+      </div>
+
+      <!-- Koffer Panel -->
+      <div class="ki-panel" id="ki-koffer-panel" style="z-index:60;">
+
+        <!-- Header -->
+        <div class="ki-panel-header">
+          <button class="ki-back-btn" onclick="_closeKofferPanel()">←</button>
+          <div class="ki-panel-title">🧳 Koffer packen</div>
+        </div>
+
+        <!-- Step 0: Eingabe -->
+        <div id="koffer-step-input" class="koffer-panel-scroll">
+          <div class="koffer-input-section">
+            <div class="koffer-field-label">Wohin fährst du?</div>
+            <input class="koffer-text-input" id="koffer-ziel-input" placeholder="z.B. Barcelona, Mallorca…" type="text" />
+            <div class="koffer-field-label">Wie lange?</div>
+            <div class="koffer-stepper">
+              <button class="koffer-stepper-btn" onclick="_kofferDaysDown()">−</button>
+              <div class="koffer-stepper-val" id="koffer-days-val">7</div>
+              <div class="koffer-stepper-unit">Tage</div>
+              <button class="koffer-stepper-btn" onclick="_kofferDaysUp()">+</button>
+            </div>
+            <button class="koffer-go-btn" onclick="_kofferGoToSelect()">Outfits &amp; Klamotten anzeigen →</button>
+          </div>
+        </div>
+
+        <!-- Step 1: Auswahl -->
+        <div id="koffer-step-select" style="display:none; flex:1; display:none; flex-direction:column; overflow:hidden;">
+          <div class="koffer-panel-scroll" style="flex:1;" id="koffer-sel-scroll">
+            <div class="koffer-sel-section">
+              <div class="koffer-sel-label">Meine Outfits</div>
+              <div class="koffer-outfits-grid" id="koffer-outfits-grid"></div>
+              <div class="koffer-sel-label" style="margin-top:8px;">Einzelne Klamotten</div>
+              <div class="koffer-wardrobe-grid" id="koffer-wardrobe-grid"></div>
+            </div>
+          </div>
+          <div class="koffer-bottom-bar">
+            <button class="koffer-confirm-btn" id="koffer-confirm-btn" onclick="_kofferGoToPackliste()" disabled>Packliste erstellen</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Packliste -->
+        <div id="koffer-step-list" style="display:none; flex:1; display:none; flex-direction:column; overflow:hidden;">
+          <div class="koffer-panel-scroll" style="flex:1;">
+            <div class="koffer-list-header">
+              <div class="koffer-list-destination" id="koffer-list-destination"></div>
+              <div class="koffer-list-meta" id="koffer-list-meta"></div>
+            </div>
+            <div class="koffer-list-body" id="koffer-list-body"></div>
+          </div>
+          <div class="koffer-bottom-bar">
+            <button class="koffer-confirm-btn" style="background:rgba(255,255,255,0.1);" onclick="_kofferBackToSelect()">← Anpassen</button>
+          </div>
+        </div>
+
       </div>
 
       <!-- FAB: Outfit generieren -->
