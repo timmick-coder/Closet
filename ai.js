@@ -5291,15 +5291,16 @@ function _kofferGoToSelect() {
 
       // Step 2: Forecast
       return fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon
-        + '&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto'
+        + '&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto'
         + '&start_date=' + startDate + '&end_date=' + endDate)
         .then(function(r) { return r.json(); })
         .then(function(wx) {
+          if (wx.error) throw new Error(wx.reason || 'API error');
           var daily = wx.daily || {};
           var dates  = daily.time || [];
           var maxTs  = daily.temperature_2m_max || [];
           var minTs  = daily.temperature_2m_min || [];
-          var codes  = daily.weathercode || [];
+          var codes  = daily.weather_code || [];
 
           var days = dates.map(function(d, i) {
             return { date: d, maxC: Math.round(maxTs[i] || 0), minC: Math.round(minTs[i] || 0), code: codes[i] || 0 };
