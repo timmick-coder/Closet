@@ -61,8 +61,9 @@ function _compressForStorage(dataUrl) {
     var isPng = dataUrl.startsWith('data:image/png');
     var img = new Image();
     img.onload = function() {
-      // Transparente PNGs (nach Hintergrundentfernung) kleiner skalieren damit WebP in localStorage passt
-      var maxSize = isPng ? 320 : 400;
+      // PNG vom Background-Removal: klein skalieren, Transparenz als PNG erhalten
+      // (iOS Safari unterstützt kein canvas WebP-Export)
+      var maxSize = isPng ? 280 : 400;
       var w = img.naturalWidth, h = img.naturalHeight;
       if (w > maxSize || h > maxSize) {
         var scale = Math.min(maxSize / w, maxSize / h);
@@ -73,15 +74,8 @@ function _compressForStorage(dataUrl) {
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext('2d');
       if (isPng) {
-        // Transparenz erhalten: kein Fill, als WebP speichern (viel kleiner als PNG)
         ctx.drawImage(img, 0, 0, w, h);
-        var webp = canvas.toDataURL('image/webp', 0.82);
-        // Falls Browser kein WebP unterstützt → JPEG mit App-Hintergrund als Fallback
-        if (webp.startsWith('data:image/webp')) { resolve(webp); return; }
-        ctx.fillStyle = '#0d1b2e';
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.72));
+        resolve(canvas.toDataURL('image/png'));
       } else {
         ctx.fillStyle = '#0d1b2e';
         ctx.fillRect(0, 0, w, h);
