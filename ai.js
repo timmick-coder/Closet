@@ -1200,32 +1200,18 @@ var _swipeUndoFn = null;
 function _initSwipeToDelete(container) {
   if (!container) return;
   container.querySelectorAll('.swipe-inner').forEach(function(inner) {
-    if (inner.getAttribute('data-swipe-init')) return; // already bound
+    if (inner.getAttribute('data-swipe-init')) return;
     inner.setAttribute('data-swipe-init', '1');
     var wrapper = inner.closest('.swipe-wrapper');
     if (!wrapper) return;
 
-    var startX = 0, startY = 0, currentX = 0, dragging = false, dirLocked = false, isHoriz = false;
-    var THRESHOLD = 85;
-    var MAX = 130;
     var lpTimer = null, lpFired = false;
 
-    function cancelLp() {
-      clearTimeout(lpTimer); lpTimer = null;
-    }
-
-    function onStart(x, y) {
-      startX = x; startY = y; currentX = 0;
-      dragging = true; dirLocked = false; isHoriz = false; lpFired = false;
-      inner.classList.add('dragging');
+    function startLp() {
+      lpFired = false;
       lpTimer = setTimeout(function() {
-        if (!dragging || isHoriz) return;
         lpFired = true;
-        dragging = false;
-        inner.classList.remove('dragging');
         if (navigator.vibrate) navigator.vibrate(50);
-        var bg = wrapper.querySelector('.swipe-delete-bg');
-        if (bg) bg.style.visibility = 'hidden';
         inner.style.transition = 'transform 0.12s, opacity 0.12s';
         inner.style.transform = 'scale(0.94)';
         inner.style.opacity = '0.6';
@@ -1233,7 +1219,6 @@ function _initSwipeToDelete(container) {
           inner.style.transition = '';
           inner.style.transform = '';
           inner.style.opacity = '';
-          if (bg) bg.style.visibility = '';
           _showContextMenu({
             type: 'outfit',
             id: wrapper.getAttribute('data-swipe-id'),
@@ -1244,55 +1229,15 @@ function _initSwipeToDelete(container) {
         }, 130);
       }, 550);
     }
-    function onMove(x, y) {
-      if (!dragging) return;
-      var dx = x - startX, dy = y - startY;
-      if (!dirLocked) {
-        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
-        isHoriz = Math.abs(dx) > Math.abs(dy);
-        dirLocked = true;
-        if (isHoriz) cancelLp();
-      }
-      if (!isHoriz || dx > 0) return;
-      cancelLp();
-      currentX = Math.max(dx, -MAX);
-      inner.style.transform = 'translateX(' + currentX + 'px)';
-      var pct = Math.abs(currentX) / MAX;
-      inner.style.opacity = String(1 - pct * 0.25);
-      var bg = wrapper.querySelector('.swipe-delete-bg');
-      if (bg) {
-        var r = Math.round(239 - pct * 20), g = Math.round(68 - pct * 30), b = Math.round(68 - pct * 30);
-        bg.style.background = 'rgb(' + r + ',' + g + ',' + b + ')';
-      }
-    }
-    function onEnd() {
-      cancelLp();
-      if (!dragging) return;
-      dragging = false;
-      inner.classList.remove('dragging');
-      if (isHoriz && Math.abs(currentX) >= THRESHOLD) {
-        _animateDeleteWrapper(wrapper);
-      } else {
-        inner.style.transform = '';
-        inner.style.opacity = '';
-        var bg = wrapper.querySelector('.swipe-delete-bg');
-        if (bg) bg.style.background = '';
-      }
-    }
 
-    inner.addEventListener('touchstart', function(e) { onStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
-    inner.addEventListener('touchmove',  function(e) {
-      if (isHoriz && dirLocked) e.preventDefault();
-      onMove(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
-    inner.addEventListener('touchend',    function() { onEnd(); });
-    inner.addEventListener('touchcancel', function() { onEnd(); });
+    function cancelLp() { clearTimeout(lpTimer); lpTimer = null; }
 
-    inner.addEventListener('mousedown', function(e) { onStart(e.clientX, e.clientY); });
-    window.addEventListener('mousemove', function(e) { if (dragging) onMove(e.clientX, e.clientY); });
-    window.addEventListener('mouseup',   function()  { if (dragging) onEnd(); });
-
-    // Block click after long-press fired
+    inner.addEventListener('touchstart', startLp, { passive: true });
+    inner.addEventListener('touchend', cancelLp);
+    inner.addEventListener('touchmove', cancelLp);
+    inner.addEventListener('mousedown', startLp);
+    inner.addEventListener('mouseup', cancelLp);
+    inner.addEventListener('mouseleave', cancelLp);
     inner.addEventListener('click', function(e) {
       if (lpFired) { e.stopImmediatePropagation(); lpFired = false; }
     }, true);
@@ -1605,8 +1550,7 @@ function renderKiOutfits(outfits) {
     var fav = _isFav(id);
     var cells = _make4Cells(outfit);
     return '<div class="swipe-wrapper col-wrap-grid" data-swipe-id="' + _escAttr(id) + '" data-swipe-type="suggestion" data-swipe-name="' + _escAttr(outfit.name || 'Outfit') + '">'
-      + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
-      + '<div class="swipe-inner col-grid-card">'
+            + '<div class="swipe-inner col-grid-card">'
       + '<div class="col-grid-preview">' + cells + '</div>'
       + '<div class="col-grid-footer" style="flex-direction:column;align-items:stretch;gap:6px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;">'
@@ -1835,8 +1779,7 @@ function _renderCollectionCard(outfit, collectionName) {
   }).join('');
 
   return '<div class="swipe-wrapper col-wrap-grid" data-swipe-id="' + _escAttr(id) + '" data-swipe-type="collection" data-swipe-col="' + _escAttr(collectionName) + '" data-swipe-name="' + _escAttr(outfit.name || 'Outfit') + '">'
-    + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
-    + '<div class="swipe-inner col-grid-card" data-col-id="' + _escAttr(id) + '" data-col-name="' + _escAttr(collectionName) + '">'
+        + '<div class="swipe-inner col-grid-card" data-col-id="' + _escAttr(id) + '" data-col-name="' + _escAttr(collectionName) + '">'
     + '<div class="col-grid-preview">' + cells + '</div>'
     + '<div class="col-grid-footer">'
     + '<div class="col-grid-name">' + (outfit.name || 'Outfit') + '</div>'
@@ -2383,8 +2326,7 @@ function _renderKiSavedSection() {
     var fav = _isFav(id);
     var cells = _make4Cells(outfit);
     return '<div class="swipe-wrapper col-wrap-grid" data-swipe-id="' + _escAttr(id) + '" data-swipe-type="saved" data-swipe-name="' + _escAttr(outfit.name || 'Outfit') + '">'
-      + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
-      + '<div class="swipe-inner col-grid-card" data-saved-id="' + _escAttr(id) + '">'
+            + '<div class="swipe-inner col-grid-card" data-saved-id="' + _escAttr(id) + '">'
       + '<div class="col-grid-preview">' + cells + '</div>'
       + '<div class="col-grid-footer">'
       + '<div class="col-grid-name">' + (outfit.name || 'Outfit') + '</div>'
@@ -2626,8 +2568,7 @@ function _autoLoadKiSuggestions(force, customDesc, colContext) {
             + '</div>';
         }).join('');
         return '<div class="swipe-wrapper" data-swipe-id="' + _escAttr(id) + '" data-swipe-type="suggestion">'
-          + '<div class="swipe-delete-bg"><div class="swipe-delete-bg-icon">🗑️</div><div class="swipe-delete-bg-label">Löschen</div></div>'
-          + '<div class="swipe-inner outfit-card-ki">'
+                    + '<div class="swipe-inner outfit-card-ki">'
           + '<div class="outfit-card-header">'
           + '<div><div class="outfit-card-name">' + (outfit.name || 'Outfit') + '</div>'
           + '<div class="outfit-card-style">' + (outfit.style || '') + '</div></div>'

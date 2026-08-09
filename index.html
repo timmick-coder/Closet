@@ -779,14 +779,9 @@
     #ki-toast { position:absolute; bottom:96px; left:50%; transform:translateX(-50%) translateY(8px); background:var(--purple); color:white; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:700; opacity:0; transition:opacity 0.25s, transform 0.25s; z-index:500; white-space:nowrap; pointer-events:none; }
     #ki-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
-    /* ── Swipe-to-Delete ── */
-    .swipe-wrapper { position:relative; overflow:hidden; margin-bottom:14px; border-radius:20px; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
-    .swipe-wrapper.col-wrap { border-radius:18px; margin-bottom:12px; }
-    .swipe-delete-bg { position:absolute; right:0; top:0; bottom:0; width:100px; background:#EF4444; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:4px; }
-    .swipe-delete-bg-icon { font-size:26px; }
-    .swipe-delete-bg-label { font-size:11px; font-weight:800; color:white; letter-spacing:0.3px; }
-    .swipe-inner { position:relative; will-change:transform; }
-    .swipe-inner:not(.dragging) { transition:transform 0.32s cubic-bezier(0.4,0,0.2,1), opacity 0.25s; }
+    .swipe-wrapper { position:relative; border-radius:20px; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+    .swipe-wrapper.col-wrap { border-radius:18px; }
+    .swipe-inner { position:relative; }
     .swipe-wrapper .outfit-card-ki { margin-bottom:0; }
     .swipe-wrapper .col-outfit-card { margin-bottom:0; }
 
