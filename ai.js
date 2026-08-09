@@ -58,6 +58,7 @@ function saveWardrobe(items) {
 function _compressForStorage(dataUrl) {
   return new Promise(function(resolve) {
     if (!dataUrl || dataUrl.length < 100) { resolve(dataUrl); return; }
+    var hasPng = dataUrl.startsWith('data:image/png');
     var img = new Image();
     img.onload = function() {
       var maxSize = 400;
@@ -70,10 +71,19 @@ function _compressForStorage(dataUrl) {
       var canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff'; // weißer Hintergrund für transparente PNGs
-      ctx.fillRect(0, 0, w, h);
+      if (!hasPng) {
+        // JPEG hat keine Transparenz → weißen Hintergrund aufmalen
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+      }
       ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', 0.72));
+      if (hasPng) {
+        // Transparenz erhalten: WebP (kleiner) falls unterstützt, sonst PNG
+        var webp = canvas.toDataURL('image/webp', 0.80);
+        resolve(webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/png'));
+      } else {
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      }
     };
     img.onerror = function() { resolve(dataUrl); };
     img.src = dataUrl;
@@ -844,9 +854,10 @@ function renderWardrobeGrid() {
       ? '<div class="cloth-brand" style="font-size:10px;color:var(--purple);font-weight:700;margin-bottom:3px;">' + item.brand + '</div>'
       : '';
     var iconStyle = hasImg
-      ? 'background-image:url(\'' + item.imageDataUrl + '\');background-size:cover;background-position:center;font-size:0;'
+      ? 'background-image:url(\'' + item.imageDataUrl + '\');font-size:0;'
       : '';
-    card.innerHTML = '<div class="cloth-icon" style="' + iconStyle + '">' + (hasImg ? '' : (item.emoji || '👕')) + '</div>'
+    var iconClass = 'cloth-icon' + (hasImg ? ' has-photo' : '');
+    card.innerHTML = '<div class="' + iconClass + '" style="' + iconStyle + '">' + (hasImg ? '' : (item.emoji || '👕')) + '</div>'
       + brandLine
       + '<div class="cloth-name">' + (item.name || 'Unbekannt') + '</div>'
       + '<div class="cloth-color-row"><div class="color-dot" style="background:' + (item.colorHex || '#888') + ';"></div>'
@@ -1574,14 +1585,14 @@ function _ensureAiStyles() {
   style.textContent = [
     '@keyframes aiPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.65;transform:scale(0.92)} }',
     '@keyframes aiSpin  { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }',
-    '#scan-overlay { position:absolute;inset:0;z-index:300;background:rgba(247,243,255,0.97);display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px; }',
+    '#scan-overlay { position:absolute;inset:0;z-index:300;background:radial-gradient(circle at 30% 0%,#1c3a5e 0%,#0d1b2e 55%,#060c16 100%);display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px; }',
     '#scan-loading { display:none;flex-direction:column;align-items:center;gap:20px;text-align:center; }',
-    '#scan-loading .ai-spin { width:44px;height:44px;border-radius:50%;border:3px solid var(--purple-border);border-top-color:var(--purple);animation:aiSpin 0.75s linear infinite; }',
+    '#scan-loading .ai-spin { width:44px;height:44px;border-radius:50%;border:3px solid rgba(77,141,255,0.3);border-top-color:#4d8dff;animation:aiSpin 0.75s linear infinite; }',
     '#scan-loading .ai-load-title { font-size:16px;font-weight:700;color:var(--text); }',
     '#scan-loading .ai-load-sub { font-size:13px;color:var(--text2); }',
     '#scan-result { display:none;flex-direction:column;align-items:center;gap:0;width:100%; }',
-    '#scan-result-img { width:160px;height:160px;object-fit:contain;border-radius:20px;background:white;box-shadow:0 8px 24px rgba(107,71,255,0.15);margin-bottom:16px; }',
-    '#scan-result-info { background:white;border-radius:20px;padding:14px 16px;width:100%;box-shadow:0 4px 16px rgba(107,71,255,0.08);margin-bottom:14px; }',
+    '#scan-result-img { width:200px;height:200px;object-fit:contain;border-radius:24px;background:radial-gradient(ellipse at 40% 30%,rgba(77,141,255,0.18) 0%,rgba(13,27,46,0.85) 70%);box-shadow:0 16px 40px rgba(0,0,0,0.5),0 4px 12px rgba(77,141,255,0.2);margin-bottom:20px;filter:drop-shadow(0 12px 20px rgba(0,0,0,0.4)); }',
+    '#scan-result-info { background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:20px;padding:14px 16px;width:100%;margin-bottom:14px; }',
     '.scan-field-row { display:flex;align-items:center;gap:10px;margin-bottom:10px; }',
     '.scan-field-row:last-child { margin-bottom:0; }',
     '.scan-field-label { font-size:11px;font-weight:800;color:var(--text2);width:62px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.03em; }',
