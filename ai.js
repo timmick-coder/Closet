@@ -5260,13 +5260,83 @@ function _kofferUpdateDaysDisplay() {
   if (el) el.textContent = _kofferDays;
 }
 
+var _kofferWeatherData = null; // { tempC, desc, icon }
+
 function _kofferGoToSelect() {
   _kofferSelectedOutfits = {};
   _kofferSelectedWardrobeIds = {};
+  _kofferWeatherData = null;
+  _kofferShowStep('select');
   _renderKofferOutfits();
   _renderKofferWardrobeItems();
   _kofferUpdateCounter();
-  _kofferShowStep('select');
+
+  var ziel = (document.getElementById('koffer-ziel-input') || {}).value || '';
+  if (!ziel.trim()) return;
+
+  var banner = document.getElementById('koffer-weather-banner');
+  if (banner) { banner.style.display = 'flex'; banner.innerHTML = '<span style="opacity:0.5">🌍 Wetter wird geladen…</span>'; }
+
+  fetch('https://wttr.in/' + encodeURIComponent(ziel.trim()) + '?format=j1')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var days = (data.weather || []).slice(0, Math.min(_kofferDays, 3));
+      var sumTemp = 0, count = 0;
+      days.forEach(function(d) { sumTemp += parseFloat(d.avgtempC || 0); count++; });
+      var avgTemp = count ? Math.round(sumTemp / count) : parseFloat((data.current_condition || [{}])[0].temp_C || 20);
+      var desc = ((data.current_condition || [{}])[0].weatherDesc || [{}])[0].value || '';
+      var icon = _kofferWeatherIcon(avgTemp, desc);
+      _kofferWeatherData = { tempC: avgTemp, desc: desc, icon: icon };
+      if (banner) {
+        banner.innerHTML = '<span style="font-size:22px;">' + icon + '</span>'
+          + '<span><strong>' + ziel.trim() + ':</strong> ø ' + avgTemp + '°C'
+          + (desc ? ' · ' + desc : '') + '</span>';
+      }
+      _renderKofferOutfits(); // re-render with weather badges
+    })
+    .catch(function() {
+      if (banner) banner.style.display = 'none';
+    });
+}
+
+function _kofferWeatherIcon(tempC, desc) {
+  var d = (desc || '').toLowerCase();
+  if (/snow|blizzard|schnee/.test(d)) return '❄️';
+  if (/thunder|storm|gewitter/.test(d)) return '⛈️';
+  if (/rain|drizzle|shower|regen/.test(d)) return '🌧️';
+  if (/cloud|overcast|bewölkt/.test(d)) return '⛅';
+  if (tempC < 0) return '🥶';
+  if (tempC < 10) return '🧥';
+  if (tempC > 28) return '🌞';
+  return '☀️';
+}
+
+function _kofferOutfitWarmthScore(outfit) {
+  var score = 0;
+  (outfit.items || []).forEach(function(item) {
+    var n = (item.name || '').toLowerCase();
+    var e = item.emoji || '';
+    if (/mantel|jacke|coat|pullover|sweater|stiefel|fleece|winter|warm/.test(n) || e === '🧥' || e === '🧣' || e === '🧤') score += 2;
+    else if (/hoodie|langarm|longsleeve/.test(n)) score += 1;
+    else if (/t-shirt|tank|shorts|sandal|flip|sommer/.test(n) || e === '👕' || e === '🩳' || e === '🩴') score -= 1;
+  });
+  return score;
+}
+
+function _kofferOutfitMatch(outfit) {
+  if (!_kofferWeatherData) return null;
+  var tempC = _kofferWeatherData.tempC;
+  var warmth = _kofferOutfitWarmthScore(outfit);
+  if (tempC >= 25) return warmth <= -1 ? 'gut' : warmth >= 2 ? 'schlecht' : 'ok';
+  if (tempC >= 15) return warmth === 0 ? 'gut' : (Math.abs(warmth) <= 1 ? 'ok' : 'schlecht');
+  if (tempC >= 5)  return warmth >= 1 ? 'gut' : warmth < 0 ? 'schlecht' : 'ok';
+  return warmth >= 3 ? 'gut' : warmth < 1 ? 'schlecht' : 'ok';
+}
+
+function _kofferMatchLabel(match) {
+  if (match === 'gut') return '✓ passt';
+  if (match === 'schlecht') return '✗ zu warm/kalt';
+  return '';
 }
 
 function _renderKofferOutfits() {
@@ -5277,22 +5347,29 @@ function _renderKofferOutfits() {
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;font-size:13px;color:var(--text2);">Noch keine Outfits gespeichert</div>';
     return;
   }
+  _kofferOutfitMap = {};
+  outfits.forEach(function(o) { _kofferOutfitMap[o.id || _outfitId(o)] = o; });
+
+  // sort: gut → ok → schlecht (only when weather is loaded)
+  if (_kofferWeatherData) {
+    var order = { gut: 0, ok: 1, schlecht: 2, null: 1 };
+    outfits = outfits.slice().sort(function(a, b) {
+      return (order[_kofferOutfitMatch(a)] || 1) - (order[_kofferOutfitMatch(b)] || 1);
+    });
+  }
+
   grid.innerHTML = outfits.map(function(outfit) {
     var id = outfit.id || _outfitId(outfit);
     var cells = _make4Cells(outfit);
     var selected = !!_kofferSelectedOutfits[id];
+    var match = _kofferOutfitMatch(outfit);
+    var badge = match ? '<div class="koffer-weather-badge ' + match + '">' + _kofferMatchLabel(match) + '</div>' : '';
     return '<div class="koffer-outfit-card' + (selected ? ' selected' : '') + '" onclick="_toggleKofferOutfit(\'' + _escAttr(id) + '\')" data-koffer-outfit-id="' + _escAttr(id) + '">'
       + '<div class="koffer-outfit-check">' + (selected ? '✓' : '') + '</div>'
-      + '<div class="col-grid-preview">' + cells + '</div>'
+      + '<div style="position:relative;"><div class="col-grid-preview">' + cells + '</div>' + badge + '</div>'
       + '<div class="koffer-outfit-name">' + (outfit.name || 'Outfit') + '</div>'
       + '</div>';
   }).join('');
-  // store outfits by id for later lookup
-  outfits.forEach(function(o) {
-    var id = o.id || _outfitId(o);
-    _kofferOutfitMap = _kofferOutfitMap || {};
-    _kofferOutfitMap[id] = o;
-  });
 }
 
 var _kofferOutfitMap = {};

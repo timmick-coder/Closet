@@ -1236,6 +1236,10 @@
     .koffer-bottom-bar { padding:12px 20px 28px; flex-shrink:0; border-top:1px solid rgba(255,255,255,0.08); background:var(--bg); }
     .koffer-confirm-btn { width:100%; background:var(--purple); color:#fff; border:none; border-radius:18px; padding:15px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; }
     .koffer-confirm-btn:disabled { opacity:0.4; cursor:default; }
+    .koffer-weather-badge { position:absolute; bottom:6px; left:6px; font-size:11px; font-weight:800; border-radius:8px; padding:2px 6px; z-index:2; }
+    .koffer-weather-badge.gut { background:rgba(34,197,94,0.22); color:#4ade80; }
+    .koffer-weather-badge.ok { background:rgba(255,255,255,0.08); color:var(--text2); }
+    .koffer-weather-badge.schlecht { background:rgba(239,68,68,0.15); color:#f87171; }
     .koffer-confirm-btn:not(:disabled):active { opacity:0.85; }
 
     .koffer-list-header { padding:16px 20px 6px; }
@@ -1489,6 +1493,7 @@
 
         <!-- Step 1: Auswahl -->
         <div id="koffer-step-select" style="display:none; flex:1; display:none; flex-direction:column; overflow:hidden;">
+          <div id="koffer-weather-banner" style="display:none; margin:10px 20px 0; border-radius:14px; padding:10px 14px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); font-size:13px; color:var(--text); align-items:center; gap:10px;"></div>
           <div class="koffer-panel-scroll" style="flex:1;" id="koffer-sel-scroll">
             <div class="koffer-sel-section">
               <div class="koffer-sel-label">Meine Outfits</div>
