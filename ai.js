@@ -1731,10 +1731,8 @@ function _createMyVersionInCol(id) {
     var newOutfit = outfits[0];
     newOutfit.isInspo = false;
     newOutfit.id = _outfitId(newOutfit);
-    if (colName) _saveOutfitToCollection(colName, newOutfit);
-    _showToast('Deine Version wurde erstellt und in Meine Fits gespeichert!');
+    // restore inspo tab while preview is shown
     if (_currentCollectionName === colName) {
-      _colActiveTab = 'fits';
       var allOutfits = _loadOutfits().filter(function(o) {
         return (o.kollektionen || []).indexOf(colName) >= 0;
       });
@@ -1742,8 +1740,9 @@ function _createMyVersionInCol(id) {
       var fits = allOutfits.filter(function(o) { return !o.isInspo; });
       var inspos = allOutfits.filter(function(o) { return !!o.isInspo; });
       _updateColTabCounts(fits.length, inspos.length);
-      _renderColTabContent(colName, 'fits', fits, inspos);
+      _renderColTabContent(colName, 'inspo', fits, inspos);
     }
+    _showVersionPreview(newOutfit, colName);
   }).catch(function(err) {
     if (list) {
       list.innerHTML = '<div class="ki-empty-state"><div class="ki-empty-icon">⚠️</div>'
@@ -1752,6 +1751,120 @@ function _createMyVersionInCol(id) {
         + '</div>';
     }
   });
+}
+
+var _versionPreviewOutfit = null;
+var _versionPreviewOriginCol = null;
+
+function _showVersionPreview(outfit, originCol) {
+  _versionPreviewOutfit = outfit;
+  _versionPreviewOriginCol = originCol || null;
+  var nameEl = document.getElementById('version-preview-name');
+  var gridEl = document.getElementById('version-preview-grid');
+  var itemsEl = document.getElementById('version-preview-items');
+  if (nameEl) nameEl.textContent = outfit.name || 'Meine Version';
+  if (gridEl) gridEl.innerHTML = _make4Cells(outfit);
+  if (itemsEl) {
+    var names = (outfit.items || []).map(function(i) { return i.emoji ? i.emoji + ' ' + i.name : i.name; });
+    itemsEl.textContent = names.join('  ·  ');
+  }
+  var overlay = document.getElementById('version-preview-overlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+function _closeVersionPreview() {
+  var overlay = document.getElementById('version-preview-overlay');
+  if (overlay) overlay.classList.remove('active');
+  _versionPreviewOutfit = null;
+  _versionPreviewOriginCol = null;
+}
+
+function _closeVersionPreviewOutside(e) {
+  if (e.target === document.getElementById('version-preview-overlay')) _closeVersionPreview();
+}
+
+function _versionPreviewAdd() {
+  // close preview, open folder picker
+  var overlay = document.getElementById('version-preview-overlay');
+  if (overlay) overlay.classList.remove('active');
+  _showVersionFolderPicker();
+}
+
+function _showVersionFolderPicker() {
+  var cols = _getCollections();
+  var list = document.getElementById('version-folder-list');
+  if (!list) return;
+  list.innerHTML = '';
+  // "Meine Fits" (no collection)
+  var allBtn = document.createElement('button');
+  allBtn.className = 'lp-btn';
+  allBtn.textContent = '🏠 Meine Fits (kein Ordner)';
+  allBtn.onclick = function() { _saveVersionToCol(null); };
+  list.appendChild(allBtn);
+  (cols || []).forEach(function(col) {
+    var btn = document.createElement('button');
+    btn.className = 'lp-btn';
+    btn.textContent = '📁 ' + col;
+    btn.onclick = function() { _saveVersionToCol(col); };
+    list.appendChild(btn);
+  });
+  // new folder option
+  var newBtn = document.createElement('button');
+  newBtn.className = 'lp-btn';
+  newBtn.style.color = 'var(--purple)';
+  newBtn.textContent = '＋ Neuer Ordner';
+  newBtn.onclick = function() {
+    _closeVersionFolderPicker();
+    var name = prompt('Name des neuen Ordners:');
+    if (name && name.trim()) _saveVersionToCol(name.trim());
+  };
+  list.appendChild(newBtn);
+  var picker = document.getElementById('version-folder-picker');
+  if (picker) picker.classList.add('active');
+}
+
+function _closeVersionFolderPicker() {
+  var picker = document.getElementById('version-folder-picker');
+  if (picker) picker.classList.remove('active');
+}
+
+function _closeVersionFolderPickerOutside(e) {
+  if (e.target === document.getElementById('version-folder-picker')) _closeVersionFolderPicker();
+}
+
+function _saveVersionToCol(targetCol) {
+  _closeVersionFolderPicker();
+  var outfit = _versionPreviewOutfit;
+  if (!outfit) return;
+  outfit.kollektionen = targetCol ? [targetCol] : [];
+  if (targetCol) {
+    _saveOutfitToCollection(targetCol, outfit);
+  } else {
+    var outfits = _loadOutfits();
+    var id = outfit.id || _outfitId(outfit);
+    if (!outfits.find(function(o) { return o.id === id; })) {
+      outfits.unshift(Object.assign({}, outfit, { id: id, kollektionen: [] }));
+      _storeOutfits(outfits);
+      _renderKiPills();
+      _renderKiSavedSection();
+    }
+  }
+  var colName = _versionPreviewOriginCol;
+  _versionPreviewOutfit = null;
+  _versionPreviewOriginCol = null;
+  _showToast('✅ Outfit gespeichert!');
+  // refresh collection view if still open
+  if (colName && _currentCollectionName === colName) {
+    _colActiveTab = 'fits';
+    var allOutfits = _loadOutfits().filter(function(o) {
+      return (o.kollektionen || []).indexOf(colName) >= 0;
+    });
+    allOutfits.forEach(function(o) { _regOutfit(o); });
+    var fits = allOutfits.filter(function(o) { return !o.isInspo; });
+    var inspos = allOutfits.filter(function(o) { return !!o.isInspo; });
+    _updateColTabCounts(fits.length, inspos.length);
+    _renderColTabContent(colName, 'fits', fits, inspos);
+  }
 }
 
 function _closeCollection() {
