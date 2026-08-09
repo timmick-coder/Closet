@@ -837,6 +837,7 @@ function renderWardrobeGrid() {
     var card = document.createElement('div');
     card.className = 'cloth-card ai-wardrobe-item';
     card.style.cursor = 'pointer';
+    card.setAttribute('data-item-id', String(item.id || item.name));
     card.onclick = (function(id) { return function() { _openItemDetail(id); }; })(item.id);
     card.setAttribute('data-category', _wardrobeCategory(item));
     var brandLine = item.brand

@@ -196,9 +196,21 @@
       border: 1px solid rgba(255,255,255,0.12);
       backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
       text-align: center; box-shadow: var(--shadow); cursor: pointer;
-      transition: transform 0.15s;
+      transition: transform 0.15s, border-color 0.15s;
+      position: relative; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
     }
     .cloth-card:active { transform: scale(0.96); }
+    /* ── Select Mode ── */
+    .cloth-card .card-select-check { display:none; position:absolute; top:7px; right:7px; width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,0.35); border:2px solid rgba(255,255,255,0.35); align-items:center; justify-content:center; z-index:5; transition:background 0.15s, border-color 0.15s; pointer-events:none; }
+    .clothes-grid.select-mode .cloth-card .card-select-check { display:flex; }
+    .clothes-grid.select-mode .cloth-card.selected { border-color:#4d8dff; background:rgba(77,141,255,0.12); }
+    .clothes-grid.select-mode .cloth-card.selected .card-select-check { background:#4d8dff; border-color:#4d8dff; }
+    .clothes-grid.select-mode .cloth-card:active { transform:scale(0.97); }
+    #schrank-delete-bar { display:none; position:absolute; bottom:14px; left:14px; right:14px; background:rgba(13,27,46,0.96); border:1px solid rgba(255,255,255,0.12); border-radius:18px; padding:12px 14px; gap:10px; align-items:center; justify-content:space-between; backdrop-filter:blur(16px); z-index:100; box-shadow:0 8px 32px rgba(0,0,0,0.4); }
+    #schrank-delete-bar.show { display:flex; }
+    #schrank-delete-count { font-size:14px; font-weight:700; color:var(--text2); }
+    #schrank-delete-confirm { flex:1; height:46px; border-radius:14px; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#ef4444; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; }
+    #schrank-delete-confirm:disabled { opacity:0.4; cursor:default; }
     .cloth-icon {
       width: 68px; height: 68px; border-radius: 50%;
       background: var(--bg); display: flex; align-items: center;
@@ -1211,6 +1223,7 @@
           <div class="big-title">Mein Schrank</div>
           <div class="big-sub" id="schrank-sub">12 Artikel</div>
         </div>
+        <button id="schrank-select-btn" onclick="_toggleSelectMode()" style="background:none;border:none;color:var(--purple);font-size:14px;font-weight:700;cursor:pointer;padding:8px 4px;font-family:inherit;">Auswählen</button>
       </div>
       <div class="scroll-content">
         <div class="search-wrap">
@@ -1235,6 +1248,10 @@
         </div>
 
         <div class="clothes-grid" id="clothes-grid"></div>
+      </div>
+      <div id="schrank-delete-bar">
+        <span id="schrank-delete-count">0 ausgewählt</span>
+        <button id="schrank-delete-confirm" onclick="_deleteSelected()" disabled>🗑️ Löschen</button>
       </div>
     </div>
 
@@ -2466,6 +2483,80 @@
         + '<div style="font-size:13px;color:var(--text2);margin-top:6px;">Versuche einen anderen Begriff</div>';
       grid.appendChild(emptyEl);
     }
+  }
+
+  // ── Auswahl-Modus (Multi-Select löschen) ─────────────────────────────────────
+  var _selectModeActive = false;
+  var _selectedItemIds = {};
+
+  function _toggleSelectMode() {
+    _selectModeActive ? _exitSelectMode() : _enterSelectMode();
+  }
+
+  function _enterSelectMode() {
+    _selectModeActive = true;
+    _selectedItemIds = {};
+    var btn = document.getElementById('schrank-select-btn');
+    if (btn) btn.textContent = 'Abbrechen';
+    var grid = document.getElementById('clothes-grid');
+    if (grid) grid.classList.add('select-mode');
+    // Checkmark-Overlay zu jeder Karte hinzufügen
+    var cards = document.querySelectorAll('#clothes-grid .cloth-card.ai-wardrobe-item');
+    cards.forEach(function(card) {
+      if (!card.querySelector('.card-select-check')) {
+        var chk = document.createElement('div');
+        chk.className = 'card-select-check';
+        chk.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        card.appendChild(chk);
+      }
+      card.onclick = (function(c) { return function(e) { e.stopPropagation(); _toggleItemSelect(c); }; })(card);
+    });
+    var bar = document.getElementById('schrank-delete-bar');
+    if (bar) bar.classList.add('show');
+    _updateDeleteBar();
+  }
+
+  function _exitSelectMode() {
+    _selectModeActive = false;
+    _selectedItemIds = {};
+    var btn = document.getElementById('schrank-select-btn');
+    if (btn) btn.textContent = 'Auswählen';
+    var grid = document.getElementById('clothes-grid');
+    if (grid) grid.classList.remove('select-mode');
+    var bar = document.getElementById('schrank-delete-bar');
+    if (bar) bar.classList.remove('show');
+    // onclick zurücksetzen
+    renderWardrobeGrid();
+  }
+
+  function _toggleItemSelect(card) {
+    var id = card.getAttribute('data-item-id');
+    if (!id) return;
+    if (_selectedItemIds[id]) {
+      delete _selectedItemIds[id];
+      card.classList.remove('selected');
+    } else {
+      _selectedItemIds[id] = true;
+      card.classList.add('selected');
+    }
+    _updateDeleteBar();
+  }
+
+  function _updateDeleteBar() {
+    var count = Object.keys(_selectedItemIds).length;
+    var countEl = document.getElementById('schrank-delete-count');
+    var confirmBtn = document.getElementById('schrank-delete-confirm');
+    if (countEl) countEl.textContent = count + (count === 1 ? ' ausgewählt' : ' ausgewählt');
+    if (confirmBtn) confirmBtn.disabled = count === 0;
+  }
+
+  function _deleteSelected() {
+    var ids = Object.keys(_selectedItemIds);
+    if (ids.length === 0) return;
+    var items = loadWardrobe().filter(function(i) { return !_selectedItemIds[String(i.id || i.name)]; });
+    saveWardrobe(items);
+    _exitSelectMode();
+    _showToast('🗑️ ' + ids.length + ' Artikel gelöscht');
   }
 
   function _clearSchrankSearch() {
