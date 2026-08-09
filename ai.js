@@ -5365,6 +5365,37 @@ function _kofferGoToPackliste() {
   _kofferShowStep('list');
 }
 
+var _kofferCategoryOrder = ['Oberteil','Hose','Kleid','Schuhe','Accessoire','Sonstiges'];
+
+function _kofferGetCategory(item) {
+  var emoji = item.emoji || '';
+  var name = (item.name || '').toLowerCase();
+  // use wardrobe type if available
+  if (item.type) {
+    var t = item.type.toLowerCase();
+    if (t === 'tops' || t === 'top') return 'Oberteil';
+    if (t === 'hosen' || t === 'hose') return 'Hose';
+    if (t === 'kleider' || t === 'kleid') return 'Kleid';
+    if (t === 'schuhe' || t === 'schuh') return 'Schuhe';
+    if (t === 'accessoires' || t === 'accessoire') return 'Accessoire';
+  }
+  // infer from emoji
+  if (['👕','👔','🧥','👚','🥋','👗'].indexOf(emoji) >= 0) {
+    if (emoji === '👗') return 'Kleid';
+    return 'Oberteil';
+  }
+  if (['👖','🩳','🩱'].indexOf(emoji) >= 0) return 'Hose';
+  if (['👟','👠','👡','👢','🥾','🩴','🥿'].indexOf(emoji) >= 0) return 'Schuhe';
+  if (['🧢','🎩','👒','👜','👝','💼','🎒','💍','💎','⌚','🕶️','👓','🧣','🧤'].indexOf(emoji) >= 0) return 'Accessoire';
+  // infer from name keywords
+  if (/shirt|top|bluse|pullover|hoodie|jacke|mantel|sweat|pulli|hemd/.test(name)) return 'Oberteil';
+  if (/hose|jeans|shorts|legging|rok/.test(name)) return 'Hose';
+  if (/kleid|dress|rock/.test(name)) return 'Kleid';
+  if (/schuh|sneaker|boot|heel|flip|sandal|stiefel/.test(name)) return 'Schuhe';
+  if (/tasche|gürtel|schal|mütze|cap|brille|uhr|schmuck|ring|kette/.test(name)) return 'Accessoire';
+  return 'Sonstiges';
+}
+
 function _renderKofferPackliste() {
   var ziel = (document.getElementById('koffer-ziel-input') || {}).value || 'deine Reise';
   var destEl = document.getElementById('koffer-list-destination');
@@ -5374,30 +5405,56 @@ function _renderKofferPackliste() {
   if (metaEl) metaEl.textContent = _kofferDays + (_kofferDays === 1 ? ' Tag' : ' Tage');
   if (!bodyEl) return;
 
-  var html = '';
-  var outfits = Object.values(_kofferSelectedOutfits);
-  var wardrobeItems = Object.values(_kofferSelectedWardrobeIds);
+  // collect all unique items (deduplicate by lowercase name)
+  var seen = {};
+  var allItems = [];
 
-  if (outfits.length > 0) {
-    html += '<div class="koffer-list-section-label">Outfits (' + outfits.length + ')</div>';
-    outfits.forEach(function(outfit) {
-      html += '<div class="koffer-list-outfit-block">';
-      html += '<div class="koffer-list-outfit-name">👗 ' + (outfit.name || 'Outfit') + '</div>';
-      (outfit.items || []).forEach(function(item) {
-        html += '<div class="koffer-list-row"><div class="koffer-list-dot"></div>' + (item.emoji ? item.emoji + ' ' : '') + item.name + '</div>';
-      });
-      html += '</div>';
+  function addItem(rawItem) {
+    var key = (rawItem.name || '').toLowerCase().trim();
+    if (!key || seen[key]) return;
+    seen[key] = true;
+    // try to enrich with wardrobe data
+    var wardrobeMatch = loadWardrobe().find(function(w) {
+      return (w.name || '').toLowerCase().trim() === key;
     });
+    allItems.push(wardrobeMatch ? Object.assign({}, rawItem, wardrobeMatch) : rawItem);
   }
 
-  if (wardrobeItems.length > 0) {
-    html += '<div class="koffer-list-section-label">Einzelne Klamotten (' + wardrobeItems.length + ')</div>';
-    wardrobeItems.forEach(function(item) {
-      html += '<div class="koffer-list-row"><div class="koffer-list-dot"></div>' + (item.emoji ? item.emoji + ' ' : '') + (item.name || '') + '</div>';
-    });
+  Object.values(_kofferSelectedOutfits).forEach(function(outfit) {
+    (outfit.items || []).forEach(addItem);
+  });
+  Object.values(_kofferSelectedWardrobeIds).forEach(addItem);
+
+  if (allItems.length === 0) {
+    bodyEl.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text2);font-size:14px;">Nichts ausgewählt</div>';
+    return;
   }
 
-  bodyEl.innerHTML = html || '<div style="text-align:center;padding:40px 0;color:var(--text2);font-size:14px;">Nichts ausgewählt</div>';
+  // group by category
+  var groups = {};
+  _kofferCategoryOrder.forEach(function(c) { groups[c] = []; });
+  allItems.forEach(function(item) {
+    var cat = _kofferGetCategory(item);
+    groups[cat].push(item);
+  });
+
+  var html = '<div style="font-size:13px;color:var(--text2);margin-bottom:12px;">' + allItems.length + ' Teile insgesamt</div>';
+  _kofferCategoryOrder.forEach(function(cat) {
+    var items = groups[cat];
+    if (!items || items.length === 0) return;
+    html += '<div class="koffer-list-section-label">' + cat + ' (' + items.length + ')</div>';
+    items.forEach(function(item) {
+      var photo = item.imageDataUrl ? 'background-image:url(\'' + item.imageDataUrl + '\');' : '';
+      html += '<div class="koffer-list-row">'
+        + (photo
+          ? '<div style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.08);' + photo + 'background-size:cover;background-position:center;flex-shrink:0;"></div>'
+          : '<div style="width:28px;text-align:center;font-size:20px;flex-shrink:0;">' + (item.emoji || '👕') + '</div>')
+        + '<div>' + (item.name || '') + '</div>'
+        + '</div>';
+    });
+  });
+
+  bodyEl.innerHTML = html;
 }
 
 function _kofferBackToSelect() {
