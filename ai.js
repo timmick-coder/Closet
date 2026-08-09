@@ -70,7 +70,7 @@ function _compressForStorage(dataUrl) {
       var canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff'; // weißer Hintergrund für transparente PNGs
+      ctx.fillStyle = '#0d1b2e'; // App-Hintergrundfarbe statt weiß
       ctx.fillRect(0, 0, w, h);
       ctx.drawImage(img, 0, 0, w, h);
       resolve(canvas.toDataURL('image/jpeg', 0.72));
