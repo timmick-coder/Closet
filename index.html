@@ -1236,6 +1236,16 @@
     .koffer-bottom-bar { padding:12px 20px 28px; flex-shrink:0; border-top:1px solid rgba(255,255,255,0.08); background:var(--bg); }
     .koffer-confirm-btn { width:100%; background:var(--purple); color:#fff; border:none; border-radius:18px; padding:15px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; }
     .koffer-confirm-btn:disabled { opacity:0.4; cursor:default; }
+    .koffer-date-input { color-scheme:dark; }
+    .koffer-weather-top { display:flex; align-items:center; gap:10px; padding:10px 14px 8px; font-size:13px; font-weight:700; color:var(--text); }
+    .koffer-weather-days { display:flex; gap:6px; padding:0 14px 12px; overflow-x:auto; scrollbar-width:none; }
+    .koffer-weather-days::-webkit-scrollbar { display:none; }
+    .koffer-weather-day { flex-shrink:0; background:rgba(255,255,255,0.06); border-radius:10px; padding:6px 8px; text-align:center; min-width:46px; }
+    .koffer-weather-day.koffer-day-rain { background:rgba(59,130,246,0.15); }
+    .koffer-weather-day.koffer-day-snow { background:rgba(186,230,253,0.12); }
+    .koffer-weather-day-name { font-size:10px; font-weight:700; color:var(--text2); margin-bottom:2px; }
+    .koffer-weather-day-icon { font-size:16px; line-height:1; margin-bottom:2px; }
+    .koffer-weather-day-temp { font-size:11px; font-weight:800; color:var(--text); }
     .koffer-weather-badge { position:absolute; bottom:6px; left:6px; font-size:11px; font-weight:800; border-radius:8px; padding:2px 6px; z-index:2; }
     .koffer-weather-badge.gut { background:rgba(34,197,94,0.22); color:#4ade80; }
     .koffer-weather-badge.ok { background:rgba(255,255,255,0.08); color:var(--text2); }
@@ -1480,20 +1490,17 @@
           <div class="koffer-input-section">
             <div class="koffer-field-label">Wohin fährst du?</div>
             <input class="koffer-text-input" id="koffer-ziel-input" placeholder="z.B. Barcelona, Mallorca…" type="text" />
-            <div class="koffer-field-label">Wie lange?</div>
-            <div class="koffer-stepper">
-              <button class="koffer-stepper-btn" onclick="_kofferDaysDown()">−</button>
-              <div class="koffer-stepper-val" id="koffer-days-val">7</div>
-              <div class="koffer-stepper-unit">Tage</div>
-              <button class="koffer-stepper-btn" onclick="_kofferDaysUp()">+</button>
-            </div>
+            <div class="koffer-field-label">Abreise</div>
+            <input class="koffer-text-input koffer-date-input" id="koffer-date-from" type="date" />
+            <div class="koffer-field-label">Rückreise</div>
+            <input class="koffer-text-input koffer-date-input" id="koffer-date-to" type="date" />
             <button class="koffer-go-btn" onclick="_kofferGoToSelect()">Outfits &amp; Klamotten anzeigen →</button>
           </div>
         </div>
 
         <!-- Step 1: Auswahl -->
         <div id="koffer-step-select" style="display:none; flex:1; display:none; flex-direction:column; overflow:hidden;">
-          <div id="koffer-weather-banner" style="display:none; margin:10px 20px 0; border-radius:14px; padding:10px 14px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); font-size:13px; color:var(--text); align-items:center; gap:10px;"></div>
+          <div id="koffer-weather-banner" style="display:none; margin:10px 20px 0; border-radius:14px; overflow:hidden; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); flex-direction:column;"></div>
           <div class="koffer-panel-scroll" style="flex:1;" id="koffer-sel-scroll">
             <div class="koffer-sel-section">
               <div class="koffer-sel-label">Meine Outfits</div>

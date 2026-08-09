@@ -5225,7 +5225,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ── Koffer packen ─────────────────────────────────────────────────────────────
 
-var _kofferDays = 7;
 var _kofferSelectedOutfits = {}; // id → outfit object
 var _kofferSelectedWardrobeIds = {}; // id/name → item object
 
@@ -5233,6 +5232,14 @@ function _openKofferPanel() {
   var panel = document.getElementById('ki-koffer-panel');
   if (!panel) return;
   _kofferShowStep('input');
+  // set default dates: tomorrow → +7 days
+  var from = new Date(); from.setDate(from.getDate() + 1);
+  var to   = new Date(); to.setDate(to.getDate() + 8);
+  var fmt = function(d) { return d.toISOString().slice(0, 10); };
+  var fi = document.getElementById('koffer-date-from');
+  var ti = document.getElementById('koffer-date-to');
+  if (fi) { fi.value = fmt(from); fi.min = fmt(from); }
+  if (ti) { ti.value = fmt(to);   ti.min = fmt(from); }
   panel.classList.add('active');
 }
 
@@ -5249,18 +5256,6 @@ function _kofferShowStep(step) {
   });
 }
 
-function _kofferDaysDown() {
-  if (_kofferDays > 1) { _kofferDays--; _kofferUpdateDaysDisplay(); }
-}
-function _kofferDaysUp() {
-  if (_kofferDays < 30) { _kofferDays++; _kofferUpdateDaysDisplay(); }
-}
-function _kofferUpdateDaysDisplay() {
-  var el = document.getElementById('koffer-days-val');
-  if (el) el.textContent = _kofferDays;
-}
-
-var _kofferWeatherData = null; // { tempC, desc, icon }
 
 function _kofferGoToSelect() {
   _kofferSelectedOutfits = {};
@@ -5272,43 +5267,106 @@ function _kofferGoToSelect() {
   _kofferUpdateCounter();
 
   var ziel = (document.getElementById('koffer-ziel-input') || {}).value || '';
+  var dateFrom = (document.getElementById('koffer-date-from') || {}).value || '';
+  var dateTo   = (document.getElementById('koffer-date-to')   || {}).value || '';
   if (!ziel.trim()) return;
 
   var banner = document.getElementById('koffer-weather-banner');
-  if (banner) { banner.style.display = 'flex'; banner.innerHTML = '<span style="opacity:0.5">🌍 Wetter wird geladen…</span>'; }
+  if (banner) { banner.style.display = 'flex'; banner.innerHTML = '<div class="koffer-weather-top"><span style="opacity:0.5">🌍 Wetter wird geladen…</span></div>'; }
 
-  fetch('https://wttr.in/' + encodeURIComponent(ziel.trim()) + '?format=j1')
+  // Step 1: Geocode
+  fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(ziel.trim()) + '&count=1&language=de&format=json')
     .then(function(r) { return r.json(); })
-    .then(function(data) {
-      var days = (data.weather || []).slice(0, Math.min(_kofferDays, 3));
-      var sumTemp = 0, count = 0;
-      days.forEach(function(d) { sumTemp += parseFloat(d.avgtempC || 0); count++; });
-      var avgTemp = count ? Math.round(sumTemp / count) : parseFloat((data.current_condition || [{}])[0].temp_C || 20);
-      var desc = ((data.current_condition || [{}])[0].weatherDesc || [{}])[0].value || '';
-      var icon = _kofferWeatherIcon(avgTemp, desc);
-      _kofferWeatherData = { tempC: avgTemp, desc: desc, icon: icon };
-      if (banner) {
-        banner.innerHTML = '<span style="font-size:22px;">' + icon + '</span>'
-          + '<span><strong>' + ziel.trim() + ':</strong> ø ' + avgTemp + '°C'
-          + (desc ? ' · ' + desc : '') + '</span>';
-      }
-      _renderKofferOutfits(); // re-render with weather badges
+    .then(function(geo) {
+      var result = (geo.results || [])[0];
+      if (!result) throw new Error('Ort nicht gefunden');
+      var lat = result.latitude, lon = result.longitude;
+      var cityName = result.name || ziel.trim();
+
+      // date range: default = next 7 days if not set
+      var today = new Date();
+      var fmt = function(d) { return d.toISOString().slice(0,10); };
+      var startDate = dateFrom || fmt(new Date(today.getTime() + 86400000));
+      var endDate   = dateTo   || fmt(new Date(today.getTime() + 7 * 86400000));
+
+      // Step 2: Forecast
+      return fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon
+        + '&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto'
+        + '&start_date=' + startDate + '&end_date=' + endDate)
+        .then(function(r) { return r.json(); })
+        .then(function(wx) {
+          var daily = wx.daily || {};
+          var dates  = daily.time || [];
+          var maxTs  = daily.temperature_2m_max || [];
+          var minTs  = daily.temperature_2m_min || [];
+          var codes  = daily.weathercode || [];
+
+          var days = dates.map(function(d, i) {
+            return { date: d, maxC: Math.round(maxTs[i] || 0), minC: Math.round(minTs[i] || 0), code: codes[i] || 0 };
+          });
+
+          var sumMax = 0, sumMin = 0, rainCount = 0;
+          days.forEach(function(d) {
+            sumMax += d.maxC; sumMin += d.minC;
+            if (d.code >= 51) rainCount++;
+          });
+          var n = days.length || 1;
+          _kofferWeatherData = {
+            avgTempC: Math.round((sumMax + sumMin) / (2 * n)),
+            maxTempC: Math.max.apply(null, days.map(function(d) { return d.maxC; })),
+            minTempC: Math.min.apply(null, days.map(function(d) { return d.minC; })),
+            rainDays: rainCount,
+            totalDays: n,
+            days: days,
+            city: cityName
+          };
+
+          _kofferRenderWeatherBanner(banner);
+          _renderKofferOutfits();
+        });
     })
-    .catch(function() {
-      if (banner) banner.style.display = 'none';
+    .catch(function(err) {
+      if (banner) banner.innerHTML = '<div class="koffer-weather-top" style="color:var(--text2);">⚠️ Wetter konnte nicht geladen werden</div>';
     });
 }
 
-function _kofferWeatherIcon(tempC, desc) {
-  var d = (desc || '').toLowerCase();
-  if (/snow|blizzard|schnee/.test(d)) return '❄️';
-  if (/thunder|storm|gewitter/.test(d)) return '⛈️';
-  if (/rain|drizzle|shower|regen/.test(d)) return '🌧️';
-  if (/cloud|overcast|bewölkt/.test(d)) return '⛅';
-  if (tempC < 0) return '🥶';
-  if (tempC < 10) return '🧥';
-  if (tempC > 28) return '🌞';
-  return '☀️';
+var _wdNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+function _kofferCodeToEmoji(code) {
+  if (code === 0) return '☀️';
+  if (code <= 3)  return '⛅';
+  if (code <= 48) return '🌫️';
+  if (code <= 67) return '🌧️';
+  if (code <= 77) return '❄️';
+  if (code <= 82) return '🌦️';
+  if (code <= 86) return '🌨️';
+  return '⛈️';
+}
+
+function _kofferRenderWeatherBanner(banner) {
+  if (!banner || !_kofferWeatherData) return;
+  var w = _kofferWeatherData;
+  var rainNote = w.rainDays > 0 ? ' · ' + w.rainDays + ' Regentag' + (w.rainDays > 1 ? 'e' : '') : '';
+  var topHtml = '<div class="koffer-weather-top">'
+    + '<span style="font-size:20px;">' + _kofferCodeToEmoji(w.days[0] ? w.days[0].code : 0) + '</span>'
+    + '<span><strong>' + w.city + '</strong> · ' + w.minTempC + '–' + w.maxTempC + '°C' + rainNote + '</span>'
+    + '</div>';
+  var daysHtml = '<div class="koffer-weather-days">'
+    + w.days.map(function(d) {
+        var date = new Date(d.date + 'T12:00:00');
+        var name = _wdNames[date.getDay()];
+        var isRain = d.code >= 51 && d.code < 71;
+        var isSnow = d.code >= 71;
+        var cls = isSnow ? 'koffer-day-snow' : isRain ? 'koffer-day-rain' : '';
+        return '<div class="koffer-weather-day ' + cls + '">'
+          + '<div class="koffer-weather-day-name">' + name + '</div>'
+          + '<div class="koffer-weather-day-icon">' + _kofferCodeToEmoji(d.code) + '</div>'
+          + '<div class="koffer-weather-day-temp">' + d.maxC + '°</div>'
+          + '</div>';
+      }).join('')
+    + '</div>';
+  banner.innerHTML = topHtml + daysHtml;
+  banner.style.display = 'flex';
 }
 
 function _kofferOutfitWarmthScore(outfit) {
@@ -5325,7 +5383,7 @@ function _kofferOutfitWarmthScore(outfit) {
 
 function _kofferOutfitMatch(outfit) {
   if (!_kofferWeatherData) return null;
-  var tempC = _kofferWeatherData.tempC;
+  var tempC = _kofferWeatherData.avgTempC;
   var warmth = _kofferOutfitWarmthScore(outfit);
   if (tempC >= 25) return warmth <= -1 ? 'gut' : warmth >= 2 ? 'schlecht' : 'ok';
   if (tempC >= 15) return warmth === 0 ? 'gut' : (Math.abs(warmth) <= 1 ? 'ok' : 'schlecht');
@@ -5479,7 +5537,15 @@ function _renderKofferPackliste() {
   var metaEl = document.getElementById('koffer-list-meta');
   var bodyEl = document.getElementById('koffer-list-body');
   if (destEl) destEl.textContent = '✈️ ' + ziel;
-  if (metaEl) metaEl.textContent = _kofferDays + (_kofferDays === 1 ? ' Tag' : ' Tage');
+  var dateFrom = (document.getElementById('koffer-date-from') || {}).value || '';
+  var dateTo   = (document.getElementById('koffer-date-to')   || {}).value || '';
+  var metaText = '';
+  if (dateFrom && dateTo) {
+    var fmt2 = function(s) { var p = s.split('-'); return p[2] + '.' + p[1] + '.' + p[0]; };
+    var n = _kofferWeatherData ? _kofferWeatherData.totalDays : '';
+    metaText = fmt2(dateFrom) + ' – ' + fmt2(dateTo) + (n ? ' · ' + n + ' Tage' : '');
+  }
+  if (metaEl) metaEl.textContent = metaText;
   if (!bodyEl) return;
 
   // collect all unique items (deduplicate by lowercase name)
