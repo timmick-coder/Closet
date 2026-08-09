@@ -279,6 +279,7 @@
       border: 1px solid rgba(255,255,255,0.12);
       backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
       box-shadow: var(--shadow); cursor: pointer; transition: transform 0.15s;
+      -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
     }
     .ordner-card:active { transform: scale(0.97); }
     .ordner-preview {
@@ -437,7 +438,7 @@
 
     /* ── 2-col fit grid inside collection panel ── */
     .ki-col-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:16px; }
-    .col-grid-card { background:#0e2240; border-radius:16px; overflow:hidden; cursor:pointer; transition:transform 0.15s; border:1px solid rgba(255,255,255,0.12); }
+    .col-grid-card { background:#0e2240; border-radius:16px; overflow:hidden; cursor:pointer; transition:transform 0.15s; border:1px solid rgba(255,255,255,0.12); -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
     .col-grid-card:active { transform:scale(0.97); }
     .col-grid-preview { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; aspect-ratio:1; gap:2px; background:rgba(0,0,0,0.25); }
     .col-grid-photo { display:flex; align-items:center; justify-content:center; font-size:22px; background:rgba(255,255,255,0.06); background-size:cover; background-position:center; overflow:hidden; }
@@ -767,7 +768,7 @@
     #ki-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
     /* ── Swipe-to-Delete ── */
-    .swipe-wrapper { position:relative; overflow:hidden; margin-bottom:14px; border-radius:20px; }
+    .swipe-wrapper { position:relative; overflow:hidden; margin-bottom:14px; border-radius:20px; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
     .swipe-wrapper.col-wrap { border-radius:18px; margin-bottom:12px; }
     .swipe-delete-bg { position:absolute; right:0; top:0; bottom:0; width:100px; background:#EF4444; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:4px; }
     .swipe-delete-bg-icon { font-size:26px; }
