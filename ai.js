@@ -58,9 +58,11 @@ function saveWardrobe(items) {
 function _compressForStorage(dataUrl) {
   return new Promise(function(resolve) {
     if (!dataUrl || dataUrl.length < 100) { resolve(dataUrl); return; }
+    var isPng = dataUrl.startsWith('data:image/png');
     var img = new Image();
     img.onload = function() {
-      var maxSize = 400;
+      // Transparente PNGs (nach Hintergrundentfernung) kleiner skalieren damit WebP in localStorage passt
+      var maxSize = isPng ? 320 : 400;
       var w = img.naturalWidth, h = img.naturalHeight;
       if (w > maxSize || h > maxSize) {
         var scale = Math.min(maxSize / w, maxSize / h);
@@ -70,10 +72,22 @@ function _compressForStorage(dataUrl) {
       var canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#0d1b2e'; // App-Hintergrundfarbe statt weiß
-      ctx.fillRect(0, 0, w, h);
-      ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', 0.72));
+      if (isPng) {
+        // Transparenz erhalten: kein Fill, als WebP speichern (viel kleiner als PNG)
+        ctx.drawImage(img, 0, 0, w, h);
+        var webp = canvas.toDataURL('image/webp', 0.82);
+        // Falls Browser kein WebP unterstützt → JPEG mit App-Hintergrund als Fallback
+        if (webp.startsWith('data:image/webp')) { resolve(webp); return; }
+        ctx.fillStyle = '#0d1b2e';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      } else {
+        ctx.fillStyle = '#0d1b2e';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      }
     };
     img.onerror = function() { resolve(dataUrl); };
     img.src = dataUrl;
