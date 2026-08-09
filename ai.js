@@ -200,7 +200,8 @@ async function _callGeminiAPI(body) {
   });
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
-    throw new Error(errData?.error || 'Gemini Proxy Fehler: ' + res.status);
+    const errMsg = (typeof errData?.error === 'string' ? errData.error : errData?.error?.message) || ('Gemini Fehler ' + res.status);
+    throw new Error(errMsg);
   }
   return res.json();
 }
