@@ -91,7 +91,7 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
     .scroll-content {
-      flex: 1; overflow-y: auto; scrollbar-width: none; padding-bottom: 12px;
+      flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; padding-bottom: 12px;
     }
     .scroll-content::-webkit-scrollbar { display: none; }
 
@@ -292,10 +292,11 @@
       backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
       box-shadow: var(--shadow); cursor: pointer; transition: transform 0.15s;
       -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+      display: flex; flex-direction: column; height: 144px;
     }
     .ordner-card:active { transform: scale(0.97); }
     .ordner-preview {
-      height: 90px; display: grid; grid-template-columns: 1fr 1fr;
+      flex: 0 0 90px; height: 90px; display: grid; grid-template-columns: 1fr 1fr;
       grid-template-rows: 1fr 1fr; gap: 2px;
     }
     .ordner-preview-cell { display: flex; align-items: center; justify-content: center; font-size: 22px; background: var(--bg); }
@@ -308,7 +309,7 @@
       box-shadow: var(--shadow); cursor: pointer;
       border: 2px dashed var(--purple-border);
       display: flex; flex-direction: column; align-items: center;
-      justify-content: center; gap: 8px; min-height: 140px;
+      justify-content: center; gap: 8px; height: 144px;
       transition: border-color 0.2s;
     }
     .ordner-new:active { border-color: var(--purple); }
