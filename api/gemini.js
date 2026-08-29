@@ -19,10 +19,10 @@ module.exports = async function handler(req, res) {
 
   try {
     const { body, model } = req.body;
-    const modelName = model || 'gemini-2.0-flash';
+    const modelName = model || 'gemini-2.5-flash';
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
