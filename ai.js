@@ -183,7 +183,7 @@ async function _callGeminiAPI(body) {
   // Lokal: direkt mit Key aufrufen
   if (key && key !== 'your_gemini_api_key_here') {
     const res = await fetch(
-      'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=' + key,
+      'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=' + key,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
     );
     if (!res.ok) {
@@ -196,7 +196,7 @@ async function _callGeminiAPI(body) {
   const res = await fetch('/api/gemini', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ body: body, model: 'gemini-1.5-flash-latest' })
+    body: JSON.stringify({ body: body, model: 'gemini-2.0-flash' })
   });
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
