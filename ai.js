@@ -2785,6 +2785,8 @@ function _confirmGenerate() {
 }
 
 // ── Vorgeschlagene Outfits (kein API, aus gespeicherten) ──────────────────────
+var _previewSuggestionsCache = { key: null, picks: null };
+
 function _renderPreviewSuggestions(collectionFilter) {
   var container = document.getElementById('ki-preview-suggestions');
   if (!container) return;
@@ -2801,11 +2803,20 @@ function _renderPreviewSuggestions(collectionFilter) {
       + '<div style="font-size:32px;">🧺</div>'
       + '<div style="font-size:14px;font-weight:700;color:var(--text2);margin-top:8px;line-height:1.5;">Noch keine Outfits gespeichert.<br>Generiere Outfits und speichere sie!</div>'
       + '</div>';
+    _previewSuggestionsCache = { key: null, picks: null };
     return;
   }
-  // Zufällige 2–3 Auswahl
-  var shuffled = pool.slice().sort(function() { return Math.random() - 0.5; });
-  var picks = shuffled.slice(0, 3);
+  // Auswahl bleibt stabil, solange sich der Pool (gespeicherte Outfits) nicht ändert –
+  // sonst würde jedes Öffnen/Verlassen eines Ordners die Vorschläge neu mischen.
+  var cacheKey = (collectionFilter || '__all__') + '|' + pool.map(function(o) { return o.id || _outfitId(o); }).sort().join(',');
+  var picks;
+  if (_previewSuggestionsCache.key === cacheKey) {
+    picks = _previewSuggestionsCache.picks;
+  } else {
+    var shuffled = pool.slice().sort(function() { return Math.random() - 0.5; });
+    picks = shuffled.slice(0, 3);
+    _previewSuggestionsCache = { key: cacheKey, picks: picks };
+  }
   container.innerHTML = '<div class="ki-col-grid">' + picks.map(function(outfit) {
     var id = _regOutfit(outfit);
     var fav = _isFav(id);
