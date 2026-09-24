@@ -3751,6 +3751,7 @@ function _submitNewPost() {
 
 // ── Build & insert own posts into feed ───────────────────────────────────────
 function _buildOotdBadge(post) {
+  if (!STREAK_ENABLED) return '';
   var s = _loadStreak();
   var today = _getTodayKey();
   if (post.timestamp && s.current >= 1 && s.lastPostDate === today) {
@@ -4793,7 +4794,7 @@ function _openFriendProfile(friendId) {
   }
   if (fpStreak) {
     fpStreak.textContent = '🔥 ' + (profile.streak || 0) + ' Tage Streak';
-    fpStreak.style.display = profile.streak > 0 ? '' : 'none';
+    fpStreak.style.display = STREAK_ENABLED && profile.streak > 0 ? '' : 'none';
   }
 
   // Stats
@@ -5092,6 +5093,11 @@ function _editPost(postId) {
 // STREAK SYSTEM
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Vorerst deaktiviert: blendet Streak-Badge, Panel, Erinnerung und Freundes-Streaks
+// aus und zählt nichts hoch. Gespeicherte Daten (stylesync_streak) bleiben erhalten –
+// zum Reaktivieren einfach auf true setzen.
+var STREAK_ENABLED = false;
+
 function _getTodayKey() {
   var d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -5189,6 +5195,7 @@ function _checkAndUpdateStreak() {
 }
 
 function _incrementStreak() {
+  if (!STREAK_ENABLED) return;
   var s = _loadStreak();
   var today = _getTodayKey();
   if (s.lastPostDate === today) return; // already posted today
@@ -5814,8 +5821,13 @@ document.addEventListener('DOMContentLoaded', function() {
     postDetailScroll.addEventListener('touchmove', function() { clearTimeout(_longPressTimer); }, { passive: true });
   }
 
-  // ── Streak System initialisieren ──
-  _checkAndUpdateStreak();
+  // ── Streak System initialisieren (vorerst deaktiviert → Profil-Badge ausblenden) ──
+  if (STREAK_ENABLED) {
+    _checkAndUpdateStreak();
+  } else {
+    var streakRow = document.getElementById('profil-streak-row');
+    if (streakRow) streakRow.style.display = 'none';
+  }
 
   // ── Profil Posts: initial rendern ──
   _renderProfilePosts();
