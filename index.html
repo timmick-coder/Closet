@@ -364,6 +364,30 @@
       background: var(--bg); margin-bottom: 16px;
     }
     .modal-input:focus { border-color: var(--purple); }
+
+    /* ── Schrank-Kategorien verwalten ── */
+    .chip.chip-edit { background: transparent; border-style: dashed; color: var(--purple); flex-shrink: 0; }
+    /* Overlay endet über der Bottom-Nav → Sheet begrenzen und scrollbar machen */
+    .cat-sheet { max-height: 92%; overflow-y: auto; box-sizing: border-box; scrollbar-width: none; }
+    .cat-sheet::-webkit-scrollbar { display: none; }
+    .cat-sheet-head { display: flex; align-items: center; justify-content: space-between; }
+    .cat-done-btn { background: var(--purple); color: #fff; border: none; border-radius: 12px; padding: 8px 16px; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .cat-sheet-hint { font-size: 13px; color: var(--text2); margin: 6px 0 14px; }
+    .cat-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--bg); border-radius: 14px; margin-bottom: 8px; border: 1.5px solid transparent; transition: border-color 0.15s; }
+    .cat-row.pending { border-color: #ff5a6e; }
+    .cat-row-emoji { width: 36px; height: 36px; border-radius: 10px; background: var(--purple-light); display: flex; align-items: center; justify-content: center; font-size: 19px; flex-shrink: 0; }
+    .cat-row-info { flex: 1; min-width: 0; }
+    .cat-row-name { font-size: 15px; font-weight: 700; color: var(--text); }
+    .cat-row-count { font-size: 12px; color: var(--text2); margin-top: 1px; }
+    .cat-row-remove { width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(255,255,255,0.08); color: var(--text2); font-size: 14px; cursor: pointer; flex-shrink: 0; }
+    .cat-row-confirm { border: none; background: #ff5a6e; color: #fff; border-radius: 10px; padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+    .cat-empty { font-size: 13px; color: var(--text2); text-align: center; padding: 14px 0; }
+    .cat-add-row { display: flex; gap: 8px; margin-top: 12px; }
+    .cat-add-row .modal-input { margin-bottom: 0; flex: 1; min-width: 0; }
+    .cat-add-btn { border: none; background: var(--purple); color: #fff; border-radius: 14px; padding: 0 16px; font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+    .cat-sugg-label { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text2); margin: 18px 0 10px; }
+    .cat-sugg-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip.cat-sugg { font-size: 13px; padding: 7px 12px; }
     .modal-emoji-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
     .modal-emoji {
       width: 42px; height: 42px; border-radius: 12px; background: var(--bg);
@@ -1345,14 +1369,9 @@
           </div>
         </div>
 
-        <div class="chip-row">
+        <!-- Kategorien werden von _renderCategoryChips() (ai.js) aus den Nutzer-Kategorien gebaut -->
+        <div class="chip-row" id="schrank-chips">
           <div class="chip active" data-filter="alle" onclick="filterChip(this)">Alle</div>
-          <div class="chip" data-filter="tops" onclick="filterChip(this)">Tops</div>
-          <div class="chip" data-filter="hosen" onclick="filterChip(this)">Hosen</div>
-          <div class="chip" data-filter="kleider" onclick="filterChip(this)">Kleider</div>
-          <div class="chip" data-filter="schuhe" onclick="filterChip(this)">Schuhe</div>
-          <div class="chip" data-filter="jacken" onclick="filterChip(this)">Jacken</div>
-          <div class="chip" data-filter="accessoires" onclick="filterChip(this)">Accessoires</div>
         </div>
 
         <div class="clothes-grid" id="clothes-grid"></div>
@@ -1388,14 +1407,7 @@
           </div>
           <div class="idp-field-row">
             <span class="idp-field-label">Kategorie</span>
-            <select class="idp-field-select" id="idp-e-type">
-              <option value="Top">Tops</option>
-              <option value="Hose">Hosen</option>
-              <option value="Kleid">Kleider</option>
-              <option value="Schuh">Schuhe</option>
-              <option value="Accessoire">Accessoires</option>
-              <option value="Jacke">Jacken</option>
-            </select>
+            <select class="idp-field-select" id="idp-e-category"></select>
           </div>
           <div class="idp-field-row">
             <span class="idp-field-label">Farbe</span>
@@ -1605,12 +1617,6 @@
         </div>
         <div class="chip-row" id="ki-create-chips" style="padding:4px 16px 10px;">
           <div class="chip active" data-create-filter="alle" onclick="_filterCreateGrid(this)">Alle</div>
-          <div class="chip" data-create-filter="tops" onclick="_filterCreateGrid(this)">Tops</div>
-          <div class="chip" data-create-filter="hosen" onclick="_filterCreateGrid(this)">Hosen</div>
-          <div class="chip" data-create-filter="kleider" onclick="_filterCreateGrid(this)">Kleider</div>
-          <div class="chip" data-create-filter="schuhe" onclick="_filterCreateGrid(this)">Schuhe</div>
-          <div class="chip" data-create-filter="jacken" onclick="_filterCreateGrid(this)">Jacken</div>
-          <div class="chip" data-create-filter="accessoires" onclick="_filterCreateGrid(this)">Accessoires</div>
         </div>
         <div class="ki-panel-scroll" style="padding-top:0;">
           <div class="ki-create-grid" id="ki-create-grid"></div>
@@ -2290,6 +2296,26 @@
   </div>
 
   <!-- Speichern in Kollektion Modal -->
+  <!-- Schrank-Kategorien verwalten -->
+  <div class="modal-overlay" id="cat-modal-overlay" onclick="_closeCategoryManagerOutside(event)">
+    <div class="modal-sheet cat-sheet" onclick="_categoryManagerClick(event)">
+      <div class="modal-handle"></div>
+      <div class="cat-sheet-head">
+        <div class="modal-title" style="margin:0;">Kategorien</div>
+        <button class="cat-done-btn" onclick="_closeCategoryManager()">Fertig</button>
+      </div>
+      <div class="cat-sheet-hint">Wähle selbst, welche Kategorien dein Schrank hat.</div>
+      <div id="cat-modal-list"></div>
+      <div class="cat-add-row">
+        <input class="modal-input" id="cat-new-name" placeholder="Neue Kategorie, z. B. Westen" maxlength="24"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();_addCategoryFromInput();}" />
+        <button class="cat-add-btn" onclick="_addCategoryFromInput()">Hinzufügen</button>
+      </div>
+      <div class="cat-sugg-label" id="cat-modal-sugg-label">Vorschläge</div>
+      <div class="cat-sugg-wrap" id="cat-modal-suggestions"></div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="save-modal-overlay" onclick="_closeSaveModalOutside(event)">
     <div class="modal-sheet">
       <div class="modal-handle"></div>
@@ -2370,7 +2396,7 @@
 
         <div class="scan-field-row">
           <label class="scan-field-label">Kategorie</label>
-          <input class="scan-field-input" id="scan-edit-type" type="text" placeholder="z. B. Top, Hose, Jacke" />
+          <select class="scan-field-input" id="scan-edit-category"></select>
         </div>
 
         <div class="scan-field-row">
@@ -2563,15 +2589,10 @@
     document.getElementById('nav-ki').classList.add('active');
   }
 
-  // Kategorie-Label für Untertitel und Leerzustand
-  var _filterLabels = {
-    alle: 'Artikel', tops: 'Tops', hosen: 'Hosen',
-    kleider: 'Kleider', schuhe: 'Schuhe', jacken: 'Jacken', accessoires: 'Accessoires'
-  };
-
+  // Kategorie-Labels kommen aus den Nutzer-Kategorien (_catLabel in ai.js)
   function filterChip(el) {
     // Aktive Klasse umschalten
-    document.querySelectorAll('.chip-row .chip').forEach(function(c) { c.classList.remove('active'); });
+    document.querySelectorAll('#schrank-chips .chip').forEach(function(c) { c.classList.remove('active'); });
     el.classList.add('active');
 
     var filter = el.getAttribute('data-filter') || 'alle';
@@ -2586,7 +2607,7 @@
     var cards = grid.querySelectorAll('.cloth-card');
     var visible = 0;
     cards.forEach(function(card) {
-      var cat = card.getAttribute('data-category') || 'tops';
+      var cat = card.getAttribute('data-category') || 'none';
       var show = filter === 'alle' || cat === filter;
       card.style.display = show ? '' : 'none';
       if (show) visible++;
@@ -2594,11 +2615,11 @@
 
     // Untertitel aktualisieren
     var sub = document.querySelector('#schrank .big-sub');
-    if (sub) sub.textContent = visible + ' ' + (_filterLabels[filter] || 'Artikel');
+    if (sub) sub.textContent = visible + ' ' + _catLabel(filter);
 
     // Leerzustand anzeigen
     if (visible === 0 && !document.getElementById('wardrobe-scan-hint')) {
-      var label = _filterLabels[filter] || filter;
+      var label = _catLabel(filter);
       emptyEl = document.createElement('div');
       emptyEl.id = 'wardrobe-filter-empty';
       emptyEl.style.cssText = 'grid-column:1/-1;text-align:center;padding:40px 16px 16px;';
@@ -2614,19 +2635,11 @@
   function _updateWardrobeSubtitle() {
     var q = (document.getElementById('schrank-search') || {}).value || '';
     if (q.trim()) { _schrankSearch(q); return; }
-    var activeChip = document.querySelector('.chip-row .chip.active');
+    var activeChip = document.querySelector('#schrank-chips .chip.active');
     if (activeChip) filterChip(activeChip);
   }
 
-  // Erweiterter Suchtext je Kategorie (für "Schuh" → findet schuhe-Karten)
-  var _catSearchText = {
-    tops: 'top tops shirt hemd bluse pullover hoodie oberteil',
-    hosen: 'hose hosen jeans chino jogginghose shorts rock',
-    kleider: 'kleid kleider dress',
-    schuhe: 'schuh schuhe sneaker stiefel sandalen boot pumps',
-    jacken: 'jacke jacken mantel coat blazer parka windbreaker bomberjacke trenchcoat',
-    accessoires: 'accessoire accessoires sonnenbrille brille uhr tasche schal schmuck'
-  };
+  // Erweiterter Suchtext je Kategorie kommt aus _catSearchText() in ai.js
 
   function _schrankSearch(query) {
     var q = query.trim().toLowerCase();
@@ -2646,7 +2659,7 @@
 
     if (!q) {
       // Suche leer → aktiven Chip-Filter anwenden
-      var activeChip = document.querySelector('.chip-row .chip.active');
+      var activeChip = document.querySelector('#schrank-chips .chip.active');
       if (activeChip) filterChip(activeChip);
       return;
     }
@@ -2663,7 +2676,7 @@
         (card.querySelector('.cloth-brand')?.textContent || '').toLowerCase(),
         (card.querySelector('.season-tag')?.textContent || '').toLowerCase(),
         cat,
-        (_catSearchText[cat] || '')
+        _catSearchText(cat)
       ].join(' ');
 
       var matches = words.every(function(w) { return searchText.includes(w); });
@@ -2770,7 +2783,7 @@
     var clearBtn = document.getElementById('schrank-search-clear');
     if (clearBtn) clearBtn.style.display = 'none';
     // Chip-Filter wiederherstellen
-    var activeChip = document.querySelector('.chip-row .chip.active');
+    var activeChip = document.querySelector('#schrank-chips .chip.active');
     if (activeChip) filterChip(activeChip);
   }
 

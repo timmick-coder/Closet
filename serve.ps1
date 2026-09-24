@@ -1,4 +1,4 @@
-$port = 8080
+$port = if ($env:PORT) { [int]$env:PORT } else { 8080 }
 $root = $PSScriptRoot
 
 # Parse .env

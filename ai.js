@@ -218,7 +218,9 @@ async function _callGeminiAPI(body) {
 }
 
 async function analyzeClothingWithGemini(base64, mimeType) {
-  const prompt = 'Du bist ein Mode-Experte. Analysiere das Kleidungsstück auf diesem Bild und antworte NUR mit einem validen JSON-Objekt (kein Markdown, keine Erklärung, kein Text außerhalb des JSON):\n{\n  "name": "Name des Kleidungsstücks auf Deutsch",\n  "brand": "Marke falls erkennbar, sonst leerer String",\n  "type": "Kategorie auf Deutsch (z.B. Top, Hose, Kleid, Schuh, Accessoire, Jacke)",\n  "color": "Hauptfarbe auf Deutsch",\n  "colorHex": "Hex-Farbcode der Hauptfarbe",\n  "season": "Saison auf Deutsch (Sommer | Winter | Frühling | Ganzjährig)",\n  "seasonClass": "s-sommer | s-winter | s-fruhjahr | s-ganzjahrig",\n  "style": "Stil auf Deutsch (z.B. Casual, Business, Sportlich, Elegant)",\n  "emoji": "Ein einzelnes passendes Emoji"\n}';
+  const cats = _loadCategories();
+  const catList = cats.map(function(c) { return c.id + ' = ' + c.label; }).join(', ');
+  const prompt = 'Du bist ein Mode-Experte. Analysiere das Kleidungsstück auf diesem Bild und antworte NUR mit einem validen JSON-Objekt (kein Markdown, keine Erklärung, kein Text außerhalb des JSON):\n{\n  "name": "Name des Kleidungsstücks auf Deutsch",\n  "brand": "Marke falls erkennbar, sonst leerer String",\n  "type": "Kleidungsart auf Deutsch (z.B. Top, Hose, Kleid, Schuh, Accessoire, Jacke)",\n  "category": "ID der passendsten Schrank-Kategorie aus dieser Liste: ' + catList + ' – oder leerer String, wenn keine passt",\n  "color": "Hauptfarbe auf Deutsch",\n  "colorHex": "Hex-Farbcode der Hauptfarbe",\n  "season": "Saison auf Deutsch (Sommer | Winter | Frühling | Ganzjährig)",\n  "seasonClass": "s-sommer | s-winter | s-fruhjahr | s-ganzjahrig",\n  "style": "Stil auf Deutsch (z.B. Casual, Business, Sportlich, Elegant)",\n  "emoji": "Ein einzelnes passendes Emoji"\n}';
   const body = {
     contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }]
   };
@@ -735,7 +737,12 @@ function showScanOverlay(state, data) {
       var set = function(id, val) { var e = document.getElementById(id); if (e) e.value = val || ''; };
       set('scan-edit-name', data.name);
       set('scan-edit-brand', data.brand);
-      set('scan-edit-type', data.type);
+      // Kategorie: KI-Vorschlag, sonst per Schlüsselwort raten
+      var catSelect = document.getElementById('scan-edit-category');
+      if (catSelect) {
+        var catId = (data.category && _catById(data.category)) ? data.category : _guessCategory(data);
+        catSelect.innerHTML = _categoryOptionsHtml(catId);
+      }
       set('scan-edit-color', data.color);
       set('scan-edit-style', data.style);
       var dot = document.getElementById('scan-result-color-dot');
@@ -775,7 +782,8 @@ async function confirmScanItem() {
   try {
     var name = (document.getElementById('scan-edit-name').value || '').trim() || _scanResult.name;
     var brand = (document.getElementById('scan-edit-brand').value || '').trim();
-    var type = (document.getElementById('scan-edit-type').value || '').trim() || _scanResult.type;
+    var type = _scanResult.type || '';
+    var category = (document.getElementById('scan-edit-category') || {}).value || '';
     var color = (document.getElementById('scan-edit-color').value || '').trim() || _scanResult.color;
     var style = (document.getElementById('scan-edit-style').value || '').trim() || _scanResult.style;
     var seasonRaw = document.getElementById('scan-edit-season').value || 'Ganzjährig|s-ganzjahrig';
@@ -784,7 +792,7 @@ async function confirmScanItem() {
     var storedImage = await _compressForStorage(_scanResult.imageDataUrl || '');
     var item = {
       id: _scanResult.id || ('item_' + Date.now()),
-      name: name, brand: brand, type: type, color: color,
+      name: name, brand: brand, type: type, category: category, color: color,
       colorHex: _scanResult.colorHex || '#888',
       season: seasonParts[0], seasonClass: seasonParts[1] || 's-ganzjahrig',
       style: style, emoji: _scanResult.emoji || '👕',
@@ -803,16 +811,277 @@ async function confirmScanItem() {
 }
 function cancelScan() { hideScanOverlay(); _scanResult = null; }
 
-// ── Kategorie aus Kleidungstyp ableiten ───────────────────────────────────────
-function _wardrobeCategory(item) {
-  var type = (item.type || '').toLowerCase().trim();
-  var name = (item.name || '').toLowerCase();
-  if (type === 'hose' || /\b(hose|jeans|chino|joggin|short|shorts|rock|röcke|legging)\b/.test(name)) return 'hosen';
-  if (type === 'kleid' || /\b(kleid|kleider|dress)\b/.test(name)) return 'kleider';
-  if (type === 'schuh' || /\b(schuh|sneaker|stiefel|sandal|boot|pumps|slipper|loafer)\b/.test(name)) return 'schuhe';
-  if (type === 'accessoire' || /\b(sonnenbrille|brille|uhr|tasche|schal|schmuck|gürtel|handschuh|hut|mütze|kappe|kette|ring|armband)\b/.test(name)) return 'accessoires';
-  if (type === 'jacke' || /\b(jacke|mantel|coat|blazer|parka|windbreaker|bomberjacke|trenchcoat)\b/.test(name)) return 'jacken';
-  return 'tops';
+// ── Schrank-Kategorien (vom Nutzer frei wählbar) ─────────────────────────────
+// Nutzer kann Kategorien hinzufügen/entfernen (z. B. "Kleider" nur bei Bedarf),
+// statt nach dem Geschlecht zu fragen. Jedes Teil speichert seine Kategorie-ID
+// in item.category; '' bzw. unbekannte ID = "Ohne Kategorie".
+var _CAT_STORAGE_KEY = 'stylesync_categories';
+var _DEFAULT_CATEGORIES = [
+  { id: 'tshirts',     label: 'T-Shirts',    emoji: '👕' },
+  { id: 'hemden',      label: 'Hemden',      emoji: '👔' },
+  { id: 'pullover',    label: 'Pullover',    emoji: '🧶' },
+  { id: 'jacken',      label: 'Jacken',      emoji: '🧥' },
+  { id: 'hosen',       label: 'Hosen',       emoji: '👖' },
+  { id: 'schuhe',      label: 'Schuhe',      emoji: '👟' },
+  { id: 'accessoires', label: 'Accessoires', emoji: '🧢' }
+];
+// Vorschläge zum schnellen Hinzufügen
+var _CATEGORY_SUGGESTIONS = [
+  { id: 'kleider',   label: 'Kleider',        emoji: '👗' },
+  { id: 'roecke',    label: 'Röcke',          emoji: '🩰' },
+  { id: 'blusen',    label: 'Blusen',         emoji: '👚' },
+  { id: 'tops',      label: 'Tops',           emoji: '🎽' },
+  { id: 'hoodies',   label: 'Hoodies',        emoji: '🧥' },
+  { id: 'shorts',    label: 'Shorts',         emoji: '🩳' },
+  { id: 'sport',     label: 'Sportkleidung',  emoji: '🏃' },
+  { id: 'anzuege',   label: 'Anzüge',         emoji: '🤵' },
+  { id: 'sneaker',   label: 'Sneaker',        emoji: '👟' },
+  { id: 'stiefel',   label: 'Stiefel',        emoji: '👢' },
+  { id: 'taschen',   label: 'Taschen',        emoji: '👜' },
+  { id: 'schmuck',   label: 'Schmuck',        emoji: '💍' },
+  { id: 'kopf',      label: 'Mützen & Hüte',  emoji: '🧢' },
+  { id: 'bade',      label: 'Badesachen',     emoji: '🩱' }
+];
+// Schlüsselwörter für die automatische Zuordnung (Teilstring-Suche, damit auch
+// zusammengesetzte Wörter wie "Langarmhemd" oder "Strickpullover" passen)
+var _CATEGORY_KEYWORDS = {
+  tshirts:     't-shirt tshirt shirt tee longsleeve polo tanktop',
+  hemden:      'hemd button-down oxford flanell',
+  pullover:    'pullover pulli sweat strick hoodie kapuze cardigan',
+  jacken:      'jacke mantel coat blazer parka weste windbreaker anorak',
+  hosen:       'hose jeans chino jogger legging cargo',
+  schuhe:      'schuh sneaker stiefel boot sandal loafer pumps slipper timberland',
+  accessoires: 'mütze cap hut beanie schal gürtel tasche brille uhr kette ring armband handschuh accessoire',
+  kleider:     'kleid dress',
+  roecke:      'rock röcke skirt',
+  blusen:      'bluse',
+  tops:        'top crop tanktop',
+  hoodies:     'hoodie kapuze',
+  shorts:      'shorts short bermuda',
+  sport:       'sport trikot training funktions',
+  anzuege:     'anzug sakko',
+  sneaker:     'sneaker',
+  stiefel:     'stiefel boot timberland',
+  taschen:     'tasche rucksack beutel',
+  schmuck:     'kette ring armband ohrring schmuck',
+  kopf:        'mütze cap hut beanie',
+  bade:        'bikini badehose badeanzug'
+};
+
+function _loadCategories() {
+  try {
+    var raw = localStorage.getItem(_CAT_STORAGE_KEY);
+    if (raw) { var list = JSON.parse(raw); if (Array.isArray(list)) return list; }
+  } catch (e) {}
+  return _DEFAULT_CATEGORIES.slice();
+}
+function _storeCategories(list) {
+  localStorage.setItem(_CAT_STORAGE_KEY, JSON.stringify(list));
+}
+function _catById(id) {
+  return _loadCategories().find(function(c) { return c.id === id; }) || null;
+}
+function _catLabel(id) {
+  if (id === 'alle') return 'Artikel';
+  if (id === 'none') return 'Ohne Kategorie';
+  var c = _catById(id);
+  return c ? c.label : 'Artikel';
+}
+function _catSearchText(id) {
+  var c = _catById(id);
+  return ((c ? c.label : '') + ' ' + (_CATEGORY_KEYWORDS[id] || '')).toLowerCase();
+}
+
+// Beste passende Kategorie aus der Liste raten (spezifische vor allgemeinen)
+function _guessCategory(item, cats) {
+  cats = cats || _loadCategories();
+  var text = ((item.name || '') + ' ' + (item.type || '')).toLowerCase();
+  var best = null, bestLen = 0;
+  cats.forEach(function(c) {
+    // Längster Treffer gewinnt; der Kategorie-Name selbst (ohne Plural-Endung)
+    // zählt extra, damit eigene Kategorien wie "Westen" Vorrang vor "Jacken" haben
+    var words = (_CATEGORY_KEYWORDS[c.id] || '').split(' ').filter(Boolean)
+      .map(function(w) { return { w: w, score: w.length }; });
+    var stem = c.label.toLowerCase().replace(/(en|er|n|s|e)$/, '');
+    if (stem.length >= 3) words.push({ w: stem, score: stem.length + 2 });
+    words.forEach(function(k) {
+      if (text.indexOf(k.w) >= 0 && k.score > bestLen) { best = c.id; bestLen = k.score; }
+    });
+  });
+  return best || '';
+}
+
+// Kategorie-ID eines Teils ('none' = ohne Kategorie)
+function _itemCategory(item) {
+  if (item.category && _catById(item.category)) return item.category;
+  return 'none';
+}
+
+// Einmalig: Teile ohne category-Feld automatisch einsortieren
+function _migrateItemCategories() {
+  var items = loadWardrobe();
+  var cats = _loadCategories();
+  var changed = false;
+  items.forEach(function(it) {
+    if (it.category === undefined) { it.category = _guessCategory(it, cats); changed = true; }
+  });
+  if (changed) saveWardrobe(items);
+}
+
+function _addCategory(label, emoji, id) {
+  label = (label || '').trim();
+  if (!label) return null;
+  var cats = _loadCategories();
+  if (cats.some(function(c) { return c.label.toLowerCase() === label.toLowerCase(); })) {
+    _showToast('Kategorie „' + label + '" gibt es schon');
+    return null;
+  }
+  var sugg = _CATEGORY_SUGGESTIONS.find(function(s) { return s.label.toLowerCase() === label.toLowerCase(); });
+  var cat = { id: id || (sugg && sugg.id) || ('c_' + Date.now()), label: label, emoji: emoji || (sugg && sugg.emoji) || '🏷️' };
+  cats.push(cat);
+  _storeCategories(cats);
+  // Teile ohne Kategorie in die neue einsortieren, falls sie passen
+  var items = loadWardrobe(), moved = 0;
+  items.forEach(function(it) {
+    if (_itemCategory(it) === 'none' && _guessCategory(it, [cat]) === cat.id) { it.category = cat.id; moved++; }
+  });
+  if (moved) saveWardrobe(items);
+  return cat;
+}
+
+function _removeCategory(id) {
+  var cats = _loadCategories().filter(function(c) { return c.id !== id; });
+  _storeCategories(cats);
+  // Betroffene Teile neu einsortieren, sonst "Ohne Kategorie"
+  var items = loadWardrobe(), changed = false;
+  items.forEach(function(it) {
+    if (it.category === id) { it.category = _guessCategory(it, cats); changed = true; }
+  });
+  if (changed) saveWardrobe(items);
+}
+
+function _categoryCounts() {
+  var counts = {};
+  loadWardrobe().forEach(function(it) {
+    var c = _itemCategory(it);
+    counts[c] = (counts[c] || 0) + 1;
+  });
+  return counts;
+}
+
+// <option>-Liste für Kategorie-Auswahlfelder (Scan + Artikel-Detail)
+function _categoryOptionsHtml(selectedId) {
+  var cats = _loadCategories();
+  var html = cats.map(function(c) {
+    return '<option value="' + _escAttr(c.id) + '"' + (c.id === selectedId ? ' selected' : '') + '>' + c.emoji + ' ' + c.label + '</option>';
+  }).join('');
+  html += '<option value=""' + (!selectedId || selectedId === 'none' ? ' selected' : '') + '>Ohne Kategorie</option>';
+  return html;
+}
+
+// Chip-Leiste im Schrank: Alle + Kategorien (+ Ohne Kategorie) + Bearbeiten
+function _renderCategoryChips() {
+  var row = document.getElementById('schrank-chips');
+  if (!row) return;
+  var activeEl = row.querySelector('.chip.active');
+  var active = activeEl ? activeEl.getAttribute('data-filter') : 'alle';
+  var counts = _categoryCounts();
+  var cats = _loadCategories();
+  if (active !== 'alle' && active !== 'none' && !cats.some(function(c) { return c.id === active; })) active = 'alle';
+  if (active === 'none' && !counts.none) active = 'alle';
+  var chip = function(id, label) {
+    return '<div class="chip' + (id === active ? ' active' : '') + '" data-filter="' + _escAttr(id) + '" onclick="filterChip(this)">' + label + '</div>';
+  };
+  row.innerHTML = chip('alle', 'Alle')
+    + cats.map(function(c) { return chip(c.id, c.label); }).join('')
+    + (counts.none ? chip('none', 'Ohne Kategorie') : '')
+    + '<div class="chip chip-edit" onclick="_openCategoryManager()" aria-label="Kategorien bearbeiten">✎ Bearbeiten</div>';
+}
+
+// ── Kategorien verwalten (Bottom-Sheet) ─────────────────────────────────────
+var _catPendingRemove = null;
+function _openCategoryManager() {
+  _catPendingRemove = null;
+  var input = document.getElementById('cat-new-name');
+  if (input) input.value = '';
+  _renderCategoryManager();
+  var ov = document.getElementById('cat-modal-overlay');
+  if (ov) ov.classList.add('open');
+}
+function _closeCategoryManager() {
+  var ov = document.getElementById('cat-modal-overlay');
+  if (ov) ov.classList.remove('open');
+  _afterCategoryChange();
+}
+function _closeCategoryManagerOutside(e) {
+  if (e.target && e.target.id === 'cat-modal-overlay') _closeCategoryManager();
+}
+function _renderCategoryManager() {
+  var list = document.getElementById('cat-modal-list');
+  var sugg = document.getElementById('cat-modal-suggestions');
+  var cats = _loadCategories();
+  var counts = _categoryCounts();
+  if (list) {
+    list.innerHTML = cats.length === 0
+      ? '<div class="cat-empty">Noch keine Kategorien – füge unten welche hinzu.</div>'
+      : cats.map(function(c) {
+        var n = counts[c.id] || 0;
+        var pending = _catPendingRemove === c.id;
+        return '<div class="cat-row' + (pending ? ' pending' : '') + '">'
+          + '<div class="cat-row-emoji">' + c.emoji + '</div>'
+          + '<div class="cat-row-info"><div class="cat-row-name">' + c.label + '</div>'
+          + '<div class="cat-row-count">' + (pending && n
+              ? n + (n === 1 ? ' Teil wird' : ' Teile werden') + ' neu einsortiert'
+              : n + (n === 1 ? ' Teil' : ' Teile')) + '</div></div>'
+          + (pending
+              ? '<button class="cat-row-confirm" data-cat-remove="' + _escAttr(c.id) + '">Entfernen</button>'
+              : '<button class="cat-row-remove" data-cat-ask="' + _escAttr(c.id) + '" aria-label="Entfernen">✕</button>')
+          + '</div>';
+      }).join('');
+  }
+  if (sugg) {
+    var have = {};
+    cats.forEach(function(c) { have[c.label.toLowerCase()] = true; });
+    var avail = _CATEGORY_SUGGESTIONS.concat(_DEFAULT_CATEGORIES).filter(function(s) { return !have[s.label.toLowerCase()]; });
+    sugg.innerHTML = avail.map(function(s) {
+      return '<div class="chip cat-sugg" data-cat-add="' + _escAttr(s.label) + '">+ ' + s.emoji + ' ' + s.label + '</div>';
+    }).join('');
+    var label = document.getElementById('cat-modal-sugg-label');
+    if (label) label.style.display = avail.length ? '' : 'none';
+  }
+}
+function _categoryManagerClick(e) {
+  var ask = e.target.closest('[data-cat-ask]');
+  var rm = e.target.closest('[data-cat-remove]');
+  var add = e.target.closest('[data-cat-add]');
+  if (ask) {
+    var id = ask.getAttribute('data-cat-ask');
+    // Leere Kategorie sofort entfernen, sonst erst bestätigen lassen
+    if (!_categoryCounts()[id]) { _removeCategory(id); _catPendingRemove = null; }
+    else _catPendingRemove = id;
+    _renderCategoryManager();
+  } else if (rm) {
+    _removeCategory(rm.getAttribute('data-cat-remove'));
+    _catPendingRemove = null;
+    _renderCategoryManager();
+  } else if (add) {
+    if (_addCategory(add.getAttribute('data-cat-add'))) _renderCategoryManager();
+  } else if (_catPendingRemove && !e.target.closest('.cat-row')) {
+    _catPendingRemove = null;
+    _renderCategoryManager();
+  }
+}
+function _addCategoryFromInput() {
+  var input = document.getElementById('cat-new-name');
+  if (!input) return;
+  if (_addCategory(input.value)) { input.value = ''; _renderCategoryManager(); }
+  else if (!input.value.trim()) input.focus();
+}
+// Schrank-Grid + Chips nach Änderungen aktualisieren
+function _afterCategoryChange() {
+  renderWardrobeGrid();
+  _renderCategoryChips();
+  if (typeof _updateWardrobeSubtitle === 'function') _updateWardrobeSubtitle();
 }
 
 // ── Item Detail Panel ─────────────────────────────────────────────────────────
@@ -877,8 +1146,8 @@ function _populateItemDetail(item) {
   setVal('idp-e-brand', item.brand || '');
   // Selects
   var seasonMap = { 'Sommer':'Sommer|s-sommer','Winter':'Winter|s-winter','Frühling':'Frühling|s-fruhjahr','Ganzjährig':'Ganzjährig|s-ganzjahrig' };
-  var typeEl = document.getElementById('idp-e-type');
-  if (typeEl) typeEl.value = item.type || 'Top';
+  var catEl = document.getElementById('idp-e-category');
+  if (catEl) catEl.innerHTML = _categoryOptionsHtml(_itemCategory(item));
   var seasonEl = document.getElementById('idp-e-season');
   if (seasonEl) seasonEl.value = seasonMap[item.season] || 'Ganzjährig|s-ganzjahrig';
   var styleEl = document.getElementById('idp-e-style');
@@ -896,7 +1165,7 @@ function _populateItemDetail(item) {
       if (e.key === 'Enter') { e.preventDefault(); clone.blur(); }
     });
   });
-  var selectIds = ['idp-e-type', 'idp-e-season', 'idp-e-style'];
+  var selectIds = ['idp-e-category', 'idp-e-season', 'idp-e-style'];
   selectIds.forEach(function(id) {
     var el = document.getElementById(id);
     if (!el) return;
@@ -928,7 +1197,8 @@ function _saveItemField() {
   var seasonRaw = (document.getElementById('idp-e-season') || {}).value || 'Ganzjährig|s-ganzjahrig';
   var seasonParts = seasonRaw.split('|');
   var newName = ((document.getElementById('idp-e-name') || {}).value || '').trim() || item.name;
-  var newType = (document.getElementById('idp-e-type') || {}).value || item.type;
+  var catEl = document.getElementById('idp-e-category');
+  var newCategory = catEl ? catEl.value : (item.category || '');
   var newColor = ((document.getElementById('idp-e-color') || {}).value || '').trim() || item.color;
   var newColorHex = (document.getElementById('idp-e-colorhex') || {}).value || item.colorHex;
   var newBrand = ((document.getElementById('idp-e-brand') || {}).value || '').trim();
@@ -936,16 +1206,16 @@ function _saveItemField() {
   var newSeasonClass = seasonParts[1] || 's-ganzjahrig';
   var newStyle = (document.getElementById('idp-e-style') || {}).value || item.style;
   // Only save if something changed
-  var changed = newName !== (item.name || '') || newType !== (item.type || '') ||
+  var changed = newName !== (item.name || '') || newCategory !== (item.category || '') ||
     newColor !== (item.color || '') || newColorHex !== (item.colorHex || '') ||
     newBrand !== (item.brand || '') || newSeason !== (item.season || '') || newStyle !== (item.style || '');
   if (!changed) return;
   items[idx] = Object.assign({}, item, {
-    name: newName, type: newType, color: newColor, colorHex: newColorHex,
+    name: newName, category: newCategory, color: newColor, colorHex: newColorHex,
     brand: newBrand, season: newSeason, seasonClass: newSeasonClass, style: newStyle
   });
   saveWardrobe(items);
-  renderWardrobeGrid();
+  _afterCategoryChange();
   var titleEl = document.getElementById('idp-view-title');
   if (titleEl) titleEl.textContent = newName;
   _showToast('✅ Gespeichert');
@@ -1020,7 +1290,7 @@ function _renderWardrobeCard(item, imgDataUrl, grid) {
   card.style.cursor = 'pointer';
   card.setAttribute('data-item-id', String(item.id || item.name));
   card.onclick = (function(id) { return function() { _openItemDetail(id); }; })(item.id);
-  card.setAttribute('data-category', _wardrobeCategory(item));
+  card.setAttribute('data-category', _itemCategory(item));
   var brandLine = item.brand
     ? '<div class="cloth-brand" style="font-size:10px;color:var(--purple);font-weight:700;margin-bottom:3px;">' + item.brand + '</div>'
     : '';
@@ -1079,7 +1349,8 @@ function renderWardrobeGrid() {
       + 'style="margin-top:18px;background:var(--purple);color:white;border:none;border-radius:14px;padding:13px 28px;font-size:14px;font-weight:700;cursor:pointer;">Jetzt scannen</button>';
     grid.appendChild(hint);
   }
-  // Aktiven Filter neu anwenden + Anzahl aktualisieren
+  // Kategorie-Chips (inkl. "Ohne Kategorie") aktualisieren, dann Filter neu anwenden
+  _renderCategoryChips();
   if (typeof _updateWardrobeSubtitle === 'function') _updateWardrobeSubtitle();
 }
 
@@ -2595,16 +2866,23 @@ function _fabAction() {
 var _createOutfitSelected = {};
 
 var _createFilterCat = 'alle';
-var _createFilterMap = { tops:'Top', hosen:'Hose', kleider:'Kleid', schuhe:'Schuh', jacken:'Jacke', accessoires:'Accessoire' };
 
 function _openCreateOutfitPanel() {
   _createOutfitSelected = {};
   _createFilterCat = 'alle';
   var nameInput = document.getElementById('ki-create-name');
   if (nameInput) nameInput.value = '';
-  // reset chips
-  var chips = document.querySelectorAll('#ki-create-chips .chip');
-  chips.forEach(function(c) { c.classList.toggle('active', c.getAttribute('data-create-filter') === 'alle'); });
+  // Chips aus den Schrank-Kategorien des Nutzers bauen
+  var chipRow = document.getElementById('ki-create-chips');
+  if (chipRow) {
+    var chip = function(id, label, active) {
+      return '<div class="chip' + (active ? ' active' : '') + '" data-create-filter="' + _escAttr(id) + '" onclick="_filterCreateGrid(this)">' + label + '</div>';
+    };
+    var counts = _categoryCounts();
+    chipRow.innerHTML = chip('alle', 'Alle', true)
+      + _loadCategories().filter(function(c) { return counts[c.id]; }).map(function(c) { return chip(c.id, c.label); }).join('')
+      + (counts.none ? chip('none', 'Ohne Kategorie') : '');
+  }
   _renderCreateGrid('alle');
   var panel = document.getElementById('ki-create-outfit-panel');
   if (panel) panel.classList.add('active');
@@ -2614,9 +2892,7 @@ function _renderCreateGrid(filter) {
   var grid = document.getElementById('ki-create-grid');
   if (!grid) return;
   var all = loadWardrobe();
-  var items = filter === 'alle' ? all : all.filter(function(w) {
-    return (w.type || '').toLowerCase() === (_createFilterMap[filter] || '').toLowerCase();
-  });
+  var items = filter === 'alle' ? all : all.filter(function(w) { return _itemCategory(w) === filter; });
   if (items.length === 0) {
     grid.innerHTML = '<div style="text-align:center;padding:40px 20px;grid-column:1/-1;">'
       + '<div style="font-size:40px;">👗</div>'
@@ -4992,6 +5268,8 @@ document.addEventListener('DOMContentLoaded', function() {
   _idbMigrate();
   // Einmalig: Outfit-Teile entfernen, die nicht mehr im Schrank sind
   _pruneGhostOutfitItems();
+  // Bestehende Teile einmalig den Schrank-Kategorien zuordnen
+  _migrateItemCategories();
 
   _ensureAiStyles();
   renderWardrobeGrid();
