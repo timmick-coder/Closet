@@ -2545,6 +2545,13 @@
   }
 
   function navigateCenter() {
+    // Offene Unterseiten (Ordner, Outfit-Detail, Ergebnisse, ...) schliessen,
+    // damit ein erneuter Tap auf KI Styling immer zur Startseite zurückführt
+    if (typeof _closeCollection === 'function') _closeCollection();
+    if (typeof _closeOutfitDetail === 'function') _closeOutfitDetail();
+    if (typeof _closeCreateOutfitPanel === 'function') _closeCreateOutfitPanel();
+    if (typeof _closeKiResults === 'function') _closeKiResults();
+
     screens.forEach(s => document.getElementById(s).classList.remove('active'));
     document.getElementById('ki-styling').classList.add('active');
     document.querySelectorAll('.nav-item, .nav-center').forEach(n => n.classList.remove('active'));
