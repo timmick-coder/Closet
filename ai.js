@@ -1959,7 +1959,7 @@ function _renderColTabContent(name, tab, fits, inspos) {
 
 function _renderInspoCard(outfit, collectionName) {
   var id = _regOutfit(outfit);
-  var items = (outfit.items || []).slice(0, 5);
+  var items = [].concat(outfit.items || []).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); }).slice(0, 5);
   var itemsHtml = items.map(function(item) {
     return '<div class="outfit-chip-item"><span>' + (item.emoji || '👕') + '</span> ' + (item.name || '') + '</div>';
   }).join('');
@@ -2038,7 +2038,8 @@ function _showVersionPreview(outfit, originCol) {
   if (nameEl) nameEl.textContent = outfit.name || 'Meine Version';
   if (gridEl) gridEl.innerHTML = _makeOutfitBoard(outfit);
   if (itemsEl) {
-    var names = (outfit.items || []).map(function(i) { return i.emoji ? i.emoji + ' ' + i.name : i.name; });
+    var names = [].concat(outfit.items || []).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); })
+      .map(function(i) { return i.emoji ? i.emoji + ' ' + i.name : i.name; });
     itemsEl.textContent = names.join('  ·  ');
   }
   var overlay = document.getElementById('version-preview-overlay');
@@ -3332,7 +3333,7 @@ function _buildOwnFeedPostCard(post) {
     ? '<img class="own-post-feed-img" src="' + _escAttr(post.imageDataUrl) + '" alt="" />'
     : '<div class="own-post-feed-emoji">' + ((post.outfitItems && post.outfitItems[0]) ? (post.outfitItems[0].emoji || '✨') : '✨') + '</div>';
   var timeStr = _formatCommentTime(post.timestamp);
-  var itemsHtml = (post.outfitItems || []).slice(0, 5).map(function(it) {
+  var itemsHtml = [].concat(post.outfitItems || []).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); }).slice(0, 5).map(function(it) {
     var itemJson = _escAttr(JSON.stringify({ name: it.name, emoji: it.emoji, color: it.color, type: it.type, season: it.season }));
     return '<div class="outfit-chip-item" data-feed-item="' + itemJson + '"><span>' + (it.emoji || '👕') + '</span> ' + (it.name || '') + '</div>';
   }).join('');
@@ -3864,7 +3865,7 @@ function _openPostModal(outfitId) {
   // Tags aus Outfit
   var tagsWrap = document.getElementById('post-modal-tags');
   if (tagsWrap) {
-    var items = (outfit && outfit.items) ? outfit.items.slice(0, 6) : [];
+    var items = (outfit && outfit.items) ? [].concat(outfit.items).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); }).slice(0, 6) : [];
     tagsWrap.innerHTML = items.length > 0
       ? items.map(function(it) { return '<div class="post-tag-chip">' + (it.emoji || '👕') + ' ' + (it.name || '') + '</div>'; }).join('')
       : '<div style="font-size:13px;color:var(--text2);">Keine Tags vorhanden</div>';
@@ -3909,7 +3910,7 @@ function _openPostModalEdit(postId) {
 
   var tagsWrap = document.getElementById('post-modal-tags');
   if (tagsWrap) {
-    var items = post.outfitItems || [];
+    var items = [].concat(post.outfitItems || []).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); });
     tagsWrap.innerHTML = items.length > 0
       ? items.map(function(it) { return '<div class="post-tag-chip">' + (it.emoji || '👕') + ' ' + (it.name || '') + '</div>'; }).join('')
       : '<div style="font-size:13px;color:var(--text2);">Keine Tags vorhanden</div>';
@@ -4181,7 +4182,7 @@ function _openPostDetail(postId) {
     ? '<img class="post-detail-photo" src="' + _escAttr(post.imageDataUrl) + '" alt="" />'
     : '<div class="post-detail-emoji-bg">' + (post.outfitItems && post.outfitItems[0] ? (post.outfitItems[0].emoji || '✨') : '✨') + '</div>';
 
-  var tagsHtml = (post.outfitItems || []).slice(0, 6).map(function(it) {
+  var tagsHtml = [].concat(post.outfitItems || []).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); }).slice(0, 6).map(function(it) {
     return '<div class="post-tag-chip">' + (it.emoji || '👕') + ' ' + (it.name || '') + '</div>';
   }).join('');
 
