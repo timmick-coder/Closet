@@ -279,20 +279,69 @@ async function removeBackground(base64, mimeType) {
 }
 
 // ── Gemini: Outfits generieren ────────────────────────────────────────────────
+// Die KI bekommt jedes Schrank-Teil mit ID (T1, T2 …) und darf per JSON-Schema nur diese IDs
+// zurückgeben. Die Outfits werden danach aus den echten Schrank-Teilen zusammengesetzt –
+// so kann die KI keine Kleidung erfinden.
 async function generateOutfitsWithGemini(description, inspoContext, inspoImageBase64, inspoImageMime) {
-  const allItems = loadWardrobe().map(function(w) { return { name: w.name, type: w.type, emoji: w.emoji, color: w.color, season: w.season }; });
-  const wardrobeText = allItems.map(function(it, i) {
-    return (i + 1) + '. ' + it.emoji + ' ' + it.name + ' (' + it.type + ', ' + it.color + ', ' + it.season + ')';
+  const wardrobe = loadWardrobe();
+  if (wardrobe.length === 0) throw new Error('Füge zuerst Kleidung zu deinem Schrank hinzu!');
+  const byId = {};
+  const wardrobeText = wardrobe.map(function(w, i) {
+    const id = 'T' + (i + 1);
+    byId[id] = w;
+    return id + ': ' + (w.emoji || '') + ' ' + w.name + ' (' + [w.type, w.color, w.season, w.style].filter(Boolean).join(', ') + ')';
   }).join('\n');
-  const prompt = 'Du bist ein professioneller Mode-Stylist. Erstelle genau 3 komplette Outfit-Vorschlaege ausschliesslich aus den folgenden Kleidungsstuecken. Verwende keine anderen Teile und uebernimm die Artikelnamen exakt wie aufgelistet. Wenn der Schrank klein ist, duerfen sich Teile zwischen Outfits wiederholen und Outfits weniger Teile haben.\n\nSCHRANK DES NUTZERS:\n' + wardrobeText + '\n\nWUNSCH: ' + (description || 'Ein stylisches, passendes Outfit') + (inspoContext ? '\nINSPIRATION: ' + inspoContext : '') + (inspoImageBase64 ? '\n\nNutze das hochgeladene Bild als Stil-Inspiration.' : '') + '\n\nAntworte NUR mit einem validen JSON-Array (kein Text, kein Markdown):\n[\n  {\n    "name": "Outfit-Name auf Deutsch",\n    "style": "Stil-Kategorie auf Deutsch",\n    "match": 90,\n    "items": [{"emoji":"👕","name":"Artikelname"}],\n    "weather": "Wetterbeschreibung mit Temperatur auf Deutsch"\n  }\n]';
+
+  const prompt = 'Du bist ein professioneller Mode-Stylist. Erstelle bis zu 3 Outfit-Vorschlaege AUSSCHLIESSLICH aus dem Schrank des Nutzers. '
+    + 'Jedes Teil hat eine ID (z.B. T1). Gib pro Outfit nur die IDs der verwendeten Teile in "itemIds" an. '
+    + 'Erfinde keine Kleidung. Wenn fuer einen Wunsch ein Teil fehlt, lass es weg. '
+    + 'Teile duerfen in mehreren Outfits vorkommen; ein Outfit darf auch nur aus wenigen Teilen bestehen.\n\n'
+    + 'SCHRANK DES NUTZERS:\n' + wardrobeText
+    + '\n\nWUNSCH: ' + (description || 'Ein stylisches, passendes Outfit')
+    + (inspoContext ? '\nINSPIRATION: ' + inspoContext : '')
+    + (inspoImageBase64 ? '\n\nNutze das hochgeladene Bild nur als Stil-Inspiration – die Teile muessen trotzdem aus dem Schrank kommen.' : '');
+
   const parts = [{ text: prompt }];
   if (inspoImageBase64 && inspoImageMime) parts.push({ inline_data: { mime_type: inspoImageMime, data: inspoImageBase64 } });
-  const body = { contents: [{ parts: parts }] };
+  const body = {
+    contents: [{ parts: parts }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            name:    { type: 'STRING', description: 'Outfit-Name auf Deutsch' },
+            style:   { type: 'STRING', description: 'Stil-Kategorie auf Deutsch' },
+            match:   { type: 'INTEGER', description: 'Passgenauigkeit 0-100' },
+            weather: { type: 'STRING', description: 'Wetterbeschreibung mit Temperatur auf Deutsch' },
+            itemIds: { type: 'ARRAY', items: { type: 'STRING', enum: Object.keys(byId) } }
+          },
+          required: ['name', 'itemIds']
+        }
+      }
+    }
+  };
+
   const data = await _callGeminiAPI(body);
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const jsonStr = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-  try { return JSON.parse(jsonStr); }
+  let raw;
+  try { raw = JSON.parse(text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()); }
   catch { throw new Error('KI hat keine verwertbaren Outfits geliefert. Bitte erneut versuchen.'); }
+  if (!Array.isArray(raw)) raw = [raw];
+
+  // Nur echte Schrank-Teile übernehmen, Unbekanntes verwerfen
+  const outfits = raw.map(function(o) {
+    const seen = {};
+    const items = (o.itemIds || []).map(function(id) { return String(id).trim(); })
+      .filter(function(id) { return byId[id] && !seen[id] && (seen[id] = true); })
+      .map(function(id) { return { emoji: byId[id].emoji || '👕', name: byId[id].name }; });
+    return { name: o.name || 'Outfit', style: o.style || '', match: o.match || 90, weather: o.weather || '', items: items };
+  }).filter(function(o) { return o.items.length > 0; });
+
+  if (outfits.length === 0) throw new Error('KI konnte kein Outfit aus deinem Schrank zusammenstellen. Bitte erneut versuchen.');
+  return outfits;
 }
 
 // ── Crop Screen ───────────────────────────────────────────────────────────────
