@@ -320,6 +320,10 @@
       border-radius: 10px; background: var(--purple); color: #fff; border: 2px solid #0d1b2e;
       font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;
     }
+    .ki-folder-cover {
+      position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
+      background-size: cover; background-position: center;
+    }
     .ki-folder-name { width: 100%; text-align: center; font-size: 12px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .ordner-new {
       background: var(--card); border-radius: 18px;
@@ -2239,11 +2243,14 @@
   <div id="lp-sheet" class="lp-overlay" onclick="_lpOverlayClick(event)">
     <div class="lp-sheet">
       <div class="lp-sheet-label" id="lp-sheet-label"></div>
+      <button class="lp-btn" id="lp-btn-cover" onclick="_ctxChangeCover()" style="display:none;">🖼️ Bild ändern</button>
       <button class="lp-btn" onclick="_ctxMove()">📁 Verschieben</button>
       <button class="lp-btn lp-btn-delete" onclick="_ctxDelete()">🗑️ Löschen</button>
       <button class="lp-btn lp-btn-cancel" onclick="_closeContextMenu()">Abbrechen</button>
     </div>
   </div>
+
+  <input type="file" id="folder-cover-input" accept="image/*" style="display:none;" onchange="_onFolderCoverFileChange(event)">
 
   <!-- Folder Picker Sheet -->
   <div id="lp-picker" class="lp-overlay" onclick="_lpPickerOverlayClick(event)">

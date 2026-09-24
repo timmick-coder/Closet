@@ -1255,6 +1255,23 @@ function _getCollectionCount(name) {
   }).length;
 }
 
+// ── Ordner-Titelbilder (wie Instagram-Story-Highlights) ───────────────────────
+function _getCollectionCovers() {
+  try { return JSON.parse(localStorage.getItem('stylesync_collection_covers') || '{}'); }
+  catch (e) { return {}; }
+}
+function _setCollectionCover(name, dataUrl) {
+  var covers = _getCollectionCovers();
+  covers[name] = dataUrl;
+  try { localStorage.setItem('stylesync_collection_covers', JSON.stringify(covers)); } catch (e) {}
+}
+function _removeCollectionCover(name) {
+  var covers = _getCollectionCovers();
+  if (!covers[name]) return;
+  delete covers[name];
+  try { localStorage.setItem('stylesync_collection_covers', JSON.stringify(covers)); } catch (e) {}
+}
+
 function _saveOutfitToCollection(collectionName, outfit) {
   var id = outfit.id || _outfitId(outfit);
   var outfits = _loadOutfits();
@@ -2224,6 +2241,8 @@ function _renderKiOrdnerGrid() {
 
   if (section) section.style.display = entries.length === 0 ? 'none' : '';
 
+  var covers = _getCollectionCovers();
+
   // Ordner als runde Kreise in einer wischbaren Leiste (Outfits bleiben Foto-Kacheln im Grid)
   grid.innerHTML = entries.map(function(e) {
     // "💼 Business" → Emoji in den Kreis, Name darunter
@@ -2231,8 +2250,12 @@ function _renderKiOrdnerGrid() {
     var hasEmoji = m && !/[A-Za-zÄÖÜäöüß0-9]/.test(m[1]);
     var emoji = hasEmoji ? m[1] : '📁';
     var name = hasEmoji ? m[2] : e.label;
+    var cover = e.key !== '__favoriten__' ? covers[e.key] : null;
+    var circleContent = cover
+      ? '<div class="ki-folder-cover" style="background-image:url(\'' + cover + '\');"></div>'
+      : emoji;
     return '<div class="ki-folder" data-col-key="' + _escAttr(e.key) + '" onclick="_openCollection(\'' + _escAttr(e.key) + '\')">'
-      + '<div class="ki-folder-circle">' + emoji
+      + '<div class="ki-folder-circle">' + circleContent
       + '<span class="ki-folder-badge">' + e.count + '</span></div>'
       + '<div class="ki-folder-name">' + name + '</div>'
       + '</div>';
@@ -2244,8 +2267,10 @@ function _renderKiOrdnerGrid() {
 function _deleteCollection(name) {
   if (!name || name === '__favoriten__') return;
   var snapshots = _loadOutfits();
+  var coverSnapshot = _getCollectionCovers()[name] || null;
   _swipeUndoFn = function() {
     _storeOutfits(snapshots);
+    if (coverSnapshot) _setCollectionCover(name, coverSnapshot);
     _renderKiOrdnerGrid();
     _renderKiPills();
     _renderKiSavedSection();
@@ -2261,6 +2286,7 @@ function _deleteCollection(name) {
     return o;
   });
   _storeOutfits(outfits);
+  _removeCollectionCover(name);
   _renderKiOrdnerGrid();
   _renderKiPills();
   _renderKiSavedSection();
@@ -2274,6 +2300,8 @@ function _showContextMenu(target) {
   _ctxTarget = target;
   var label = document.getElementById('lp-sheet-label');
   if (label) label.textContent = target.name || '';
+  var coverBtn = document.getElementById('lp-btn-cover');
+  if (coverBtn) coverBtn.style.display = target.type === 'folder' ? '' : 'none';
   var sheet = document.getElementById('lp-sheet');
   if (sheet) sheet.classList.add('active');
 }
@@ -2303,6 +2331,33 @@ function _ctxMove() {
   _closeContextMenu();
   if (!_ctxTarget) return;
   _showFolderPicker();
+}
+
+var _coverTargetCol = null;
+
+function _ctxChangeCover() {
+  _closeContextMenu();
+  if (!_ctxTarget || _ctxTarget.type !== 'folder') { _ctxTarget = null; return; }
+  _coverTargetCol = _ctxTarget.colKey;
+  _ctxTarget = null;
+  var input = document.getElementById('folder-cover-input');
+  if (input) { input.value = ''; input.click(); }
+}
+
+function _onFolderCoverFileChange(e) {
+  var file = e.target.files && e.target.files[0];
+  var colKey = _coverTargetCol;
+  _coverTargetCol = null;
+  if (!file || !colKey) return;
+  var reader = new FileReader();
+  reader.onload = function() {
+    _compressForStorage(reader.result).then(function(dataUrl) {
+      _setCollectionCover(colKey, dataUrl);
+      _renderKiOrdnerGrid();
+      _showToast('✅ Ordnerbild geändert');
+    });
+  };
+  reader.readAsDataURL(file);
 }
 
 function _showFolderPicker() {
@@ -2378,6 +2433,7 @@ function _moveToCollection(targetCol) {
       }
     });
     _storeOutfits(outfits2);
+    _removeCollectionCover(t.colKey);
     _renderKiOrdnerGrid();
     _renderKiPills();
     _renderKiSavedSection();
