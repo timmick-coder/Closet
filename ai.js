@@ -989,12 +989,122 @@ function _renderCategoryChips() {
   var cats = _loadCategories();
   if (active !== 'alle' && active !== 'none' && !cats.some(function(c) { return c.id === active; })) active = 'alle';
   if (active === 'none' && !counts.none) active = 'alle';
-  var chip = function(id, label) {
-    return '<div class="chip' + (id === active ? ' active' : '') + '" data-filter="' + _escAttr(id) + '" onclick="filterChip(this)">' + label + '</div>';
+  var chip = function(id, label, sortable) {
+    return '<div class="chip' + (id === active ? ' active' : '') + '" data-filter="' + _escAttr(id) + '"'
+      + (sortable ? ' data-sort-id="' + _escAttr(id) + '"' : '') + ' onclick="filterChip(this)">' + label + '</div>';
   };
   row.innerHTML = chip('alle', 'Alle')
-    + cats.map(function(c) { return chip(c.id, c.label); }).join('')
+    + cats.map(function(c) { return chip(c.id, c.label, true); }).join('')
     + (counts.none ? chip('none', 'Ohne Kategorie') : '');
+  _makeSortable(row, 'x', _reorderCategories);
+}
+
+// Neue Reihenfolge speichern (ids = Kategorie-IDs in gewünschter Reihenfolge)
+function _reorderCategories(ids) {
+  var cats = _loadCategories();
+  var byId = {};
+  cats.forEach(function(c) { byId[c.id] = c; });
+  var sorted = ids.map(function(id) { return byId[id]; }).filter(Boolean);
+  cats.forEach(function(c) { if (sorted.indexOf(c) < 0) sorted.push(c); });
+  _storeCategories(sorted);
+  _renderCategoryChips();
+  if (document.getElementById('cat-modal-overlay').classList.contains('open')) _renderCategoryManager();
+}
+
+// ── Verschieben per Gedrückthalten (Kategorie-Chips + Kategorie-Liste) ──────
+// Elemente mit [data-sort-id] im container werden nach ~0,35 s Halten "angehoben"
+// und folgen dem Finger; bewegt man sich vorher, wird normal gescrollt.
+function _makeSortable(container, axis, onDone) {
+  if (!container || container._sortableInit) return;
+  container._sortableInit = true;
+  var HOLD_MS = 350, MOVE_TOL = 8;
+  var timer = null, dragEl = null, start = null, lastPos = null, justDragged = false;
+  var scroller = axis === 'x' ? container : (container.closest('.cat-sheet') || container.parentElement);
+
+  function pos(e) {
+    var p = e.touches ? e.touches[0] : e;
+    return { x: p.clientX, y: p.clientY };
+  }
+  function down(e) {
+    var el = e.target.closest('[data-sort-id]');
+    if (!el || !container.contains(el) || e.target.closest('button')) return;
+    if (e.type === 'mousedown' && e.button !== 0) return;
+    start = pos(e); lastPos = start;
+    timer = setTimeout(function() { lift(el); }, HOLD_MS);
+    document.addEventListener(e.touches ? 'touchmove' : 'mousemove', move, { passive: false });
+    document.addEventListener(e.touches ? 'touchend' : 'mouseup', up);
+    if (e.touches) document.addEventListener('touchcancel', up);
+  }
+  function lift(el) {
+    timer = null;
+    dragEl = el;
+    start = lastPos;
+    dragEl.classList.add('sort-dragging');
+    container.classList.add('sort-active');
+    if (navigator.vibrate) navigator.vibrate(30);
+  }
+  function move(e) {
+    var p = pos(e);
+    lastPos = p;
+    if (!dragEl) {
+      // Vor dem Anheben bewegt → normales Scrollen, kein Verschieben
+      if (timer && (Math.abs(p.x - start.x) > MOVE_TOL || Math.abs(p.y - start.y) > MOVE_TOL)) cleanup();
+      return;
+    }
+    e.preventDefault();
+    var d = axis === 'x' ? p.x - start.x : p.y - start.y;
+    // Mit Nachbarn tauschen, sobald die Mitte überschritten ist
+    var sibs = [].slice.call(container.querySelectorAll('[data-sort-id]'));
+    var idx = sibs.indexOf(dragEl);
+    var r = dragEl.getBoundingClientRect();
+    var before = axis === 'x' ? r.left : r.top;
+    var next = sibs[idx + 1], prev = sibs[idx - 1];
+    var mid = function(el) { var b = el.getBoundingClientRect(); return axis === 'x' ? b.left + b.width / 2 : b.top + b.height / 2; };
+    var edge = axis === 'x' ? r.left + d + r.width / 2 : r.top + d + r.height / 2;
+    if (next && edge > mid(next)) container.insertBefore(next, dragEl);
+    else if (prev && edge < mid(prev)) container.insertBefore(dragEl, prev);
+    // Startpunkt um die Layout-Verschiebung korrigieren, damit das Element am Finger bleibt
+    var r2 = dragEl.getBoundingClientRect();
+    var shift = (axis === 'x' ? r2.left : r2.top) - before;
+    if (axis === 'x') start.x += shift; else start.y += shift;
+    d = axis === 'x' ? p.x - start.x : p.y - start.y;
+    dragEl.style.transform = (axis === 'x' ? 'translateX(' : 'translateY(') + d + 'px) scale(1.05)';
+    // Am Rand automatisch weiterscrollen
+    if (scroller) {
+      var sb = scroller.getBoundingClientRect();
+      var c = axis === 'x' ? p.x : p.y, lo = axis === 'x' ? sb.left : sb.top, hi = axis === 'x' ? sb.right : sb.bottom;
+      var step = c < lo + 40 ? -8 : c > hi - 40 ? 8 : 0;
+      if (step) { if (axis === 'x') scroller.scrollLeft += step; else scroller.scrollTop += step; }
+    }
+  }
+  function up() {
+    var wasDragging = !!dragEl;
+    var ids = wasDragging ? [].slice.call(container.querySelectorAll('[data-sort-id]')).map(function(el) { return el.getAttribute('data-sort-id'); }) : null;
+    cleanup();
+    if (wasDragging) {
+      justDragged = true;
+      setTimeout(function() { justDragged = false; }, 50);
+      onDone(ids);
+    }
+  }
+  function cleanup() {
+    clearTimeout(timer); timer = null;
+    if (dragEl) { dragEl.classList.remove('sort-dragging'); dragEl.style.transform = ''; }
+    dragEl = null;
+    container.classList.remove('sort-active');
+    document.removeEventListener('touchmove', move);
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('touchend', up);
+    document.removeEventListener('touchcancel', up);
+    document.removeEventListener('mouseup', up);
+  }
+  container.addEventListener('touchstart', down, { passive: true });
+  container.addEventListener('mousedown', down);
+  container.addEventListener('contextmenu', function(e) { if (e.target.closest('[data-sort-id]')) e.preventDefault(); });
+  // Klick nach dem Verschieben nicht als Filter-Tipp werten
+  container.addEventListener('click', function(e) {
+    if (justDragged) { e.stopPropagation(); e.preventDefault(); }
+  }, true);
 }
 
 // ── Kategorien verwalten (Bottom-Sheet) ─────────────────────────────────────
@@ -1026,7 +1136,7 @@ function _renderCategoryManager() {
       : cats.map(function(c) {
         var n = counts[c.id] || 0;
         var pending = _catPendingRemove === c.id;
-        return '<div class="cat-row' + (pending ? ' pending' : '') + '">'
+        return '<div class="cat-row' + (pending ? ' pending' : '') + '" data-sort-id="' + _escAttr(c.id) + '">'
           + '<div class="cat-row-emoji">' + c.emoji + '</div>'
           + '<div class="cat-row-info"><div class="cat-row-name">' + c.label + '</div>'
           + '<div class="cat-row-count">' + (pending && n
@@ -1035,8 +1145,10 @@ function _renderCategoryManager() {
           + (pending
               ? '<button class="cat-row-confirm" data-cat-remove="' + _escAttr(c.id) + '">Entfernen</button>'
               : '<button class="cat-row-remove" data-cat-ask="' + _escAttr(c.id) + '" aria-label="Entfernen">✕</button>')
+          + '<div class="cat-row-grip" aria-hidden="true">⠿</div>'
           + '</div>';
       }).join('');
+    _makeSortable(list, 'y', _reorderCategories);
   }
   if (sugg) {
     var have = {};

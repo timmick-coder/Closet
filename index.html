@@ -381,6 +381,11 @@
     .cat-row-remove { width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(255,255,255,0.08); color: var(--text2); font-size: 14px; cursor: pointer; flex-shrink: 0; }
     .cat-row-confirm { border: none; background: #ff5a6e; color: #fff; border-radius: 10px; padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
     .cat-empty { font-size: 13px; color: var(--text2); text-align: center; padding: 14px 0; }
+    .cat-row-grip { color: var(--text2); font-size: 16px; opacity: 0.5; flex-shrink: 0; margin-left: -4px; }
+    /* Verschieben per Gedrückthalten */
+    [data-sort-id] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .sort-dragging { position: relative; z-index: 5; box-shadow: 0 10px 24px rgba(0,0,0,0.45); border-color: var(--purple) !important; transition: box-shadow 0.15s; }
+    .sort-active [data-sort-id]:not(.sort-dragging) { transition: transform 0.15s; }
     .cat-add-row { display: flex; gap: 8px; margin-top: 12px; }
     .cat-add-row .modal-input { margin-bottom: 0; flex: 1; min-width: 0; }
     .cat-add-btn { border: none; background: var(--purple); color: #fff; border-radius: 14px; padding: 0 16px; font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
@@ -2310,7 +2315,7 @@
         <div class="modal-title" style="margin:0;">Kategorien</div>
         <button class="cat-done-btn" onclick="_closeCategoryManager()">Fertig</button>
       </div>
-      <div class="cat-sheet-hint">Wähle selbst, welche Kategorien dein Schrank hat.</div>
+      <div class="cat-sheet-hint">Wähle selbst, welche Kategorien dein Schrank hat. Gedrückt halten und ziehen, um die Reihenfolge zu ändern.</div>
       <div id="cat-modal-list"></div>
       <div class="cat-add-row">
         <input class="modal-input" id="cat-new-name" placeholder="Neue Kategorie, z. B. Westen" maxlength="24"
