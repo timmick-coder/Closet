@@ -5428,6 +5428,7 @@ document.addEventListener('DOMContentLoaded', function() {
     { id: 'item-detail-panel',    close: function() { _closeItemDetail(); } },
     { id: 'ki-results-panel',       close: function() { _closeKiResults(); } },
     { id: 'ki-create-outfit-panel', close: function() { _closeCreateOutfitPanel(); } },
+    { id: 'ki-koffer-panel',        close: function() { _closeKofferPanel(); } },
     { id: 'ki-outfit-panel',        close: function() { _closeOutfitDetail(); } },
     { id: 'ki-collection-panel',    close: function() { _closeCollection(); } },
     { id: 'post-detail-panel',    close: function() { _closePostDetail(); } },
