@@ -2197,8 +2197,11 @@ function _renderKiOrdnerGrid() {
     return '<div class="ordner-card" data-col-key="' + _escAttr(e.key) + '" onclick="_openCollection(\'' + _escAttr(e.key) + '\')">'
       + '<div class="ordner-preview">' + cells + '</div>'
       + '<div class="ordner-info">'
+      + '<div class="ordner-info-text">'
       + '<div class="ordner-name">' + e.label + '</div>'
       + '<div class="ordner-count">' + e.count + (e.count === 1 ? ' Outfit' : ' Outfits') + '</div>'
+      + '</div>'
+      + '<div class="ordner-chevron">›</div>'
       + '</div></div>';
   }).join('');
 

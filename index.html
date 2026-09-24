@@ -304,6 +304,23 @@
     .ordner-info { padding: 10px 12px 12px; }
     .ordner-name { font-size: 13px; font-weight: 700; color: var(--text); font-family: 'Playfair Display', Georgia, serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .ordner-count { font-size: 11px; color: var(--text2); margin-top: 2px; font-weight: 500; }
+
+    /* KI Styling: Ordner optisch klar von Outfit-Kacheln abheben (blauer Akzent + Pfeil) */
+    #ki-ordner-grid .ordner-card {
+      background: linear-gradient(160deg, rgba(77,141,255,0.30) 0%, rgba(47,95,207,0.12) 100%);
+      border: 1px solid rgba(77,141,255,0.55);
+      box-shadow: 0 6px 18px rgba(47,95,207,0.28);
+    }
+    #ki-ordner-grid .ordner-preview { box-sizing: border-box; padding: 6px 6px 0; gap: 4px; }
+    #ki-ordner-grid .ordner-preview-cell { border-radius: 8px; overflow: hidden; background-color: rgba(13,27,46,0.55); }
+    #ki-ordner-grid .ordner-info { display: flex; align-items: center; gap: 8px; padding: 8px 10px 10px 12px; }
+    #ki-ordner-grid .ordner-info-text { flex: 1; min-width: 0; }
+    #ki-ordner-grid .ordner-count { color: var(--purple); font-weight: 700; }
+    #ki-ordner-grid .ordner-chevron {
+      flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--purple); color: #fff; font-size: 16px; font-weight: 700; line-height: 1;
+    }
     .ordner-new {
       background: var(--card); border-radius: 18px;
       box-shadow: var(--shadow); cursor: pointer;
