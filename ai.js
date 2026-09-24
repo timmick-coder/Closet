@@ -1650,16 +1650,28 @@ function _doRenameCollection(oldName, newName) {
   _showToast('✅ Name geändert!');
 }
 
-// ── 4-Bild-Gitter-Zellen ─────────────────────────────────────────────────────
-function _make4Cells(outfit) {
-  var items = (outfit.items || []).slice(0, 4);
-  return [0, 1, 2, 3].map(function(i) {
-    var item = items[i];
-    if (!item) return '<div class="col-grid-photo col-grid-empty"></div>';
+// ── Outfit-Board: Teile von Kopf bis Fuß, freigestellt übereinander ──────────
+var _BOARD_MAX = 4;
+function _makeOutfitBoard(outfit) {
+  var all = [].concat(outfit.items || []).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); });
+  var shown = all.slice(0, _BOARD_MAX);
+  var html = shown.map(function(item) {
     var photo = _findWardrobePhoto(item.name);
-    var style = photo ? 'background-image:url(\'' + photo + '\');background-size:cover;background-position:center;font-size:0;' : '';
-    return '<div class="col-grid-photo" style="' + style + '">' + (photo ? '' : (item.emoji || '👕')) + '</div>';
+    return '<div class="ob-item">'
+      + (photo ? '<img src="' + _escAttr(photo) + '" alt="" draggable="false">' : '<span class="ob-emoji">' + (item.emoji || '👕') + '</span>')
+      + '</div>';
   }).join('');
+  if (all.length > _BOARD_MAX) html += '<span class="ob-more">+' + (all.length - _BOARD_MAX) + '</span>';
+  return html;
+}
+
+// Name + "N Teile" für den Kachel-Footer
+function _outfitTitle(outfit) {
+  var n = (outfit.items || []).length;
+  return '<div class="col-grid-title">'
+    + '<div class="col-grid-name">' + (outfit.name || 'Outfit') + '</div>'
+    + '<div class="col-grid-sub">' + n + (n === 1 ? ' Teil' : ' Teile') + '</div>'
+    + '</div>';
 }
 
 // ── renderKiOutfits (KI-Vorschläge rendern) ───────────────────────────────────
@@ -1670,13 +1682,13 @@ function renderKiOutfits(outfits) {
   container.innerHTML = '<div class="ki-col-grid">' + outfits.map(function(outfit) {
     var id = _regOutfit(outfit);
     var fav = _isFav(id);
-    var cells = _make4Cells(outfit);
+    var cells = _makeOutfitBoard(outfit);
     return '<div class="swipe-wrapper col-wrap-grid" data-swipe-id="' + _escAttr(id) + '" data-swipe-type="suggestion" data-swipe-name="' + _escAttr(outfit.name || 'Outfit') + '">'
             + '<div class="swipe-inner col-grid-card">'
       + '<div class="col-grid-preview">' + cells + '</div>'
       + '<div class="col-grid-footer" style="flex-direction:column;align-items:stretch;gap:6px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;">'
-      + '<div class="col-grid-name">' + (outfit.name || 'Outfit') + '</div>'
+      + _outfitTitle(outfit)
       + '<button class="col-grid-heart heart-btn" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
       + '</div>'
       + '<button class="outfit-save-btn" onclick="_openSaveModal(\'' + id + '\')" style="height:30px;font-size:12px;margin:0;border-radius:10px;">💾 Speichern</button>'
@@ -1885,7 +1897,7 @@ function _showVersionPreview(outfit, originCol) {
   var gridEl = document.getElementById('version-preview-grid');
   var itemsEl = document.getElementById('version-preview-items');
   if (nameEl) nameEl.textContent = outfit.name || 'Meine Version';
-  if (gridEl) gridEl.innerHTML = _make4Cells(outfit);
+  if (gridEl) gridEl.innerHTML = _makeOutfitBoard(outfit);
   if (itemsEl) {
     var names = (outfit.items || []).map(function(i) { return i.emoji ? i.emoji + ' ' + i.name : i.name; });
     itemsEl.textContent = names.join('  ·  ');
@@ -2003,21 +2015,13 @@ function _closeCollection() {
 function _renderCollectionCard(outfit, collectionName) {
   var id = _regOutfit(outfit);
   var fav = _isFav(id);
-  var items = (outfit.items || []).slice(0, 4);
-
-  var cells = [0, 1, 2, 3].map(function(i) {
-    var item = items[i];
-    if (!item) return '<div class="col-grid-photo col-grid-empty"></div>';
-    var photo = _findWardrobePhoto(item.name);
-    var style = photo ? 'background-image:url(\'' + photo + '\');background-size:cover;background-position:center;font-size:0;' : '';
-    return '<div class="col-grid-photo" style="' + style + '">' + (photo ? '' : (item.emoji || '👕')) + '</div>';
-  }).join('');
+  var cells = _makeOutfitBoard(outfit);
 
   return '<div class="swipe-wrapper col-wrap-grid" data-swipe-id="' + _escAttr(id) + '" data-swipe-type="collection" data-swipe-col="' + _escAttr(collectionName) + '" data-swipe-name="' + _escAttr(outfit.name || 'Outfit') + '">'
         + '<div class="swipe-inner col-grid-card" data-col-id="' + _escAttr(id) + '" data-col-name="' + _escAttr(collectionName) + '">'
     + '<div class="col-grid-preview">' + cells + '</div>'
     + '<div class="col-grid-footer">'
-    + '<div class="col-grid-name">' + (outfit.name || 'Outfit') + '</div>'
+    + _outfitTitle(outfit)
     + '<button class="col-grid-heart" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
     + '</div>'
     + '</div></div>';
@@ -2544,12 +2548,12 @@ function _renderKiSavedSection() {
     var id = _regOutfit(outfit);
     _savedCardRegistry[id] = { collection: (outfit.kollektionen || [])[0] || '__all__' };
     var fav = _isFav(id);
-    var cells = _make4Cells(outfit);
+    var cells = _makeOutfitBoard(outfit);
     return '<div class="swipe-wrapper col-wrap-grid" data-swipe-id="' + _escAttr(id) + '" data-swipe-type="saved" data-swipe-name="' + _escAttr(outfit.name || 'Outfit') + '">'
             + '<div class="swipe-inner col-grid-card" data-saved-id="' + _escAttr(id) + '">'
       + '<div class="col-grid-preview">' + cells + '</div>'
       + '<div class="col-grid-footer">'
-      + '<div class="col-grid-name">' + (outfit.name || 'Outfit') + '</div>'
+      + _outfitTitle(outfit)
       + '<button class="col-grid-heart" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
       + '</div>'
       + '</div></div>';
@@ -2700,11 +2704,11 @@ function _renderPreviewSuggestions(collectionFilter) {
   container.innerHTML = '<div class="ki-col-grid">' + picks.map(function(outfit) {
     var id = _regOutfit(outfit);
     var fav = _isFav(id);
-    var cells = _make4Cells(outfit);
+    var cells = _makeOutfitBoard(outfit);
     return '<div class="col-grid-card" data-saved-id="' + _escAttr(id) + '" style="cursor:pointer;">'
       + '<div class="col-grid-preview">' + cells + '</div>'
       + '<div class="col-grid-footer">'
-      + '<div class="col-grid-name">' + (outfit.name || 'Outfit') + '</div>'
+      + _outfitTitle(outfit)
       + '<button class="col-grid-heart" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
       + '</div>'
       + '</div>';
@@ -5557,7 +5561,7 @@ function _renderKofferOutfits() {
 
   grid.innerHTML = outfits.map(function(outfit) {
     var id = outfit.id || _outfitId(outfit);
-    var cells = _make4Cells(outfit);
+    var cells = _makeOutfitBoard(outfit);
     var selected = !!_kofferSelectedOutfits[id];
     var match = _kofferOutfitMatch(outfit);
     var badge = match ? '<div class="koffer-weather-badge ' + match + '">' + _kofferMatchLabel(match) + '</div>' : '';

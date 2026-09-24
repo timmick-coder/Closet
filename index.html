@@ -474,12 +474,21 @@
     .col-wrap-grid { min-width:0; }
     .col-grid-card { min-width:0; background:#0e2240; border-radius:16px; overflow:hidden; cursor:pointer; transition:transform 0.15s; border:1px solid rgba(255,255,255,0.12); -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
     .col-grid-card:active { transform:scale(0.97); }
-    /* Vorschau selbst ist quadratisch, die 4 Zellen teilen sie gleichmäßig – unabhängig davon ob Foto oder Emoji */
-    .col-grid-preview { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); grid-template-rows:repeat(2, minmax(0,1fr)); aspect-ratio:1; gap:2px; background:rgba(0,0,0,0.25); }
-    .col-grid-photo { display:flex; align-items:center; justify-content:center; min-width:0; min-height:0; font-size:22px; line-height:1; background:rgba(255,255,255,0.06); background-size:cover; background-position:center; overflow:hidden; }
-    .col-grid-empty { background:rgba(255,255,255,0.03); }
-    .col-grid-footer { padding:8px 10px 10px; display:flex; align-items:center; justify-content:space-between; gap:4px; }
-    .col-grid-name { font-size:12px; font-weight:800; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; font-family:'Playfair Display',Georgia,serif; }
+    /* Outfit-Board: Teile von Kopf bis Fuß übereinander, ganz sichtbar (contain) auf weichem Verlauf */
+    .col-grid-preview {
+      position:relative; aspect-ratio:4/5; box-sizing:border-box;
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+      padding:12px 14px;
+      background:radial-gradient(ellipse at 50% 35%, #2a4f80 0%, #17325a 55%, #0e2240 100%);
+    }
+    .ob-item { flex:1 1 0; min-height:0; width:100%; display:flex; align-items:center; justify-content:center; }
+    .ob-item img { max-width:100%; max-height:100%; object-fit:contain; filter:drop-shadow(0 4px 8px rgba(0,0,0,0.35)); -webkit-user-drag:none; pointer-events:none; }
+    .ob-emoji { font-size:30px; line-height:1; filter:drop-shadow(0 3px 6px rgba(0,0,0,0.3)); }
+    .ob-more { position:absolute; right:8px; bottom:8px; padding:2px 7px; border-radius:10px; background:rgba(13,27,46,0.75); color:var(--text); font-size:11px; font-weight:800; }
+    .col-grid-footer { padding:9px 10px 10px 12px; display:flex; align-items:center; justify-content:space-between; gap:6px; }
+    .col-grid-title { flex:1; min-width:0; }
+    .col-grid-name { font-size:13px; font-weight:800; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:'Playfair Display',Georgia,serif; }
+    .col-grid-sub { font-size:11px; font-weight:600; color:var(--text2); margin-top:2px; }
     .col-grid-heart { background:none; border:none; font-size:16px; cursor:pointer; padding:0; flex-shrink:0; line-height:1; }
     .swipe-wrapper.col-wrap-grid { border-radius:16px; margin-bottom:0; }
 
