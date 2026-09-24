@@ -965,11 +965,50 @@ function _deleteItem() {
   if (!_currentItemId) return;
   idbDeleteImage(_currentItemId).catch(function() {});
   var items = loadWardrobe();
+  var deleted = items.find(function(i) { return i.id === _currentItemId; });
   var filtered = items.filter(function(i) { return i.id !== _currentItemId; });
   saveWardrobe(filtered);
+  if (deleted && deleted.name) _removeItemFromOutfits(deleted.name);
   renderWardrobeGrid();
   _closeItemDetail();
   _showToast('🗑️ Artikel gelöscht');
+}
+
+// Entfernt ein geloeschtes Schrank-Teil aus allen gespeicherten Outfits,
+// damit dort nicht dauerhaft ein Teil auftaucht, das gar nicht mehr existiert
+// (sieht sonst so aus, als haette die KI Kleidung erfunden). Outfits ohne
+// verbleibende echte Teile werden ebenfalls entfernt.
+function _removeItemFromOutfits(itemName) {
+  var outfits = _loadOutfits();
+  var changed = false;
+  var cleaned = outfits.map(function(o) {
+    var before = (o.items || []).length;
+    o.items = (o.items || []).filter(function(it) { return it.name !== itemName; });
+    if (o.items.length !== before) changed = true;
+    return o;
+  }).filter(function(o) { return o.isInspo || o.items.length > 0; });
+  if (changed) {
+    _storeOutfits(cleaned);
+    _renderKiPills();
+    _renderKiSavedSection();
+  }
+}
+
+// Einmalig beim Start: alte gespeicherte Outfits von Teilen befreien, die
+// laengst aus dem Schrank geloescht wurden (z.B. vor diesem Fix entstanden).
+function _pruneGhostOutfitItems() {
+  var wardrobeNames = {};
+  loadWardrobe().forEach(function(i) { if (i.name) wardrobeNames[i.name] = true; });
+  var outfits = _loadOutfits();
+  var changed = false;
+  var cleaned = outfits.map(function(o) {
+    if (o.isInspo) return o; // Inspo-Outfits zeigen bewusst fremde Teile
+    var before = (o.items || []).length;
+    o.items = (o.items || []).filter(function(it) { return wardrobeNames[it.name]; });
+    if (o.items.length !== before) changed = true;
+    return o;
+  }).filter(function(o) { return o.isInspo || o.items.length > 0; });
+  if (changed) _storeOutfits(cleaned);
 }
 
 
@@ -4950,6 +4989,8 @@ document.addEventListener('DOMContentLoaded', function() {
   _migrateOldData();
   // Bilder aus localStorage → IndexedDB migrieren
   _idbMigrate();
+  // Einmalig: Outfit-Teile entfernen, die nicht mehr im Schrank sind
+  _pruneGhostOutfitItems();
 
   _ensureAiStyles();
   renderWardrobeGrid();
@@ -4992,27 +5033,28 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // ── Event Delegation: Gespeicherte Outfit-Karten ──
-  var savedContainer = document.getElementById('ki-saved-outfits');
-  if (savedContainer) {
-    savedContainer.addEventListener('click', function(e) {
-      var heartBtn = e.target.closest('[data-heart-id]');
-      if (heartBtn) {
-        e.stopPropagation();
-        _toggleFav(heartBtn.getAttribute('data-heart-id'), heartBtn);
-        return;
+  // ── Event Delegation: Gespeicherte Outfit-Karten (+ Vorgeschlagene Outfits) ──
+  function _handleSavedCardClick(e) {
+    var heartBtn = e.target.closest('[data-heart-id]');
+    if (heartBtn) {
+      e.stopPropagation();
+      _toggleFav(heartBtn.getAttribute('data-heart-id'), heartBtn);
+      return;
+    }
+    var card = e.target.closest('[data-saved-id]');
+    if (card) {
+      var id = card.getAttribute('data-saved-id');
+      var outfit = _loadOutfits().find(function(o) { return o.id === id; });
+      if (outfit) {
+        var col = (_kiActivePill !== null) ? _kiActivePill : ((outfit.kollektionen || [])[0] || '__all__');
+        _openOutfitDetail(id, col);
       }
-      var card = e.target.closest('[data-saved-id]');
-      if (card) {
-        var id = card.getAttribute('data-saved-id');
-        var outfit = _loadOutfits().find(function(o) { return o.id === id; });
-        if (outfit) {
-          var col = (_kiActivePill !== null) ? _kiActivePill : ((outfit.kollektionen || [])[0] || '__all__');
-          _openOutfitDetail(id, col);
-        }
-      }
-    });
+    }
   }
+  var savedContainer = document.getElementById('ki-saved-outfits');
+  if (savedContainer) savedContainer.addEventListener('click', _handleSavedCardClick);
+  var previewContainer = document.getElementById('ki-preview-suggestions');
+  if (previewContainer) previewContainer.addEventListener('click', _handleSavedCardClick);
 
   // ── Event Delegation: KI-Vorschlag Karten anklicken → Detail öffnen ──
   var aiSugContainer = document.getElementById('ki-ai-suggestions');
