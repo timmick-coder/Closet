@@ -994,8 +994,7 @@ function _renderCategoryChips() {
   };
   row.innerHTML = chip('alle', 'Alle')
     + cats.map(function(c) { return chip(c.id, c.label); }).join('')
-    + (counts.none ? chip('none', 'Ohne Kategorie') : '')
-    + '<div class="chip chip-edit" onclick="_openCategoryManager()" aria-label="Kategorien bearbeiten">✎ Bearbeiten</div>';
+    + (counts.none ? chip('none', 'Ohne Kategorie') : '');
 }
 
 // ── Kategorien verwalten (Bottom-Sheet) ─────────────────────────────────────
@@ -1303,7 +1302,38 @@ function _renderWardrobeCard(item, imgDataUrl, grid) {
     + '<div class="cloth-color-row"><div class="color-dot" style="background:' + (item.colorHex || '#888') + ';"></div>'
     + '<span class="cloth-color-name">' + (item.color || '') + '</span></div>'
     + '<span class="season-tag ' + (item.seasonClass || 's-ganzjahrig') + '">' + (item.season || 'Ganzjährig') + '</span>';
+  _initCardLongPress(card);
   grid.insertBefore(card, grid.firstChild);
+}
+
+// Langes Drücken auf ein Teil startet die Mehrfachauswahl (mit diesem Teil markiert)
+function _initCardLongPress(card) {
+  var timer = null, fired = false, startX = 0, startY = 0;
+  function start(x, y) {
+    if (typeof _selectModeActive !== 'undefined' && _selectModeActive) return;
+    fired = false; startX = x; startY = y;
+    timer = setTimeout(function() {
+      fired = true;
+      if (navigator.vibrate) navigator.vibrate(40);
+      _enterSelectMode(card);
+    }, 500);
+  }
+  function cancel() { clearTimeout(timer); timer = null; }
+  card.addEventListener('touchstart', function(e) { var t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: true });
+  card.addEventListener('touchmove', function(e) {
+    var t = e.touches[0];
+    if (Math.abs(t.clientX - startX) > 8 || Math.abs(t.clientY - startY) > 8) cancel();
+  }, { passive: true });
+  card.addEventListener('touchend', cancel);
+  card.addEventListener('touchcancel', cancel);
+  card.addEventListener('mousedown', function(e) { start(e.clientX, e.clientY); });
+  card.addEventListener('mouseup', cancel);
+  card.addEventListener('mouseleave', cancel);
+  card.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+  // Klick direkt nach dem Long-Press nicht als "Detail öffnen/abwählen" werten
+  card.addEventListener('click', function(e) {
+    if (fired) { e.stopImmediatePropagation(); e.preventDefault(); fired = false; }
+  }, true);
 }
 
 function renderWardrobeGrid() {

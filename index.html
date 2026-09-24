@@ -366,7 +366,6 @@
     .modal-input:focus { border-color: var(--purple); }
 
     /* ── Schrank-Kategorien verwalten ── */
-    .chip.chip-edit { background: transparent; border-style: dashed; color: var(--purple); flex-shrink: 0; }
     /* Overlay endet über der Bottom-Nav → Sheet begrenzen und scrollbar machen */
     .cat-sheet { max-height: 92%; overflow-y: auto; box-sizing: border-box; scrollbar-width: none; }
     .cat-sheet::-webkit-scrollbar { display: none; }
@@ -1360,7 +1359,8 @@
           <div class="big-title">Mein Schrank</div>
           <div class="big-sub" id="schrank-sub">0 Artikel</div>
         </div>
-        <button id="schrank-select-btn" onclick="_toggleSelectMode()" style="background:none;border:none;color:var(--purple);font-size:14px;font-weight:700;cursor:pointer;padding:8px 4px;font-family:inherit;">Auswählen</button>
+        <!-- Bearbeiten = Kategorien verwalten; im Auswahl-Modus (Long-Press auf ein Teil) wird daraus "Abbrechen" -->
+        <button id="schrank-select-btn" onclick="_schrankHeaderBtn()" style="background:none;border:none;color:var(--purple);font-size:14px;font-weight:700;cursor:pointer;padding:8px 4px;font-family:inherit;">Bearbeiten</button>
       </div>
       <div class="scroll-content">
         <div class="search-wrap">
@@ -2713,11 +2713,13 @@
   var _selectModeActive = false;
   var _selectedItemIds = {};
 
-  function _toggleSelectMode() {
-    _selectModeActive ? _exitSelectMode() : _enterSelectMode();
+  // Header-Button: im Auswahl-Modus abbrechen, sonst Kategorien bearbeiten
+  function _schrankHeaderBtn() {
+    _selectModeActive ? _exitSelectMode() : _openCategoryManager();
   }
 
-  function _enterSelectMode() {
+  // firstCard: per Long-Press gedrücktes Teil, das direkt markiert wird
+  function _enterSelectMode(firstCard) {
     _selectModeActive = true;
     _selectedItemIds = {};
     var btn = document.getElementById('schrank-select-btn');
@@ -2737,6 +2739,7 @@
     });
     var bar = document.getElementById('schrank-delete-bar');
     if (bar) bar.classList.add('show');
+    if (firstCard) _toggleItemSelect(firstCard);
     _updateDeleteBar();
   }
 
@@ -2744,7 +2747,7 @@
     _selectModeActive = false;
     _selectedItemIds = {};
     var btn = document.getElementById('schrank-select-btn');
-    if (btn) btn.textContent = 'Auswählen';
+    if (btn) btn.textContent = 'Bearbeiten';
     var grid = document.getElementById('clothes-grid');
     if (grid) grid.classList.remove('select-mode');
     var bar = document.getElementById('schrank-delete-bar');
@@ -2777,8 +2780,15 @@
   function _deleteSelected() {
     var ids = Object.keys(_selectedItemIds);
     if (ids.length === 0) return;
-    var items = loadWardrobe().filter(function(i) { return !_selectedItemIds[String(i.id || i.name)]; });
+    var all = loadWardrobe();
+    var removed = all.filter(function(i) { return _selectedItemIds[String(i.id || i.name)]; });
+    var items = all.filter(function(i) { return !_selectedItemIds[String(i.id || i.name)]; });
     saveWardrobe(items);
+    // Wie beim Einzel-Löschen: Bilder und Outfit-Einträge mit aufräumen
+    removed.forEach(function(i) {
+      if (i.id) idbDeleteImage(i.id).catch(function() {});
+      if (i.name) _removeItemFromOutfits(i.name);
+    });
     _exitSelectMode();
     _showToast('🗑️ ' + ids.length + ' Artikel gelöscht');
   }
