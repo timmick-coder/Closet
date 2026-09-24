@@ -1236,7 +1236,26 @@ function _updateFavoritenCard() {
   }
 }
 
-// ── Kollektionen (abgeleitet aus kollektionen-Arrays) ─────────────────────────
+// ── Kollektionen (abgeleitet aus kollektionen-Arrays + manuell angelegte leere Ordner) ─
+function _getManualCollections() {
+  try { return JSON.parse(localStorage.getItem('stylesync_manual_collections') || '[]'); }
+  catch (e) { return []; }
+}
+function _addManualCollection(name) {
+  var list = _getManualCollections();
+  if (list.indexOf(name) < 0) {
+    list.push(name);
+    try { localStorage.setItem('stylesync_manual_collections', JSON.stringify(list)); } catch (e) {}
+  }
+}
+function _removeManualCollection(name) {
+  var list = _getManualCollections();
+  var idx = list.indexOf(name);
+  if (idx < 0) return;
+  list.splice(idx, 1);
+  try { localStorage.setItem('stylesync_manual_collections', JSON.stringify(list)); } catch (e) {}
+}
+
 function _getCollections() {
   // Liefert alle Kollektions-Namen (ohne __favoriten__), dedupliziert, stabil sortiert
   var outfits = _loadOutfits();
@@ -1246,6 +1265,7 @@ function _getCollections() {
       if (c !== '__favoriten__') seen[c] = true;
     });
   });
+  _getManualCollections().forEach(function(c) { seen[c] = true; });
   return Object.keys(seen);
 }
 
@@ -1253,6 +1273,20 @@ function _getCollectionCount(name) {
   return _loadOutfits().filter(function(o) {
     return (o.kollektionen || []).indexOf(name) >= 0;
   }).length;
+}
+
+function _createEmptyFolder() {
+  var name = prompt('Name des neuen Ordners:');
+  if (!name || !name.trim()) return;
+  name = name.trim();
+  if (_getCollections().indexOf(name) >= 0) {
+    _showToast('📁 Ordner "' + name + '" existiert bereits');
+    return;
+  }
+  _addManualCollection(name);
+  _renderKiOrdnerGrid();
+  _renderKiPills();
+  _showToast('✅ Ordner "' + name + '" erstellt');
 }
 
 // ── Ordner-Titelbilder (wie Instagram-Story-Highlights) ───────────────────────
@@ -2231,15 +2265,17 @@ function _renderKiOrdnerGrid() {
   var section = document.getElementById('ki-ordner-section');
   if (!grid) return;
 
+  var manualCols = _getManualCollections();
   var entries = [];
   var favCount = _loadFavs().length;
   if (favCount > 0) entries.push({ key: '__favoriten__', label: '❤️ Favoriten', count: favCount });
   _getCollections().forEach(function(name) {
     var count = _getCollectionCount(name);
-    if (count > 0) entries.push({ key: name, label: name, count: count });
+    // Manuell angelegte Ordner bleiben auch mit 0 Outfits sichtbar
+    if (count > 0 || manualCols.indexOf(name) >= 0) entries.push({ key: name, label: name, count: count });
   });
 
-  if (section) section.style.display = entries.length === 0 ? 'none' : '';
+  if (section) section.style.display = '';
 
   var covers = _getCollectionCovers();
 
@@ -2254,12 +2290,16 @@ function _renderKiOrdnerGrid() {
     var circleContent = cover
       ? '<div class="ki-folder-cover" style="background-image:url(\'' + cover + '\');"></div>'
       : emoji;
+    var badge = e.count > 0 ? '<span class="ki-folder-badge">' + e.count + '</span>' : '';
     return '<div class="ki-folder" data-col-key="' + _escAttr(e.key) + '" onclick="_openCollection(\'' + _escAttr(e.key) + '\')">'
-      + '<div class="ki-folder-circle">' + circleContent
-      + '<span class="ki-folder-badge">' + e.count + '</span></div>'
+      + '<div class="ki-folder-circle">' + circleContent + badge + '</div>'
       + '<div class="ki-folder-name">' + name + '</div>'
       + '</div>';
-  }).join('');
+  }).join('')
+    + '<div class="ki-folder" onclick="_createEmptyFolder()">'
+    + '<div class="ki-folder-circle ki-folder-circle-add">+</div>'
+    + '<div class="ki-folder-name">Neu</div>'
+    + '</div>';
 
   _initOrdnerLongPress(grid);
 }
@@ -2268,9 +2308,11 @@ function _deleteCollection(name) {
   if (!name || name === '__favoriten__') return;
   var snapshots = _loadOutfits();
   var coverSnapshot = _getCollectionCovers()[name] || null;
+  var wasManual = _getManualCollections().indexOf(name) >= 0;
   _swipeUndoFn = function() {
     _storeOutfits(snapshots);
     if (coverSnapshot) _setCollectionCover(name, coverSnapshot);
+    if (wasManual) _addManualCollection(name);
     _renderKiOrdnerGrid();
     _renderKiPills();
     _renderKiSavedSection();
@@ -2287,6 +2329,7 @@ function _deleteCollection(name) {
   });
   _storeOutfits(outfits);
   _removeCollectionCover(name);
+  _removeManualCollection(name);
   _renderKiOrdnerGrid();
   _renderKiPills();
   _renderKiSavedSection();
@@ -2434,6 +2477,7 @@ function _moveToCollection(targetCol) {
     });
     _storeOutfits(outfits2);
     _removeCollectionCover(t.colKey);
+    _removeManualCollection(t.colKey);
     _renderKiOrdnerGrid();
     _renderKiPills();
     _renderKiSavedSection();
