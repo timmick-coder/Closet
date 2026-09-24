@@ -338,7 +338,7 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
     const seen = {};
     const items = (o.itemIds || []).map(function(id) { return String(id).trim(); })
       .filter(function(id) { return byId[id] && !seen[id] && (seen[id] = true); })
-      .map(function(id) { return { emoji: byId[id].emoji || '👕', name: byId[id].name }; });
+      .map(function(id) { return { id: byId[id].id, emoji: byId[id].emoji || '👕', name: byId[id].name }; });
     return { name: o.name || 'Outfit', style: o.style || '', match: o.match || 90, weather: o.weather || '', items: items };
   }).filter(function(o) { return o.items.length > 0; });
 
@@ -1551,8 +1551,16 @@ function _regOutfit(outfit) {
 }
 
 // ── Wardrobe Foto-Suche ───────────────────────────────────────────────────────
-function _findWardrobePhoto(itemName) {
+// item: Outfit-Item-Objekt ({id, name, ...}) oder (Altfaelle ohne id) ein reiner Name-String.
+// Erst per id exakt zuordnen (zuverlaessig, auch nach Umbenennen), sonst per Name raten.
+function _findWardrobePhoto(item) {
   var wardrobe = loadWardrobe();
+  var itemId = item && typeof item === 'object' ? item.id : null;
+  var itemName = item && typeof item === 'object' ? item.name : item;
+  if (itemId) {
+    var byId = wardrobe.find(function(w) { return String(w.id) === String(itemId); });
+    if (byId && byId.imageDataUrl) return byId.imageDataUrl;
+  }
   var name = (itemName || '').toLowerCase();
   var match = wardrobe.find(function(w) {
     var wn = (w.name || '').toLowerCase();
@@ -1680,7 +1688,7 @@ function _updateFavoritenCard() {
   var preview = document.getElementById('favoriten-preview');
   if (!preview) return;
   var firstItem = favs[0] && favs[0].items && favs[0].items[0];
-  var photo = firstItem ? _findWardrobePhoto(firstItem.name) : null;
+  var photo = firstItem ? _findWardrobePhoto(firstItem) : null;
   if (photo) {
     preview.innerHTML = '<div class="ordner-preview-cell" style="grid-column:1/-1;grid-row:1/-1;background-image:url(\'' + photo + '\');background-size:cover;background-position:center;"></div>';
   } else {
@@ -2208,7 +2216,7 @@ function _makeOutfitBoard(outfit) {
   var all = [].concat(outfit.items || []).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); });
   var shown = all.slice(0, _BOARD_MAX);
   var html = shown.map(function(item) {
-    var photo = _findWardrobePhoto(item.name);
+    var photo = _findWardrobePhoto(item);
     return '<div class="ob-item">'
       + (photo ? '<img src="' + _escAttr(photo) + '" alt="" draggable="false">' : '<span class="ob-emoji">' + (item.emoji || '👕') + '</span>')
       + '</div>';
@@ -2606,7 +2614,7 @@ function _openOutfitDetail(id, collectionName) {
   if (content) {
     var items = [].concat(outfit.items || []).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); });
     var itemsHtml = items.map(function(item) {
-      var photo = _findWardrobePhoto(item.name);
+      var photo = _findWardrobePhoto(item);
       var photoStyle = photo ? 'background-image:url(\'' + photo + '\');background-size:cover;background-position:center;font-size:0;' : '';
       return '<div class="outfit-item-row">'
         + '<div class="outfit-item-photo" style="' + photoStyle + '">' + (photo ? '' : (item.emoji || '👕')) + '</div>'
@@ -3108,7 +3116,7 @@ function _saveManualOutfit() {
     name: name,
     style: 'Manuell erstellt',
     match: 95,
-    items: selectedItems.map(function(item) { return { name: item.name, emoji: item.emoji || '👕' }; }),
+    items: selectedItems.map(function(item) { return { id: item.id, name: item.name, emoji: item.emoji || '👕' }; }),
     kollektionen: _currentCollectionName ? [_currentCollectionName] : []
   };
   var outfits = _loadOutfits();
@@ -3409,7 +3417,7 @@ function _autoLoadKiSuggestions(force, customDesc, colContext) {
         var fav = _isFav(id);
         var items = [].concat(outfit.items || []).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); });
         var itemsHtml = items.slice(0, 6).map(function(item) {
-          var photo = _findWardrobePhoto(item.name);
+          var photo = _findWardrobePhoto(item);
           var photoStyle = photo ? 'background-image:url(\'' + photo + '\');background-size:cover;background-position:center;font-size:0;' : '';
           return '<div class="outfit-item-row">'
             + '<div class="outfit-item-photo" style="' + photoStyle + '">' + (photo ? '' : (item.emoji || '👕')) + '</div>'
