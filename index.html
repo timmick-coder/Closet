@@ -902,7 +902,11 @@
     .ki-panel-header { display:flex; align-items:center; gap:10px; padding:14px 16px 12px; border-bottom:1px solid rgba(255,255,255,0.08); flex-shrink:0; background:transparent; }
     .ki-back-btn { background:none; border:none; cursor:pointer; font-size:22px; color:var(--purple); padding:0 4px 0 0; line-height:1; flex-shrink:0; }
     .ki-panel-title { flex:1; font-size:17px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family: 'Playfair Display', Georgia, serif; }
-    .ki-col-cover { width:30px; height:30px; border-radius:50%; flex-shrink:0; background-size:cover; background-position:center; border:1.5px solid var(--purple); box-shadow:0 0 0 2px rgba(77,141,255,0.18); }
+    .ki-col-cover-big {
+      width:88px; height:88px; border-radius:50%; margin:2px auto 14px;
+      background-size:cover; background-position:center;
+      border:2px solid var(--purple); box-shadow:0 0 0 3px rgba(77,141,255,0.18), 0 6px 14px rgba(0,0,0,0.3);
+    }
     .ki-options-btn { background:none; border:none; cursor:pointer; font-size:18px; color:var(--text2); padding:4px 2px; letter-spacing:3px; line-height:1; flex-shrink:0; }
     .ki-panel-sub { font-size:13px; color:var(--text2); font-weight:600; padding:10px 16px 0; flex-shrink:0; }
     .ki-panel-scroll { flex:1; overflow-y:auto; scrollbar-width:none; padding:12px 16px 24px; }
@@ -1628,11 +1632,11 @@
       <div class="ki-panel" id="ki-collection-panel">
         <div class="ki-panel-header">
           <button class="ki-back-btn" onclick="_closeCollection()">←</button>
-          <div class="ki-col-cover" id="ki-col-cover" style="display:none;"></div>
           <div class="ki-panel-title" id="ki-col-title" onclick="_startCollectionRename(_currentCollectionName)">Kollektion</div>
           <button class="ki-panel-rename-btn" id="ki-col-add-btn" title="Outfit erstellen" onclick="_openCreateOutfitPanel()" style="font-size:22px;opacity:1;color:#4d8dff;font-weight:300;line-height:1;">+</button>
         </div>
         <div class="ki-panel-sub" id="ki-col-sub">0 Outfits</div>
+        <div class="ki-col-cover-big" id="ki-col-cover" style="display:none;"></div>
         <div class="col-tab-row" id="ki-col-tabs">
           <button class="col-tab active" data-col-tab="fits" onclick="_selectColTab('fits')">Meine Fits</button>
           <button class="col-tab" data-col-tab="inspo" onclick="_selectColTab('inspo')">Inspo</button>
