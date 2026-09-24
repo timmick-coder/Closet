@@ -2171,38 +2171,18 @@ function _renderKiOrdnerGrid() {
 
   if (section) section.style.display = entries.length === 0 ? 'none' : '';
 
+  // Ordner als runde Kreise in einer wischbaren Leiste (Outfits bleiben Foto-Kacheln im Grid)
   grid.innerHTML = entries.map(function(e) {
-    var outfits = _loadOutfits().filter(function(o) {
-      return e.key === '__favoriten__'
-        ? _isFav(_regOutfit(o))
-        : (o.kollektionen || []).indexOf(e.key) >= 0;
-    });
-
-    var cells;
-    if (outfits.length === 0) {
-      cells = '<div class="ordner-preview-cell" style="grid-column:1/-1;grid-row:1/-1;font-size:36px;background:var(--purple-light);">'
-        + (e.key === '__favoriten__' ? '❤️' : '📁') + '</div>';
-    } else {
-      cells = [0, 1, 2, 3].map(function(i) {
-        var o = outfits[i];
-        if (!o) return '<div class="ordner-preview-cell ordner-preview-empty" style="background:rgba(255,255,255,0.03);"></div>';
-        var item = (o.items || [])[0];
-        if (!item) return '<div class="ordner-preview-cell ordner-preview-empty"></div>';
-        var photo = _findWardrobePhoto(item.name);
-        var style = photo ? 'background-image:url(\'' + photo + '\');background-size:cover;background-position:center;font-size:0;' : '';
-        return '<div class="ordner-preview-cell" style="' + style + '">' + (photo ? '' : (item.emoji || '👕')) + '</div>';
-      }).join('');
-    }
-
-    return '<div class="ordner-card" data-col-key="' + _escAttr(e.key) + '" onclick="_openCollection(\'' + _escAttr(e.key) + '\')">'
-      + '<div class="ordner-preview">' + cells + '</div>'
-      + '<div class="ordner-info">'
-      + '<div class="ordner-info-text">'
-      + '<div class="ordner-name">' + e.label + '</div>'
-      + '<div class="ordner-count">' + e.count + (e.count === 1 ? ' Outfit' : ' Outfits') + '</div>'
-      + '</div>'
-      + '<div class="ordner-chevron">›</div>'
-      + '</div></div>';
+    // "💼 Business" → Emoji in den Kreis, Name darunter
+    var m = e.label.match(/^(\S+)\s+(.+)$/);
+    var hasEmoji = m && !/[A-Za-zÄÖÜäöüß0-9]/.test(m[1]);
+    var emoji = hasEmoji ? m[1] : '📁';
+    var name = hasEmoji ? m[2] : e.label;
+    return '<div class="ki-folder" data-col-key="' + _escAttr(e.key) + '" onclick="_openCollection(\'' + _escAttr(e.key) + '\')">'
+      + '<div class="ki-folder-circle">' + emoji
+      + '<span class="ki-folder-badge">' + e.count + '</span></div>'
+      + '<div class="ki-folder-name">' + name + '</div>'
+      + '</div>';
   }).join('');
 
   _initOrdnerLongPress(grid);
@@ -2354,7 +2334,7 @@ function _moveToCollection(targetCol) {
 
 function _initOrdnerLongPress(grid) {
   if (!grid) return;
-  grid.querySelectorAll('.ordner-card[data-col-key]').forEach(function(card) {
+  grid.querySelectorAll('.ordner-card[data-col-key], .ki-folder[data-col-key]').forEach(function(card) {
     if (card.getAttribute('data-lp-init')) return;
     card.setAttribute('data-lp-init', '1');
     var key = card.getAttribute('data-col-key');

@@ -305,22 +305,22 @@
     .ordner-name { font-size: 13px; font-weight: 700; color: var(--text); font-family: 'Playfair Display', Georgia, serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .ordner-count { font-size: 11px; color: var(--text2); margin-top: 2px; font-weight: 500; }
 
-    /* KI Styling: Ordner optisch klar von Outfit-Kacheln abheben (blauer Akzent + Pfeil) */
-    #ki-ordner-grid .ordner-card {
-      background: linear-gradient(160deg, rgba(77,141,255,0.30) 0%, rgba(47,95,207,0.12) 100%);
-      border: 1px solid rgba(77,141,255,0.55);
-      box-shadow: 0 6px 18px rgba(47,95,207,0.28);
+    /* KI Styling: Ordner als runde Kreise in einer wischbaren Leiste (wie Story-Highlights) */
+    .ki-folder { flex: 0 0 auto; width: 72px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; transition: transform 0.15s; }
+    .ki-folder:active { transform: scale(0.94); }
+    .ki-folder-circle {
+      position: relative; width: 64px; height: 64px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-size: 28px; line-height: 1;
+      background: linear-gradient(145deg, #1c3a6b, #0e2240);
+      border: 2px solid var(--purple);
+      box-shadow: 0 0 0 3px rgba(77,141,255,0.18), 0 6px 14px rgba(0,0,0,0.3);
     }
-    #ki-ordner-grid .ordner-preview { box-sizing: border-box; padding: 6px 6px 0; gap: 4px; }
-    #ki-ordner-grid .ordner-preview-cell { border-radius: 8px; overflow: hidden; background-color: rgba(13,27,46,0.55); }
-    #ki-ordner-grid .ordner-info { display: flex; align-items: center; gap: 8px; padding: 8px 10px 10px 12px; }
-    #ki-ordner-grid .ordner-info-text { flex: 1; min-width: 0; }
-    #ki-ordner-grid .ordner-count { color: var(--purple); font-weight: 700; }
-    #ki-ordner-grid .ordner-chevron {
-      flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      background: var(--purple); color: #fff; font-size: 16px; font-weight: 700; line-height: 1;
+    .ki-folder-badge {
+      position: absolute; top: -3px; right: -3px; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box;
+      border-radius: 10px; background: var(--purple); color: #fff; border: 2px solid #0d1b2e;
+      font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;
     }
+    .ki-folder-name { width: 100%; text-align: center; font-size: 12px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .ordner-new {
       background: var(--card); border-radius: 18px;
       box-shadow: var(--shadow); cursor: pointer;
@@ -464,7 +464,8 @@
 
     /* ── Ordner grid on main KI screen ── */
     .ki-pills-wrap { display:none; }
-    .ki-ordner-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); grid-auto-rows:144px; gap:12px; padding:0 20px 4px; }
+    .ki-ordner-grid { display:flex; gap:14px; padding:4px 20px 8px; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+    .ki-ordner-grid::-webkit-scrollbar { display:none; }
 
     /* ── 2-col fit grid inside collection panel ── */
     /* minmax(0,1fr) statt 1fr: Spalten dürfen nicht durch Inhalt breiter werden (sonst ungleiche Kacheln + seitliches Scrollen auf iOS) */
@@ -1469,7 +1470,7 @@
       <div class="ki-pills-wrap" id="ki-pills-wrap"></div>
 
       <!-- Haupt-Scroll-Bereich -->
-      <div class="scroll-content" id="ki-scroll" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior-x:none;touch-action:pan-y;padding:0 0 80px;">
+      <div class="scroll-content" id="ki-scroll" style="flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior-x:none;padding:0 0 80px;">
 
         <!-- Koffer packen Banner -->
         <div class="koffer-entry-banner" onclick="_openKofferPanel()">
