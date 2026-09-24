@@ -37,6 +37,8 @@ function _compressImage(base64, mimeType) {
 
 // ── IndexedDB für Bilder ──────────────────────────────────────────────────────
 var _idbConn = null;
+// Synchroner Cache der IDB-Bilder, damit loadWardrobe() Bilder mitliefern kann
+var _imgCache = {};
 function _idbOpen() {
   if (_idbConn) return Promise.resolve(_idbConn);
   return new Promise(function(resolve, reject) {
@@ -49,6 +51,7 @@ function _idbOpen() {
   });
 }
 function idbPutImage(id, dataUrl) {
+  _imgCache[String(id)] = dataUrl;
   return _idbOpen().then(function(db) {
     return new Promise(function(resolve, reject) {
       var tx  = db.transaction('images', 'readwrite');
@@ -66,6 +69,7 @@ function idbGetAllImages() {
       req.onsuccess = function(e) {
         var map = {};
         (e.target.result || []).forEach(function(r) { map[r.id] = r.dataUrl; });
+        Object.assign(_imgCache, map);
         resolve(map);
       };
       req.onerror = function() { resolve({}); };
@@ -73,6 +77,7 @@ function idbGetAllImages() {
   });
 }
 function idbDeleteImage(id) {
+  delete _imgCache[String(id)];
   return _idbOpen().then(function(db) {
     return new Promise(function(resolve) {
       var tx = db.transaction('images', 'readwrite');
@@ -107,8 +112,13 @@ function _idbMigrate() {
 
 // ── Garderobe (LocalStorage für Metadaten, IndexedDB für Bilder) ──────────────
 function loadWardrobe() {
-  try { return JSON.parse(localStorage.getItem('stylesync_wardrobe') || '[]'); }
+  var items;
+  try { items = JSON.parse(localStorage.getItem('stylesync_wardrobe') || '[]'); }
   catch { return []; }
+  return items.map(function(item) {
+    var img = !item.imageDataUrl && _imgCache[String(item.id)];
+    return img ? Object.assign({}, item, { imageDataUrl: img }) : item;
+  });
 }
 function loadWardrobeAsync() {
   var items = loadWardrobe();
@@ -122,7 +132,8 @@ function loadWardrobeAsync() {
 function saveWardrobe(items) {
   // Bilder in IDB speichern, Metadaten ohne Bilder in localStorage
   items.forEach(function(item) {
-    if (item.id && item.imageDataUrl && item.imageDataUrl.length > 20) {
+    if (item.id && item.imageDataUrl && item.imageDataUrl.length > 20
+        && _imgCache[String(item.id)] !== item.imageDataUrl) {
       idbPutImage(item.id, item.imageDataUrl).catch(function(e) {
         console.warn('[idb] put failed', e);
       });
@@ -269,26 +280,11 @@ async function removeBackground(base64, mimeType) {
 
 // ── Gemini: Outfits generieren ────────────────────────────────────────────────
 async function generateOutfitsWithGemini(description, inspoContext, inspoImageBase64, inspoImageMime) {
-  const staticItems = [
-    { name: 'Weißes T-Shirt', type: 'Top', emoji: '👕', color: 'Weiß', season: 'Sommer' },
-    { name: 'Jeans', type: 'Hose', emoji: '👖', color: 'Blau', season: 'Ganzjährig' },
-    { name: 'Sneaker', type: 'Schuh', emoji: '👟', color: 'Weiß', season: 'Ganzjährig' },
-    { name: 'Sommerkleid', type: 'Kleid', emoji: '👗', color: 'Rosa', season: 'Sommer' },
-    { name: 'Lederjacke', type: 'Jacke', emoji: '🧥', color: 'Schwarz', season: 'Winter' },
-    { name: 'Chino-Hose', type: 'Hose', emoji: '👖', color: 'Beige', season: 'Sommer' },
-    { name: 'Stiefel', type: 'Schuh', emoji: '👢', color: 'Braun', season: 'Winter' },
-    { name: 'Sonnenbrille', type: 'Accessoire', emoji: '🕶️', color: 'Schwarz', season: 'Sommer' },
-    { name: 'Strickpullover', type: 'Top', emoji: '🧶', color: 'Grau', season: 'Winter' },
-    { name: 'Jogginghose', type: 'Hose', emoji: '👖', color: 'Schwarz', season: 'Ganzjährig' },
-    { name: 'Sandalen', type: 'Schuh', emoji: '🩴', color: 'Braun', season: 'Sommer' },
-    { name: 'Schal', type: 'Accessoire', emoji: '🧣', color: 'Rot', season: 'Winter' },
-  ];
-  const saved = loadWardrobe().map(function(w) { return { name: w.name, type: w.type, emoji: w.emoji, color: w.color, season: w.season }; });
-  const allItems = saved.concat(staticItems);
+  const allItems = loadWardrobe().map(function(w) { return { name: w.name, type: w.type, emoji: w.emoji, color: w.color, season: w.season }; });
   const wardrobeText = allItems.map(function(it, i) {
     return (i + 1) + '. ' + it.emoji + ' ' + it.name + ' (' + it.type + ', ' + it.color + ', ' + it.season + ')';
   }).join('\n');
-  const prompt = 'Du bist ein professioneller Mode-Stylist. Erstelle genau 3 komplette Outfit-Vorschlaege ausschliesslich aus den folgenden Kleidungsstuecken.\n\nSCHRANK DES NUTZERS:\n' + wardrobeText + '\n\nWUNSCH: ' + (description || 'Ein stylisches, passendes Outfit') + (inspoContext ? '\nINSPIRATION: ' + inspoContext : '') + (inspoImageBase64 ? '\n\nNutze das hochgeladene Bild als Stil-Inspiration.' : '') + '\n\nAntworte NUR mit einem validen JSON-Array (kein Text, kein Markdown):\n[\n  {\n    "name": "Outfit-Name auf Deutsch",\n    "style": "Stil-Kategorie auf Deutsch",\n    "match": 90,\n    "items": [{"emoji":"👕","name":"Artikelname"}],\n    "weather": "Wetterbeschreibung mit Temperatur auf Deutsch"\n  }\n]';
+  const prompt = 'Du bist ein professioneller Mode-Stylist. Erstelle genau 3 komplette Outfit-Vorschlaege ausschliesslich aus den folgenden Kleidungsstuecken. Verwende keine anderen Teile und uebernimm die Artikelnamen exakt wie aufgelistet. Wenn der Schrank klein ist, duerfen sich Teile zwischen Outfits wiederholen und Outfits weniger Teile haben.\n\nSCHRANK DES NUTZERS:\n' + wardrobeText + '\n\nWUNSCH: ' + (description || 'Ein stylisches, passendes Outfit') + (inspoContext ? '\nINSPIRATION: ' + inspoContext : '') + (inspoImageBase64 ? '\n\nNutze das hochgeladene Bild als Stil-Inspiration.' : '') + '\n\nAntworte NUR mit einem validen JSON-Array (kein Text, kein Markdown):\n[\n  {\n    "name": "Outfit-Name auf Deutsch",\n    "style": "Stil-Kategorie auf Deutsch",\n    "match": 90,\n    "items": [{"emoji":"👕","name":"Artikelname"}],\n    "weather": "Wetterbeschreibung mit Temperatur auf Deutsch"\n  }\n]';
   const parts = [{ text: prompt }];
   if (inspoImageBase64 && inspoImageMime) parts.push({ inline_data: { mime_type: inspoImageMime, data: inspoImageBase64 } });
   const body = { contents: [{ parts: parts }] };
@@ -957,7 +953,6 @@ function renderWardrobeGrid() {
   if (!grid) return;
   grid.querySelectorAll('.ai-wardrobe-item').forEach(function(el) { el.remove(); });
   var items = loadWardrobe();
-  if (items.length === 0) return;
   // Erst ohne Bilder rendern (sofort sichtbar)
   [].concat(items).reverse().forEach(function(item) {
     _renderWardrobeCard(item, null, grid);
@@ -1265,11 +1260,13 @@ function _openSaveModal(id) {
   list.innerHTML = allCols.map(function(name) {
     var count = _getCollectionCount(name);
     var emoji = colMeta[name] || '📁';
+    // Emoji steht schon links im Icon → nicht doppelt im Namen zeigen
+    var label = name.indexOf(emoji + ' ') === 0 ? name.slice(emoji.length + 1) : name;
     var isSaved = currentKollektionen.indexOf(name) >= 0;
     var checkmark = isSaved ? ' <span style="color:var(--purple);font-size:14px;">✓</span>' : '';
     return '<div class="save-col-item" data-save-col="' + _escAttr(name) + '" style="' + (isSaved ? 'opacity:0.6;' : '') + '">'
       + '<div class="save-col-emoji">' + emoji + '</div>'
-      + '<div class="save-col-info"><div class="save-col-name">' + name + checkmark + '</div>'
+      + '<div class="save-col-info"><div class="save-col-name">' + label + checkmark + '</div>'
       + '<div class="save-col-count">' + count + ' Outfits</div></div></div>';
   }).join('');
 
@@ -2543,6 +2540,8 @@ function _clearKiPillFilter() {
 }
 
 function _renderKiSavedSection() {
+  // Vorschau hängt an denselben gespeicherten Outfits → mit aktualisieren
+  _renderPreviewSuggestions(null);
   var savedContainer = document.getElementById('ki-saved-outfits');
   if (!savedContainer) return;
   _savedCardRegistry = {};
@@ -2753,10 +2752,7 @@ function _autoLoadKiSuggestions(force, customDesc, colContext) {
   if (!suggestions) return;
 
   if (wardrobe.length === 0) {
-    if (suggestions) suggestions.innerHTML = '<div style="text-align:center;padding:40px 20px 16px;">'
-      + '<div style="font-size:40px;">👗</div>'
-      + '<div style="font-size:15px;font-weight:700;color:var(--text2);margin-top:10px;">Füge zuerst Kleidung zu deinem Schrank hinzu!</div>'
-      + '</div>';
+    _showToast('👗 Füge zuerst Kleidung zu deinem Schrank hinzu!');
     return;
   }
 
@@ -3835,6 +3831,10 @@ function _renderProfilePosts() {
   var posts = _loadMyPosts();
 
   if (countEl) countEl.textContent = posts.length;
+  var artikelEl = document.getElementById('profil-artikel-count');
+  if (artikelEl) artikelEl.textContent = loadWardrobe().length;
+  var outfitsEl = document.getElementById('profil-outfits-count');
+  if (outfitsEl) outfitsEl.textContent = _loadOutfits().length;
 
   if (!grid) return;
 
@@ -5108,8 +5108,13 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ── Preview-Sektion + Saved initial befüllen ──
-  _renderPreviewSuggestions(null);
   _renderKiSavedSection();
+  // Bilder kommen asynchron aus IndexedDB → Outfit-Ansichten danach mit Fotos neu rendern
+  idbGetAllImages().then(function() {
+    _updateFavoritenCard();
+    _renderKiOrdnerGrid();
+    _renderKiSavedSection();
+  }).catch(function() {});
 
   // ── Event Delegation: Post Detail Kommentare ──
   var postDetailScroll = document.getElementById('post-detail-content');
@@ -5216,7 +5221,6 @@ document.addEventListener('DOMContentLoaded', function() {
       mutations.forEach(function(m) {
         if (m.type === 'attributes' && m.attributeName === 'class' && kiScreen.classList.contains('active')) {
           _renderKiPills();
-          _renderPreviewSuggestions(null);
           _renderKiSavedSection();
         }
       });

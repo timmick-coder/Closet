@@ -1289,7 +1289,7 @@
       <div class="screen-header">
         <div>
           <div class="big-title">Mein Schrank</div>
-          <div class="big-sub" id="schrank-sub">12 Artikel</div>
+          <div class="big-sub" id="schrank-sub">0 Artikel</div>
         </div>
         <button id="schrank-select-btn" onclick="_toggleSelectMode()" style="background:none;border:none;color:var(--purple);font-size:14px;font-weight:700;cursor:pointer;padding:8px 4px;font-family:inherit;">Auswählen</button>
       </div>
@@ -1907,8 +1907,8 @@
           </div>
         </div>
         <div class="profil-stats">
-          <div class="profil-stat"><div class="pnum">18</div><div class="plbl">Artikel</div></div>
-          <div class="profil-stat"><div class="pnum">12</div><div class="plbl">Outfits</div></div>
+          <div class="profil-stat"><div class="pnum" id="profil-artikel-count">0</div><div class="plbl">Artikel</div></div>
+          <div class="profil-stat"><div class="pnum" id="profil-outfits-count">0</div><div class="plbl">Outfits</div></div>
           <div class="profil-stat"><div class="pnum">284</div><div class="plbl">Follower</div></div>
           <div class="profil-stat"><div class="pnum" id="profil-posts-count">0</div><div class="plbl">Posts</div></div>
         </div>
@@ -2543,7 +2543,7 @@
     if (sub) sub.textContent = visible + ' ' + (_filterLabels[filter] || 'Artikel');
 
     // Leerzustand anzeigen
-    if (visible === 0) {
+    if (visible === 0 && !document.getElementById('wardrobe-scan-hint')) {
       var label = _filterLabels[filter] || filter;
       emptyEl = document.createElement('div');
       emptyEl.id = 'wardrobe-filter-empty';
@@ -2826,8 +2826,10 @@
 
   // clock
   function tick() {
+    const el = document.getElementById('clock');
+    if (!el) return;
     const n = new Date();
-    document.getElementById('clock').textContent =
+    el.textContent =
       String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
   }
   tick(); setInterval(tick, 30000);
