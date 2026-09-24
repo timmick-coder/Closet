@@ -2164,6 +2164,16 @@ function _openCollection(name) {
     titleEl.textContent = displayName;
     titleEl.style.cursor = (name === '__favoriten__') ? 'default' : 'pointer';
   }
+  var coverEl = document.getElementById('ki-col-cover');
+  if (coverEl) {
+    var cover = (name !== '__favoriten__') ? _getCollectionCovers()[name] : null;
+    if (cover) {
+      coverEl.style.backgroundImage = "url('" + cover + "')";
+      coverEl.style.display = '';
+    } else {
+      coverEl.style.display = 'none';
+    }
+  }
 
   var fits = allOutfits.filter(function(o) { return !o.isInspo; });
   var inspos = allOutfits.filter(function(o) { return !!o.isInspo; });
