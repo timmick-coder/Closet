@@ -329,6 +329,9 @@
       background: transparent; border: 2px dashed var(--purple);
       box-shadow: none; font-size: 26px; font-weight: 300; color: var(--purple);
     }
+    .ki-folder.active .ki-folder-circle {
+      border-color: #fff; box-shadow: 0 0 0 3px var(--purple), 0 6px 14px rgba(0,0,0,0.3);
+    }
     .ordner-new {
       background: var(--card); border-radius: 18px;
       box-shadow: var(--shadow); cursor: pointer;
@@ -1539,9 +1542,13 @@
         <!-- Step 1: Auswahl -->
         <div id="koffer-step-select" style="display:none; flex:1; display:none; flex-direction:column; overflow:hidden;">
           <div id="koffer-weather-banner" style="display:none; margin:10px 20px 0; border-radius:14px; overflow:hidden; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); flex-direction:column;"></div>
+          <div id="koffer-ordner-section" style="flex-shrink:0;">
+            <div class="ki-section-label" style="padding:14px 20px 6px;">Meine Ordner</div>
+            <div class="ki-ordner-grid" id="koffer-ordner-grid"></div>
+          </div>
           <div class="koffer-panel-scroll" style="flex:1;" id="koffer-sel-scroll">
             <div class="koffer-sel-section">
-              <div class="koffer-sel-label">Meine Outfits</div>
+              <div class="koffer-sel-label" id="koffer-outfits-label">Meine Outfits</div>
               <div class="koffer-outfits-grid" id="koffer-outfits-grid"></div>
               <div class="koffer-sel-label" style="margin-top:8px;">Einzelne Klamotten</div>
               <div class="koffer-wardrobe-grid" id="koffer-wardrobe-grid"></div>

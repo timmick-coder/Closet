@@ -5581,7 +5581,9 @@ function _kofferGoToSelect() {
   _kofferSelectedOutfits = {};
   _kofferSelectedWardrobeIds = {};
   _kofferWeatherData = null;
+  _kofferActiveFolder = null;
   _kofferShowStep('select');
+  _renderKofferOrdnerGrid();
   _renderKofferOutfits();
   _renderKofferWardrobeItems();
   _kofferUpdateCounter();
@@ -5742,10 +5744,64 @@ function _kofferMatchLabel(match) {
   return '';
 }
 
+var _kofferActiveFolder = null; // null = alle Ordner
+
+function _renderKofferOrdnerGrid() {
+  var grid = document.getElementById('koffer-ordner-grid');
+  var section = document.getElementById('koffer-ordner-section');
+  if (!grid) return;
+
+  var manualCols = _getManualCollections();
+  var entries = [];
+  var favCount = _loadFavs().length;
+  if (favCount > 0) entries.push({ key: '__favoriten__', label: '❤️ Favoriten', count: favCount });
+  _getCollections().forEach(function(name) {
+    var count = _getCollectionCount(name);
+    if (count > 0 || manualCols.indexOf(name) >= 0) entries.push({ key: name, label: name, count: count });
+  });
+
+  if (section) section.style.display = entries.length === 0 ? 'none' : '';
+  if (entries.length === 0) { grid.innerHTML = ''; return; }
+
+  var covers = _getCollectionCovers();
+  grid.innerHTML = entries.map(function(e) {
+    var m = e.label.match(/^(\S+)\s+(.+)$/);
+    var hasEmoji = m && !/[A-Za-zÄÖÜäöüß0-9]/.test(m[1]);
+    var emoji = hasEmoji ? m[1] : '📁';
+    var name = hasEmoji ? m[2] : e.label;
+    var cover = e.key !== '__favoriten__' ? covers[e.key] : null;
+    var circleContent = cover
+      ? '<div class="ki-folder-cover" style="background-image:url(\'' + cover + '\');"></div>'
+      : emoji;
+    var badge = e.count > 0 ? '<span class="ki-folder-badge">' + e.count + '</span>' : '';
+    var active = _kofferActiveFolder === e.key;
+    return '<div class="ki-folder' + (active ? ' active' : '') + '" onclick="_selectKofferFolder(\'' + _escAttr(e.key) + '\')">'
+      + '<div class="ki-folder-circle">' + circleContent + badge + '</div>'
+      + '<div class="ki-folder-name">' + name + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function _selectKofferFolder(key) {
+  _kofferActiveFolder = (_kofferActiveFolder === key) ? null : key;
+  _renderKofferOrdnerGrid();
+  _renderKofferOutfits();
+}
+
 function _renderKofferOutfits() {
   var grid = document.getElementById('koffer-outfits-grid');
   if (!grid) return;
+  var label = document.getElementById('koffer-outfits-label');
+  if (label) {
+    var activeName = _kofferActiveFolder === '__favoriten__' ? '❤️ Favoriten' : _kofferActiveFolder;
+    label.innerHTML = activeName
+      ? 'Meine Outfits · ' + activeName + ' <span class="ki-section-clear" onclick="_selectKofferFolder(\'' + _escAttr(_kofferActiveFolder) + '\')">Alle zeigen</span>'
+      : 'Meine Outfits';
+  }
   var outfits = _loadOutfits().filter(function(o) { return !o.isInspo; });
+  if (_kofferActiveFolder) {
+    outfits = outfits.filter(function(o) { return (o.kollektionen || []).indexOf(_kofferActiveFolder) >= 0; });
+  }
   if (outfits.length === 0) {
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;font-size:13px;color:var(--text2);">Noch keine Outfits gespeichert</div>';
     return;
