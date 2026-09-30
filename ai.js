@@ -654,11 +654,13 @@ function _initCropDrag() {
 
   function onEnd() { _cropDragState = null; }
 
-  // Clean up old listeners by cloning
-  var newCanvas = canvas.cloneNode(true);
-  canvas.parentNode.replaceChild(newCanvas, canvas);
-  newCanvas.addEventListener('mousedown', onStart);
-  newCanvas.addEventListener('touchstart', onStart, { passive: false });
+  // Listener nur einmal anhängen. (Früher wurde das Canvas per cloneNode ersetzt –
+  // eine Kopie ist aber leer, dadurch wurde das Bild z. B. nach "Drehen" schwarz.)
+  if (!canvas._cropDragInit) {
+    canvas._cropDragInit = true;
+    canvas.addEventListener('mousedown', onStart);
+    canvas.addEventListener('touchstart', onStart, { passive: false });
+  }
 
   if (!_cropMoveListenersAdded) {
     _cropMoveListenersAdded = true;
@@ -675,12 +677,6 @@ function _cropRotate() {
   _cropState.cropRect = null;
   _cropDrawAll();
   _initCropDrag();
-}
-
-function _cropMirror() {
-  if (!_cropState) return;
-  _cropState.mirrored = !_cropState.mirrored;
-  _cropDrawAll();
 }
 
 async function _cropAndContinue() {
