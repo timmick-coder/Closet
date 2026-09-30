@@ -1014,11 +1014,13 @@ function _reorderCategories(ids) {
 // ── Verschieben per Gedrückthalten (Kategorie-Chips + Kategorie-Liste) ──────
 // Elemente mit [data-sort-id] im container werden nach ~0,35 s Halten "angehoben"
 // und folgen dem Finger; bewegt man sich vorher, wird normal gescrollt.
-function _makeSortable(container, axis, onDone) {
+// onHold (optional): wird aufgerufen, wenn angehoben, aber ohne Ziehen losgelassen
+// wurde (z. B. um wie bisher ein Kontextmenü zu öffnen).
+function _makeSortable(container, axis, onDone, onHold) {
   if (!container || container._sortableInit) return;
   container._sortableInit = true;
   var HOLD_MS = 350, MOVE_TOL = 8;
-  var timer = null, dragEl = null, start = null, lastPos = null, justDragged = false;
+  var timer = null, dragEl = null, start = null, lastPos = null, liftPos = null, moved = false, justDragged = false;
   var scroller = axis === 'x' ? container : (container.closest('.cat-sheet') || container.parentElement);
 
   function pos(e) {
@@ -1039,6 +1041,8 @@ function _makeSortable(container, axis, onDone) {
     timer = null;
     dragEl = el;
     start = lastPos;
+    liftPos = { x: lastPos.x, y: lastPos.y };
+    moved = false;
     dragEl.classList.add('sort-dragging');
     container.classList.add('sort-active');
     if (navigator.vibrate) navigator.vibrate(30);
@@ -1052,6 +1056,7 @@ function _makeSortable(container, axis, onDone) {
       return;
     }
     e.preventDefault();
+    if (Math.abs(p.x - liftPos.x) > MOVE_TOL || Math.abs(p.y - liftPos.y) > MOVE_TOL) moved = true;
     var d = axis === 'x' ? p.x - start.x : p.y - start.y;
     // Mit Nachbarn tauschen, sobald die Mitte überschritten ist
     var sibs = [].slice.call(container.querySelectorAll('[data-sort-id]'));
@@ -1078,13 +1083,15 @@ function _makeSortable(container, axis, onDone) {
     }
   }
   function up() {
-    var wasDragging = !!dragEl;
-    var ids = wasDragging ? [].slice.call(container.querySelectorAll('[data-sort-id]')).map(function(el) { return el.getAttribute('data-sort-id'); }) : null;
+    var heldEl = dragEl, wasMoved = moved;
+    var ids = heldEl ? [].slice.call(container.querySelectorAll('[data-sort-id]')).map(function(el) { return el.getAttribute('data-sort-id'); }) : null;
     cleanup();
-    if (wasDragging) {
+    if (heldEl) {
+      // Folgenden Klick (öffnen / filtern) unterdrücken
       justDragged = true;
-      setTimeout(function() { justDragged = false; }, 50);
-      onDone(ids);
+      setTimeout(function() { justDragged = false; }, 400);
+      if (!wasMoved && onHold) onHold(heldEl);
+      else onDone(ids);
     }
   }
   function cleanup() {
@@ -2198,6 +2205,10 @@ function _doRenameCollection(oldName, newName) {
   });
   _storeOutfits(outfits);
   _currentCollectionName = newName;
+  // Umbenannter Ordner behält seinen Platz in der Reihenfolge
+  var order = _loadFolderOrder();
+  var oi = order.indexOf(oldName);
+  if (oi >= 0) { order[oi] = newName; _storeFolderOrder(order); }
 
   // Collection-Panel-Titel
   var titleEl = document.getElementById('ki-col-title');
@@ -2750,6 +2761,13 @@ function _renderKiOrdnerGrid() {
 
   var covers = _getCollectionCovers();
 
+  // Vom Nutzer per Ziehen festgelegte Reihenfolge anwenden (neue Ordner hinten)
+  var order = _loadFolderOrder();
+  var rank = function(key) { var i = order.indexOf(key); return i < 0 ? order.length : i; };
+  entries = entries.map(function(e, i) { return { e: e, i: i }; })
+    .sort(function(a, b) { return (rank(a.e.key) - rank(b.e.key)) || (a.i - b.i); })
+    .map(function(x) { return x.e; });
+
   // Ordner als runde Kreise in einer wischbaren Leiste (Outfits bleiben Foto-Kacheln im Grid)
   grid.innerHTML = entries.map(function(e) {
     // "💼 Business" → Emoji in den Kreis, Name darunter
@@ -2762,7 +2780,7 @@ function _renderKiOrdnerGrid() {
       ? '<div class="ki-folder-cover" style="background-image:url(\'' + cover + '\');"></div>'
       : emoji;
     var badge = e.count > 0 ? '<span class="ki-folder-badge">' + e.count + '</span>' : '';
-    return '<div class="ki-folder" data-col-key="' + _escAttr(e.key) + '" onclick="_openCollection(\'' + _escAttr(e.key) + '\')">'
+    return '<div class="ki-folder" data-col-key="' + _escAttr(e.key) + '" data-sort-id="' + _escAttr(e.key) + '" onclick="_openCollection(\'' + _escAttr(e.key) + '\')">'
       + '<div class="ki-folder-circle">' + circleContent + badge + '</div>'
       + '<div class="ki-folder-name">' + name + '</div>'
       + '</div>';
@@ -2772,7 +2790,23 @@ function _renderKiOrdnerGrid() {
     + '<div class="ki-folder-name">Neu</div>'
     + '</div>';
 
-  _initOrdnerLongPress(grid);
+  // Gedrückt halten + ziehen = verschieben; gedrückt halten + loslassen = Menü (wie bisher)
+  _makeSortable(grid, 'x', function(keys) {
+    _storeFolderOrder(keys);
+    _renderKiOrdnerGrid();
+  }, function(el) {
+    var key = el.getAttribute('data-col-key');
+    if (key && key !== '__favoriten__') _showContextMenu({ type: 'folder', colKey: key, name: key });
+  });
+}
+
+// ── Ordner-Reihenfolge (per Gedrückthalten + Ziehen) ────────────────────────
+function _loadFolderOrder() {
+  try { var o = JSON.parse(localStorage.getItem('stylesync_folder_order') || '[]'); return Array.isArray(o) ? o : []; }
+  catch (e) { return []; }
+}
+function _storeFolderOrder(keys) {
+  try { localStorage.setItem('stylesync_folder_order', JSON.stringify(keys)); } catch (e) {}
 }
 
 function _deleteCollection(name) {

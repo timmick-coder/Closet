@@ -386,6 +386,9 @@
     [data-sort-id] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .sort-dragging { position: relative; z-index: 5; box-shadow: 0 10px 24px rgba(0,0,0,0.45); border-color: var(--purple) !important; transition: box-shadow 0.15s; }
     .sort-active [data-sort-id]:not(.sort-dragging) { transition: transform 0.15s; }
+    /* Ordner (KI Styling): nur der Kreis leuchtet beim Anheben */
+    .ki-folder.sort-dragging { box-shadow: none; border-color: transparent !important; }
+    .ki-folder.sort-dragging .ki-folder-circle { box-shadow: 0 0 0 3px var(--purple), 0 10px 22px rgba(0,0,0,0.5); }
     .cat-add-row { display: flex; gap: 8px; margin-top: 12px; }
     .cat-add-row .modal-input { margin-bottom: 0; flex: 1; min-width: 0; }
     .cat-add-btn { border: none; background: var(--purple); color: #fff; border-radius: 14px; padding: 0 16px; font-size: 14px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
