@@ -243,13 +243,16 @@ async function _loadRembgModule() {
   return _rembgModule;
 }
 
-async function removeBackground(base64, mimeType) {
+// onStep(text): Fortschritt melden – Standard ist das (blockierende) Scan-Overlay,
+// Hintergrund-Scans übergeben stattdessen ihre Fortschrittsanzeige.
+async function removeBackground(base64, mimeType, onStep) {
+  var step = onStep || function(text) { showScanOverlay('loading', { text: text }); };
   try {
     // Beim ersten Aufruf lädt das Modell (~40 MB, wird vom Browser gecacht)
     if (!_rembgModelLoaded) {
-      showScanOverlay('loading', { text: '⏳ KI-Modell wird geladen… (nur einmalig, ~40 MB)' });
+      step('⏳ KI-Modell wird geladen… (nur einmalig, ~40 MB)');
     } else {
-      showScanOverlay('loading', { text: '✂️ Hintergrund wird entfernt…' });
+      step('✂️ Hintergrund wird entfernt…');
     }
 
     var lib = await _loadRembgModule();
@@ -274,8 +277,8 @@ async function removeBackground(base64, mimeType) {
   } catch (e) {
     console.error('[rembg] Fehler:', e.message, e);
     var errMsg = (e && e.message) ? e.message.slice(0, 80) : 'Unbekannter Fehler';
-    showScanOverlay('loading', { text: '⚠️ rembg Fehler: ' + errMsg });
-    await new Promise(function(r) { setTimeout(r, 2500); });
+    step('⚠️ Hintergrund konnte nicht entfernt werden: ' + errMsg);
+    if (!onStep) await new Promise(function(r) { setTimeout(r, 2500); });
     return 'data:' + (mimeType || 'image/jpeg') + ';base64,' + base64;
   }
 }
@@ -662,13 +665,27 @@ function _recropImage() {
   // Re-open crop screen with original image
   var origUrl = (_cropState && _cropState._lastOriginalDataUrl) || (_scanResult && _scanResult._origDataUrl);
   var origMime = (_cropState && _cropState._lastMimeType) || 'image/jpeg';
+  // Beim Hintergrund-Scan: Original des gerade geprüften Jobs verwenden
+  if (_scanResult && _scanResult._origDataUrl) {
+    origUrl = _scanResult._origDataUrl;
+    origMime = (origUrl.match(/^data:([^;]+);/) || [])[1] || 'image/jpeg';
+  }
   if (!origUrl) return;
   hideScanOverlay();
+  // Neu zuschneiden erzeugt einen neuen Scan → alten Job verwerfen
+  if (_currentScanJobId) _removeScanJob(_currentScanJobId);
+  _scanResult = null;
   _openCropScreen(origUrl, origMime);
 }
 
 async function _processCroppedImage(base64, mimeType) {
   var origDataUrl = (_cropState && _cropState._lastOriginalDataUrl) || ('data:' + mimeType + ';base64,' + base64);
+  // Neue Scans laufen im Hintergrund – die App bleibt währenddessen bedienbar.
+  // Nur "Bild eines Teils ändern" (aus dem Artikel-Detail) bleibt ein kurzer blockierender Ablauf.
+  if (!(_cropState && _cropState._isItemImageUpdate)) {
+    _startScanJob(base64, mimeType, origDataUrl);
+    return;
+  }
   try {
     showScanOverlay('loading', { text: '📸 Foto wird hochgeladen…' });
     var compressed = await _compressImage(base64, mimeType);
@@ -706,6 +723,105 @@ async function _processCroppedImage(base64, mimeType) {
     showScanOverlay('result', _scanResult);
   } catch (err) {
     showScanOverlay('error', { text: err.message || 'KI-Analyse fehlgeschlagen.' });
+  }
+}
+
+// ── Hintergrund-Scans (Warteschlange + Fortschrittsleiste) ───────────────────
+// Jeder Scan wird ein Job: 'waiting' → 'processing' → 'ready' | 'error'.
+// Jobs laufen nacheinander (Hintergrundentfernung ist rechenintensiv), die
+// Leiste über der Navigation zeigt den Stand; Tipp auf "bereit" öffnet das Formular.
+var _scanJobs = [];
+var _scanQueue = Promise.resolve();
+var _currentScanJobId = null;
+
+function _startScanJob(base64, mimeType, origDataUrl) {
+  var job = {
+    id: 'scan_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    status: 'waiting', step: 'Wartet…',
+    thumb: 'data:' + mimeType + ';base64,' + base64,
+    origDataUrl: origDataUrl, result: null, error: null
+  };
+  _scanJobs.push(job);
+  _renderScanJobsPill();
+  _showToast('📸 Wird im Hintergrund analysiert');
+  _scanQueue = _scanQueue.then(function() { return _runScanJob(job, base64, mimeType); });
+}
+
+async function _runScanJob(job, base64, mimeType) {
+  if (_scanJobs.indexOf(job) < 0) return; // inzwischen verworfen
+  var setStep = function(text) { job.step = text; _renderScanJobsPill(); };
+  job.status = 'processing';
+  try {
+    setStep('📸 Foto wird vorbereitet…');
+    var compressed = await _compressImage(base64, mimeType);
+    base64 = compressed.base64;
+    mimeType = compressed.mimeType;
+    var imageDataUrl = await removeBackground(base64, mimeType, setStep);
+    setStep('🔍 KI erkennt Kleidungsstück…');
+    var analysis = await analyzeClothingWithGemini(base64, mimeType);
+    job.result = Object.assign({}, analysis, { imageDataUrl: imageDataUrl, _origDataUrl: job.origDataUrl });
+    job.thumb = imageDataUrl;
+    job.status = 'ready';
+    _showToast('✅ ' + (analysis.name || 'Kleidungsstück') + ' erkannt – tippe zum Prüfen');
+  } catch (err) {
+    job.status = 'error';
+    job.error = (err && err.message) || 'KI-Analyse fehlgeschlagen.';
+  }
+  _renderScanJobsPill();
+}
+
+function _removeScanJob(id) {
+  _scanJobs = _scanJobs.filter(function(j) { return j.id !== id; });
+  if (_currentScanJobId === id) _currentScanJobId = null;
+  _renderScanJobsPill();
+}
+
+function _renderScanJobsPill() {
+  var pill = document.getElementById('scan-jobs-pill');
+  if (!pill) return;
+  if (_scanJobs.length === 0) {
+    pill.className = '';
+    pill.innerHTML = '';
+    document.body.classList.remove('has-scan-pill');
+    return;
+  }
+  var ready = _scanJobs.filter(function(j) { return j.status === 'ready'; });
+  var failed = _scanJobs.filter(function(j) { return j.status === 'error'; });
+  var busy = _scanJobs.filter(function(j) { return j.status === 'waiting' || j.status === 'processing'; });
+  var active = _scanJobs.find(function(j) { return j.status === 'processing'; }) || busy[0];
+  var show = ready[0] || failed[0] || active;
+  var icon, title, sub;
+  if (ready.length) {
+    icon = '✅';
+    title = ready.length === 1 ? (ready[0].result.name || 'Teil') + ' bereit' : ready.length + ' Teile bereit';
+    sub = 'Tippen zum Prüfen & Speichern' + (busy.length ? ' · ' + busy.length + ' in Arbeit' : '');
+  } else if (failed.length) {
+    icon = '⚠️';
+    title = 'Scan fehlgeschlagen';
+    sub = 'Tippen für Details' + (busy.length ? ' · ' + busy.length + ' in Arbeit' : '');
+  } else {
+    icon = '<span class="sjp-spin"></span>';
+    title = busy.length === 1 ? 'Teil wird analysiert' : busy.length + ' Teile werden analysiert';
+    sub = active ? active.step : '';
+  }
+  pill.className = 'show' + (ready.length ? ' ready' : failed.length ? ' failed' : '');
+  pill.innerHTML = '<div class="sjp-thumb" style="background-image:url(\'' + show.thumb + '\')"></div>'
+    + '<div class="sjp-text"><div class="sjp-title">' + title + '</div><div class="sjp-sub">' + sub + '</div></div>'
+    + '<div class="sjp-icon">' + icon + '</div>';
+  document.body.classList.add('has-scan-pill');
+}
+
+// Tipp auf die Leiste: fertigen Scan prüfen bzw. Fehler anzeigen
+function _onScanJobsPillTap() {
+  var job = _scanJobs.find(function(j) { return j.status === 'ready'; })
+    || _scanJobs.find(function(j) { return j.status === 'error'; });
+  if (!job) { _showToast('⏳ Wird noch analysiert – du kannst die App weiter nutzen'); return; }
+  _currentScanJobId = job.id;
+  if (job.status === 'ready') {
+    _scanResult = job.result;
+    showScanOverlay('result', _scanResult);
+  } else {
+    showScanOverlay('error', { text: job.error });
   }
 }
 
@@ -802,6 +918,7 @@ async function confirmScanItem() {
     renderWardrobeGrid();
     hideScanOverlay();
     _scanResult = null;
+    if (_currentScanJobId) _removeScanJob(_currentScanJobId);
     _showToast('✅ Kleidungsstück gespeichert!');
     navigate('schrank', document.getElementById('nav-schrank'));
   } catch (err) {
@@ -809,7 +926,11 @@ async function confirmScanItem() {
     _showToast('❌ Speichern fehlgeschlagen: ' + err.message);
   }
 }
-function cancelScan() { hideScanOverlay(); _scanResult = null; }
+function cancelScan() {
+  hideScanOverlay();
+  _scanResult = null;
+  if (_currentScanJobId) _removeScanJob(_currentScanJobId);
+}
 
 // ── Schrank-Kategorien (vom Nutzer frei wählbar) ─────────────────────────────
 // Nutzer kann Kategorien hinzufügen/entfernen (z. B. "Kleider" nur bei Bedarf),
