@@ -9,25 +9,24 @@ function getRemoveBgKey() {
 }
 
 // ── Bild komprimieren (max 1024px, JPEG 0.82) ─────────────────────────────────
-function _compressImage(base64, mimeType) {
+// maxSize: Standard 1600 (KI-Erkennung); für die Hintergrundentfernung größer.
+// Durchsichtige Bereiche werden weiß gefüllt (JPEG kennt keine Transparenz – sonst schwarz).
+function _compressImage(base64, mimeType, maxSize) {
   return new Promise(function(resolve) {
     var img = new Image();
     img.onload = function() {
-      var maxSize = 1600; // Höhere Auflösung für bessere KI-Erkennung
+      maxSize = maxSize || 1600; // Höhere Auflösung für bessere KI-Erkennung
       var w = img.naturalWidth;
       var h = img.naturalHeight;
-      if (w <= maxSize && h <= maxSize) {
-        var c = document.createElement('canvas');
-        c.width = w; c.height = h;
-        c.getContext('2d').drawImage(img, 0, 0);
-        resolve({ base64: c.toDataURL('image/jpeg', 0.92).split(',')[1], mimeType: 'image/jpeg' });
-        return;
-      }
-      var scale = Math.min(maxSize / w, maxSize / h);
+      var scale = Math.min(1, maxSize / w, maxSize / h);
       var c = document.createElement('canvas');
       c.width = Math.round(w * scale);
       c.height = Math.round(h * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      var ctx = c.getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
       resolve({ base64: c.toDataURL('image/jpeg', 0.92).split(',')[1], mimeType: 'image/jpeg' });
     };
     img.onerror = function() { resolve({ base64: base64, mimeType: mimeType }); };
@@ -151,14 +150,15 @@ function saveWardrobe(items) {
   }
 }
 
-// Bild für localStorage komprimieren (max 400px, JPEG 0.72)
+// Bild zum Speichern verkleinern (max 800px; Bilder liegen in IndexedDB, daher
+// ist mehr Auflösung als früher in localStorage kein Problem → schärfere Kacheln)
 function _compressForStorage(dataUrl) {
   return new Promise(function(resolve) {
     if (!dataUrl || dataUrl.length < 100) { resolve(dataUrl); return; }
     var isPng = dataUrl.startsWith('data:image/png');
     var img = new Image();
     img.onload = function() {
-      var maxSize = 400;
+      var maxSize = 800;
       var w = img.naturalWidth, h = img.naturalHeight;
       if (w > maxSize || h > maxSize) {
         var scale = Math.min(maxSize / w, maxSize / h);
@@ -168,6 +168,7 @@ function _compressForStorage(dataUrl) {
       var canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
       if (isPng) {
         ctx.drawImage(img, 0, 0, w, h);
         resolve(canvas.toDataURL('image/png'));
@@ -175,10 +176,80 @@ function _compressForStorage(dataUrl) {
         ctx.fillStyle = '#0d1b2e';
         ctx.fillRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.72));
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
       }
     };
     img.onerror = function() { resolve(dataUrl); };
+    img.src = dataUrl;
+  });
+}
+
+// ── Freigestelltes Bild nachbearbeiten ───────────────────────────────────────
+// 1. Halo/Reste: fast durchsichtige Pixel ganz entfernen, fast deckende voll deckend
+// 2. Leeren durchsichtigen Rand abschneiden (mit etwas Luft), damit das Teil die
+//    Kachel ausfüllt statt klein in der Mitte zu schweben
+function _cleanupCutout(dataUrl) {
+  return new Promise(function(resolve) {
+    if (!dataUrl || !dataUrl.startsWith('data:image/png')) { resolve(dataUrl); return; }
+    var img = new Image();
+    img.onload = function() {
+      var w = img.naturalWidth, h = img.naturalHeight;
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      var data;
+      try { data = ctx.getImageData(0, 0, w, h); } catch (e) { resolve(dataUrl); return; }
+      var px = data.data;
+      var minX = w, minY = h, maxX = -1, maxY = -1;
+      for (var y = 0; y < h; y++) {
+        for (var x = 0; x < w; x++) {
+          var i = (y * w + x) * 4 + 3;
+          var a = px[i];
+          if (a < 16) { px[i] = 0; continue; }
+          if (a > 240) px[i] = 255;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+      if (maxX < 0) { resolve(dataUrl); return; } // nichts erkannt → Original behalten
+      ctx.putImageData(data, 0, 0);
+      var pad = Math.round(Math.max(maxX - minX, maxY - minY) * 0.04);
+      minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+      maxX = Math.min(w - 1, maxX + pad); maxY = Math.min(h - 1, maxY + pad);
+      var out = document.createElement('canvas');
+      out.width = maxX - minX + 1; out.height = maxY - minY + 1;
+      out.getContext('2d').drawImage(c, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
+      resolve(out.toDataURL('image/png'));
+    };
+    img.onerror = function() { resolve(dataUrl); };
+    img.src = dataUrl;
+  });
+}
+
+// Hat das Bild schon einen durchsichtigen Hintergrund (z. B. iPhone "Motiv freistellen")?
+function _hasTransparency(dataUrl) {
+  return new Promise(function(resolve) {
+    if (!/^data:image\/(png|webp|gif)/.test(dataUrl || '')) { resolve(false); return; }
+    var img = new Image();
+    img.onload = function() {
+      // Verkleinert prüfen reicht und ist schnell
+      var s = Math.min(1, 256 / Math.max(img.naturalWidth, img.naturalHeight));
+      var w = Math.max(1, Math.round(img.naturalWidth * s)), h = Math.max(1, Math.round(img.naturalHeight * s));
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      var px;
+      try { px = ctx.getImageData(0, 0, w, h).data; } catch (e) { resolve(false); return; }
+      var transparent = 0;
+      for (var i = 3; i < px.length; i += 4) if (px[i] < 200) transparent++;
+      // Mindestens 5 % durchsichtig = schon freigestellt
+      resolve(transparent / (w * h) > 0.05);
+    };
+    img.onerror = function() { resolve(false); };
     img.src = dataUrl;
   });
 }
@@ -248,9 +319,9 @@ async function _loadRembgModule() {
 async function removeBackground(base64, mimeType, onStep) {
   var step = onStep || function(text) { showScanOverlay('loading', { text: text }); };
   try {
-    // Beim ersten Aufruf lädt das Modell (~40 MB, wird vom Browser gecacht)
+    // Beim ersten Aufruf lädt das Modell (~80 MB, wird vom Browser gecacht)
     if (!_rembgModelLoaded) {
-      step('⏳ KI-Modell wird geladen… (nur einmalig, ~40 MB)');
+      step('⏳ KI-Modell wird geladen… (nur einmalig, ~80 MB)');
     } else {
       step('✂️ Hintergrund wird entfernt…');
     }
@@ -652,13 +723,17 @@ async function _cropAndContinue() {
   out.height = cropH;
   out.getContext('2d').drawImage(fullCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-  var dataUrl = out.toDataURL('image/jpeg', 0.95);
+  // Schon freigestellte Bilder (durchsichtiger Hintergrund) als PNG behalten,
+  // sonst würde JPEG die Transparenz zerstören
+  var keepAlpha = await _hasTransparency(_cropState.imageDataUrl);
+  var outMime = keepAlpha ? 'image/png' : 'image/jpeg';
+  var dataUrl = keepAlpha ? out.toDataURL('image/png') : out.toDataURL('image/jpeg', 0.95);
   var base64 = dataUrl.split(',')[1];
 
   _cropState._lastOriginalDataUrl = _cropState.imageDataUrl;
   _cropState._lastMimeType = _cropState.mimeType;
   _closeCropScreen();
-  await _processCroppedImage(base64, 'image/jpeg');
+  await _processCroppedImage(base64, outMime);
 }
 
 function _recropImage() {
@@ -688,12 +763,12 @@ async function _processCroppedImage(base64, mimeType) {
   }
   try {
     showScanOverlay('loading', { text: '📸 Foto wird hochgeladen…' });
+    var imageDataUrl = await _makeCutout(base64, mimeType, function(text) {
+      showScanOverlay('loading', { text: text });
+    });
     var compressed = await _compressImage(base64, mimeType);
     base64 = compressed.base64;
     mimeType = compressed.mimeType;
-
-    // removeBackground zeigt eigene Lade-Meldung (Modell-Download vs. normaler Lauf)
-    var imageDataUrl = await removeBackground(base64, mimeType);
 
     // If this is an item image update (from item detail), save directly
     if (_cropState && _cropState._isItemImageUpdate) {
@@ -753,10 +828,11 @@ async function _runScanJob(job, base64, mimeType) {
   job.status = 'processing';
   try {
     setStep('📸 Foto wird vorbereitet…');
+    var imageDataUrl = await _makeCutout(base64, mimeType, setStep);
+    // KI-Erkennung bekommt eine handliche JPEG-Version
     var compressed = await _compressImage(base64, mimeType);
     base64 = compressed.base64;
     mimeType = compressed.mimeType;
-    var imageDataUrl = await removeBackground(base64, mimeType, setStep);
     setStep('🔍 KI erkennt Kleidungsstück…');
     var analysis = await analyzeClothingWithGemini(base64, mimeType);
     job.result = Object.assign({}, analysis, { imageDataUrl: imageDataUrl, _origDataUrl: job.origDataUrl });
@@ -768,6 +844,23 @@ async function _runScanJob(job, base64, mimeType) {
     job.error = (err && err.message) || 'KI-Analyse fehlgeschlagen.';
   }
   _renderScanJobsPill();
+}
+
+// Freigestelltes Bild erzeugen: schon freigestellte Fotos (z. B. iPhone "Motiv
+// kopieren") direkt übernehmen, sonst Hintergrund auf einer großen, scharfen
+// Version entfernen; danach Säume säubern + leeren Rand abschneiden.
+async function _makeCutout(base64, mimeType, setStep) {
+  var src = 'data:' + mimeType + ';base64,' + base64;
+  var cutout;
+  if (await _hasTransparency(src)) {
+    setStep('✂️ Bereits freigestellt – wird übernommen');
+    cutout = src;
+  } else {
+    var big = await _compressImage(base64, mimeType, 2048);
+    cutout = await removeBackground(big.base64, big.mimeType, setStep);
+  }
+  setStep('✨ Kanten werden gesäubert…');
+  return _cleanupCutout(cutout);
 }
 
 function _removeScanJob(id) {
