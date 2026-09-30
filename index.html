@@ -2417,8 +2417,14 @@
     <div id="scan-result">
       <img id="scan-result-img" src="" alt="Kleidungsstück" />
       <div id="scan-duplicate-banner" style="display:none;">
-        <span id="scan-duplicate-text">⚠️ Hast du schon im Schrank</span>
-        <button onclick="_discardDuplicateScan()">🗑️ Vorhandenes löschen</button>
+        <div class="scan-dup-row">
+          <div id="scan-duplicate-thumb"></div>
+          <span id="scan-duplicate-text">⚠️ Hast du schon im Schrank</span>
+        </div>
+        <div class="scan-dup-btns">
+          <button onclick="_dismissDuplicateScan()">Ist ein anderes</button>
+          <button onclick="_discardDuplicateScan()">🗑️ Vorhandenes löschen</button>
+        </div>
       </div>
       <div id="scan-result-info">
 

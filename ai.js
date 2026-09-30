@@ -1034,26 +1034,92 @@ function hideScanOverlay() {
 // ── Duplikat-Erkennung: gescanntes Teil evtl. schon im Schrank ────────────────
 var _scanDuplicateId = null;
 
-function _findDuplicateWardrobeItem(data) {
-  var name = (data && data.name || '').trim().toLowerCase();
-  if (!name) return null;
-  return loadWardrobe().find(function(w) {
-    return (w.name || '').trim().toLowerCase() === name;
-  }) || null;
+// Früher reichte ein gleicher Name ("Weißes T-Shirt") – dadurch galten zwei
+// verschiedene Shirts als Duplikat. Jetzt entscheidet das Aussehen: beide
+// freigestellten Bilder werden verkleinert verglichen (Farbabstand 0–255).
+// Getestet: dasselbe Teil neu fotografiert ≈ 16, verschiedene Teile ≈ 43–52.
+var DUPLICATE_MAX_DIST = 28;
+
+// Kleine 24×24-Signatur eines Bildes (auf grauem Grund, Seitenverhältnis erhalten)
+function _imageSignature(url) {
+  return new Promise(function(resolve) {
+    if (!url) { resolve(null); return; }
+    var img = new Image();
+    img.onload = function() {
+      var size = 24, c = document.createElement('canvas');
+      c.width = c.height = size;
+      var x = c.getContext('2d');
+      x.fillStyle = '#808080';
+      x.fillRect(0, 0, size, size);
+      var s = Math.min(size / img.naturalWidth, size / img.naturalHeight);
+      var w = img.naturalWidth * s, h = img.naturalHeight * s;
+      x.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      try { resolve(x.getImageData(0, 0, size, size).data); } catch (e) { resolve(null); }
+    };
+    img.onerror = function() { resolve(null); };
+    img.src = url;
+  });
+}
+function _signatureDistance(a, b) {
+  var d = 0, n = 0;
+  for (var k = 0; k < a.length; k += 4) {
+    d += Math.abs(a[k] - b[k]) + Math.abs(a[k + 1] - b[k + 1]) + Math.abs(a[k + 2] - b[k + 2]);
+    n += 3;
+  }
+  return d / n;
 }
 
-function _checkScanDuplicate(data) {
+async function _findDuplicateWardrobeItem(data) {
+  var wardrobe = loadWardrobe();
+  var sig = await _imageSignature(data && data.imageDataUrl);
+  var best = null, bestDist = Infinity;
+  for (var i = 0; i < wardrobe.length; i++) {
+    var w = wardrobe[i];
+    if (sig && w.imageDataUrl) {
+      var wsig = await _imageSignature(w.imageDataUrl);
+      if (!wsig) continue;
+      var dist = _signatureDistance(sig, wsig);
+      if (dist < bestDist) { bestDist = dist; best = w; }
+    }
+  }
+  if (best && bestDist <= DUPLICATE_MAX_DIST) return best;
+  // Ohne Bilder: nur warnen, wenn Name UND Farbe exakt gleich sind
+  if (!sig) {
+    var name = (data && data.name || '').trim().toLowerCase();
+    var color = (data && data.color || '').trim().toLowerCase();
+    return wardrobe.find(function(w) {
+      return name && (w.name || '').trim().toLowerCase() === name && (w.color || '').trim().toLowerCase() === color;
+    }) || null;
+  }
+  return null;
+}
+
+async function _checkScanDuplicate(data) {
   var banner = document.getElementById('scan-duplicate-banner');
   var textEl = document.getElementById('scan-duplicate-text');
+  var thumb = document.getElementById('scan-duplicate-thumb');
   if (!banner) return;
-  var dup = _findDuplicateWardrobeItem(data);
+  banner.style.display = 'none';
+  _scanDuplicateId = null;
+  var dup = await _findDuplicateWardrobeItem(data);
+  // Inzwischen anderes Ergebnis geöffnet/geschlossen? Dann nichts anzeigen
+  if (_scanResult !== data) return;
   _scanDuplicateId = dup ? dup.id : null;
   if (dup) {
-    if (textEl) textEl.textContent = '⚠️ "' + (dup.name || 'Teil') + '" hast du schon im Schrank';
+    if (textEl) textEl.textContent = '⚠️ Sieht aus wie dein „' + (dup.name || 'Teil') + '“ – hast du das schon im Schrank?';
+    if (thumb) {
+      thumb.style.backgroundImage = dup.imageDataUrl ? 'url(\'' + dup.imageDataUrl + '\')' : '';
+      thumb.textContent = dup.imageDataUrl ? '' : (dup.emoji || '👕');
+    }
     banner.style.display = 'flex';
-  } else {
-    banner.style.display = 'none';
   }
+}
+
+// "Ist ein anderes Teil" – Warnung ausblenden, nichts löschen
+function _dismissDuplicateScan() {
+  _scanDuplicateId = null;
+  var banner = document.getElementById('scan-duplicate-banner');
+  if (banner) banner.style.display = 'none';
 }
 
 // Vorhandenes (dupliziertes) Schrank-Teil löschen, damit das neue ohne Duplikat gespeichert werden kann
@@ -2601,6 +2667,11 @@ function _ensureAiStyles() {
     '#scan-duplicate-banner { display:none;flex-direction:column;align-items:stretch;gap:10px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);border-radius:16px;padding:12px 14px;width:100%;margin-bottom:14px; }',
     '#scan-duplicate-text { font-size:13px;font-weight:700;color:#fbbf24;line-height:1.4; }',
     '#scan-duplicate-banner button { background:rgba(245,158,11,0.18);border:1.5px solid rgba(245,158,11,0.5);color:#fbbf24;border-radius:12px;padding:9px 14px;font-size:13px;font-weight:800;cursor:pointer; }',
+    '.scan-dup-row { display:flex;align-items:center;gap:12px; }',
+    '#scan-duplicate-thumb { width:52px;height:52px;flex-shrink:0;border-radius:12px;background:#0d1b2e center/contain no-repeat;display:flex;align-items:center;justify-content:center;font-size:26px; }',
+    '.scan-dup-btns { display:flex;gap:8px; }',
+    '.scan-dup-btns button { flex:1; }',
+    '.scan-dup-btns button:first-child { background:transparent;border-color:rgba(255,255,255,0.2);color:var(--text2); }',
     '.scan-field-row { display:flex;align-items:center;gap:10px;margin-bottom:10px; }',
     '.scan-field-row:last-child { margin-bottom:0; }',
     '.scan-field-label { font-size:11px;font-weight:800;color:var(--text2);width:62px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.03em; }',
