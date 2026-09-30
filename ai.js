@@ -996,6 +996,7 @@ function showScanOverlay(state, data) {
       el.style.display = 'flex';
       var img = document.getElementById('scan-result-img');
       if (img) img.src = data.imageDataUrl || '';
+      _checkScanDuplicate(data);
       var set = function(id, val) { var e = document.getElementById(id); if (e) e.value = val || ''; };
       set('scan-edit-name', data.name);
       set('scan-edit-brand', data.brand);
@@ -1028,6 +1029,47 @@ function showScanOverlay(state, data) {
 function hideScanOverlay() {
   var overlay = document.getElementById('scan-overlay');
   if (overlay) overlay.style.display = 'none';
+}
+
+// ── Duplikat-Erkennung: gescanntes Teil evtl. schon im Schrank ────────────────
+var _scanDuplicateId = null;
+
+function _findDuplicateWardrobeItem(data) {
+  var name = (data && data.name || '').trim().toLowerCase();
+  if (!name) return null;
+  return loadWardrobe().find(function(w) {
+    return (w.name || '').trim().toLowerCase() === name;
+  }) || null;
+}
+
+function _checkScanDuplicate(data) {
+  var banner = document.getElementById('scan-duplicate-banner');
+  var textEl = document.getElementById('scan-duplicate-text');
+  if (!banner) return;
+  var dup = _findDuplicateWardrobeItem(data);
+  _scanDuplicateId = dup ? dup.id : null;
+  if (dup) {
+    if (textEl) textEl.textContent = '⚠️ "' + (dup.name || 'Teil') + '" hast du schon im Schrank';
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// Vorhandenes (dupliziertes) Schrank-Teil löschen, damit das neue ohne Duplikat gespeichert werden kann
+function _discardDuplicateScan() {
+  if (!_scanDuplicateId) return;
+  var id = _scanDuplicateId;
+  idbDeleteImage(id).catch(function() {});
+  var items = loadWardrobe();
+  var deleted = items.find(function(i) { return i.id === id; });
+  saveWardrobe(items.filter(function(i) { return i.id !== id; }));
+  if (deleted && deleted.name) _removeItemFromOutfits(deleted.name);
+  renderWardrobeGrid();
+  _scanDuplicateId = null;
+  var banner = document.getElementById('scan-duplicate-banner');
+  if (banner) banner.style.display = 'none';
+  _showToast('🗑️ Vorhandenes Teil gelöscht');
 }
 async function processScanFile(file) {
   if (!file) return;
@@ -1064,6 +1106,7 @@ async function confirmScanItem() {
     renderWardrobeGrid();
     hideScanOverlay();
     _scanResult = null;
+    _scanDuplicateId = null;
     if (_currentScanJobId) _removeScanJob(_currentScanJobId);
     _showToast('✅ Kleidungsstück gespeichert!');
     navigate('schrank', document.getElementById('nav-schrank'));
@@ -1075,6 +1118,7 @@ async function confirmScanItem() {
 function cancelScan() {
   hideScanOverlay();
   _scanResult = null;
+  _scanDuplicateId = null;
   if (_currentScanJobId) _removeScanJob(_currentScanJobId);
 }
 
@@ -2554,6 +2598,9 @@ function _ensureAiStyles() {
     '#scan-result { display:none;flex-direction:column;align-items:center;gap:0;width:100%; }',
     '#scan-result-img { width:200px;height:200px;object-fit:contain;border-radius:24px;background:transparent;margin-bottom:16px;filter:drop-shadow(0 12px 28px rgba(0,0,0,0.5)); }',
     '#scan-result-info { background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:14px 16px;width:100%;margin-bottom:14px; }',
+    '#scan-duplicate-banner { display:none;flex-direction:column;align-items:stretch;gap:10px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);border-radius:16px;padding:12px 14px;width:100%;margin-bottom:14px; }',
+    '#scan-duplicate-text { font-size:13px;font-weight:700;color:#fbbf24;line-height:1.4; }',
+    '#scan-duplicate-banner button { background:rgba(245,158,11,0.18);border:1.5px solid rgba(245,158,11,0.5);color:#fbbf24;border-radius:12px;padding:9px 14px;font-size:13px;font-weight:800;cursor:pointer; }',
     '.scan-field-row { display:flex;align-items:center;gap:10px;margin-bottom:10px; }',
     '.scan-field-row:last-child { margin-bottom:0; }',
     '.scan-field-label { font-size:11px;font-weight:800;color:var(--text2);width:62px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.03em; }',
