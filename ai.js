@@ -260,42 +260,70 @@ function addToWardrobe(item) {
 }
 
 // ── Gemini: Kleidungsstück analysieren ───────────────────────────────────────
-async function _callGeminiAPI(body) {
+// Gratis-Gemini ist öfter überlastet (503 "high demand") oder am Minuten-Limit (429).
+// Deshalb: kurz warten + nochmal, danach auf ein anderes Modell ausweichen.
+// Reihenfolge = getestet mit dem Gratis-Key (2.5-flash-lite gibt es für neue Nutzer nicht mehr).
+var GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-flash-lite-latest', 'gemini-flash-latest'];
+var _geminiPreferred = 0; // zuletzt funktionierendes Modell zuerst probieren
+
+async function _geminiRequest(model, body) {
   const key = getGeminiKey();
-  // Lokal: direkt mit Key aufrufen
+  var res;
   if (key && key !== 'your_gemini_api_key_here') {
-    const res = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-    );
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData?.error?.message || 'Gemini Fehler: ' + res.status);
-    }
-    return res.json();
+    // Lokal: direkt mit Key aufrufen
+    res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  } else {
+    // Produktion: über Vercel Proxy aufrufen (Key bleibt sicher auf Server)
+    res = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: body, model: model })
+    });
   }
-  // Produktion: über Vercel Proxy aufrufen (Key bleibt sicher auf Server)
-  const res = await fetch('/api/gemini', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ body: body, model: 'gemini-2.5-flash' })
-  });
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    const errMsg = (typeof errData?.error === 'string' ? errData.error : errData?.error?.message) || ('Gemini Fehler ' + res.status);
-    throw new Error(errMsg);
-  }
-  return res.json();
+  if (res.ok) return { ok: true, data: await res.json() };
+  const errData = await res.json().catch(() => ({}));
+  const msg = (typeof errData?.error === 'string' ? errData.error : errData?.error?.message) || ('Gemini Fehler ' + res.status);
+  return { ok: false, status: res.status, msg: msg };
 }
 
-async function analyzeClothingWithGemini(base64, mimeType) {
+// onStatus(text) optional: meldet Warte-/Ausweich-Versuche (z. B. an die Scan-Leiste)
+async function _callGeminiAPI(body, onStatus) {
+  var order = GEMINI_MODELS.slice(_geminiPreferred).concat(GEMINI_MODELS.slice(0, _geminiPreferred));
+  var lastMsg = '';
+  for (var m = 0; m < order.length; m++) {
+    var model = order[m];
+    for (var attempt = 0; attempt < 2; attempt++) {
+      var r;
+      try { r = await _geminiRequest(model, body); }
+      catch (e) { r = { ok: false, status: 0, msg: e.message }; } // Netzwerkfehler
+      if (r.ok) { _geminiPreferred = GEMINI_MODELS.indexOf(model); return r.data; }
+      lastMsg = r.msg;
+      // Anfrage selbst fehlerhaft (400/401/403) → anderes Modell hilft nicht
+      if (r.status === 400 || r.status === 401 || r.status === 403) throw new Error(r.msg);
+      // Überlastet / Serverfehler / Netz → kurz warten und gleiches Modell nochmal
+      var overloaded = r.status === 0 || r.status >= 500;
+      if (overloaded && attempt === 0) {
+        if (onStatus) onStatus('⏳ KI-Server ausgelastet – neuer Versuch…');
+        await new Promise(function(res) { setTimeout(res, 2000); });
+        continue;
+      }
+      break; // 429 (Limit) / 404 (Modell weg) / 2. Fehlversuch → nächstes Modell
+    }
+    if (m < order.length - 1 && onStatus) onStatus('🔁 Weiche auf anderes KI-Modell aus…');
+  }
+  console.warn('[gemini] alle Modelle fehlgeschlagen:', lastMsg);
+  throw new Error('Die KI-Server von Google sind gerade stark ausgelastet. Bitte versuche es in ein paar Minuten erneut.');
+}
+
+async function analyzeClothingWithGemini(base64, mimeType, onStatus) {
   const cats = _loadCategories();
   const catList = cats.map(function(c) { return c.id + ' = ' + c.label; }).join(', ');
   const prompt = 'Du bist ein Mode-Experte. Analysiere das Kleidungsstück auf diesem Bild und antworte NUR mit einem validen JSON-Objekt (kein Markdown, keine Erklärung, kein Text außerhalb des JSON):\n{\n  "name": "Name des Kleidungsstücks auf Deutsch",\n  "brand": "Marke falls erkennbar, sonst leerer String",\n  "type": "Kleidungsart auf Deutsch (z.B. Top, Hose, Kleid, Schuh, Accessoire, Jacke)",\n  "category": "ID der passendsten Schrank-Kategorie aus dieser Liste: ' + catList + ' – oder leerer String, wenn keine passt",\n  "color": "Hauptfarbe auf Deutsch",\n  "colorHex": "Hex-Farbcode der Hauptfarbe",\n  "season": "Saison auf Deutsch (Sommer | Winter | Frühling | Ganzjährig)",\n  "seasonClass": "s-sommer | s-winter | s-fruhjahr | s-ganzjahrig",\n  "style": "Stil auf Deutsch (z.B. Casual, Business, Sportlich, Elegant)",\n  "emoji": "Ein einzelnes passendes Emoji"\n}';
   const body = {
     contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }]
   };
-  const data = await _callGeminiAPI(body);
+  const data = await _callGeminiAPI(body, onStatus);
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const jsonStr = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   try { return JSON.parse(jsonStr); }
@@ -810,7 +838,8 @@ function _startScanJob(base64, mimeType, origDataUrl) {
     id: 'scan_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     status: 'waiting', step: 'Wartet…',
     thumb: 'data:' + mimeType + ';base64,' + base64,
-    origDataUrl: origDataUrl, result: null, error: null
+    origDataUrl: origDataUrl, result: null, error: null,
+    src: { base64: base64, mimeType: mimeType } // für "Erneut versuchen"
   };
   _scanJobs.push(job);
   _renderScanJobsPill();
@@ -820,26 +849,54 @@ function _startScanJob(base64, mimeType, origDataUrl) {
 
 async function _runScanJob(job, base64, mimeType) {
   if (_scanJobs.indexOf(job) < 0) return; // inzwischen verworfen
+  base64 = base64 || job.src.base64;
+  mimeType = mimeType || job.src.mimeType;
   var setStep = function(text) { job.step = text; _renderScanJobsPill(); };
   job.status = 'processing';
+  job.error = null;
+  _renderScanJobsPill();
   try {
-    setStep('📸 Foto wird vorbereitet…');
-    var imageDataUrl = await _makeCutout(base64, mimeType, setStep);
-    // KI-Erkennung bekommt eine handliche JPEG-Version
-    var compressed = await _compressImage(base64, mimeType);
-    base64 = compressed.base64;
-    mimeType = compressed.mimeType;
+    // Bereits Erledigtes (bei "Erneut versuchen") nicht nochmal rechnen
+    if (!job.cutout) {
+      setStep('📸 Foto wird vorbereitet…');
+      job.cutout = await _makeCutout(base64, mimeType, setStep);
+      job.thumb = job.cutout;
+    }
+    if (!job.aiInput) {
+      // KI-Erkennung bekommt eine handliche JPEG-Version
+      job.aiInput = await _compressImage(base64, mimeType);
+    }
     setStep('🔍 KI erkennt Kleidungsstück…');
-    var analysis = await analyzeClothingWithGemini(base64, mimeType);
-    job.result = Object.assign({}, analysis, { imageDataUrl: imageDataUrl, _origDataUrl: job.origDataUrl });
-    job.thumb = imageDataUrl;
+    var analysis = await analyzeClothingWithGemini(job.aiInput.base64, job.aiInput.mimeType, setStep);
+    job.result = Object.assign({}, analysis, { imageDataUrl: job.cutout, _origDataUrl: job.origDataUrl });
     job.status = 'ready';
+    job.aiInput = null; // Speicher freigeben
+    job.src = null;
     _showToast('✅ ' + (analysis.name || 'Kleidungsstück') + ' erkannt – tippe zum Prüfen');
   } catch (err) {
     job.status = 'error';
     job.error = (err && err.message) || 'KI-Analyse fehlgeschlagen.';
   }
   _renderScanJobsPill();
+}
+
+// "Erneut versuchen" im Fehler-Dialog: fehlgeschlagenen Scan wiederholen, ohne das
+// Foto neu auszuwählen (freigestelltes Bild bleibt erhalten, nur die KI läuft nochmal)
+function _retryScanJob() {
+  var job = _scanJobs.find(function(j) { return j.id === _currentScanJobId; });
+  hideScanOverlay();
+  if (!job) {
+    // Kein Hintergrund-Job (z. B. "Bild ändern") → wie bisher neues Foto wählen
+    _scanResult = null;
+    var input = document.getElementById('scan-gallery-input');
+    if (input) input.click();
+    return;
+  }
+  _currentScanJobId = null;
+  job.status = 'waiting';
+  job.step = 'Wartet…';
+  _renderScanJobsPill();
+  _scanQueue = _scanQueue.then(function() { return _runScanJob(job); });
 }
 
 // Freigestelltes Bild erzeugen: schon freigestellte Fotos (z. B. iPhone "Motiv
