@@ -734,6 +734,7 @@
     .settings-row-icon { font-size:20px; width:28px; text-align:center; flex-shrink:0; }
     .settings-row-label { flex:1; font-size:15px; font-weight:700; color:var(--text); }
     .settings-row-arrow { font-size:18px; color:var(--text2); }
+    .settings-row-sub { font-size:12px; font-weight:500; color:var(--text2); margin-top:2px; }
     .settings-toggle { position:relative; width:44px; height:26px; flex-shrink:0; }
     .settings-toggle input { opacity:0; width:0; height:0; position:absolute; }
     .settings-toggle-slider { position:absolute; inset:0; background:#D1D5DB; border-radius:13px; transition:background 0.2s; cursor:pointer; }
@@ -2021,6 +2022,23 @@
             <div class="settings-row-label">Profil bearbeiten</div>
             <div class="settings-row-arrow">›</div>
           </div>
+          <div class="settings-section-header">Daten</div>
+          <div class="settings-row" onclick="_exportBackup()">
+            <div class="settings-row-icon">💾</div>
+            <div class="settings-row-label">Schrank sichern
+              <div class="settings-row-sub" id="backup-last-info">Noch nie gesichert</div>
+            </div>
+            <div class="settings-row-arrow">›</div>
+          </div>
+          <div class="settings-row" onclick="_importBackupPick()">
+            <div class="settings-row-icon">📂</div>
+            <div class="settings-row-label">Schrank laden
+              <div class="settings-row-sub">Sicherung von diesem oder einem anderen Gerät</div>
+            </div>
+            <div class="settings-row-arrow">›</div>
+          </div>
+          <input type="file" id="backup-file-input" accept="application/json,.json" style="display:none"
+                 onchange="_importBackupFile(this.files[0])" />
           <div class="settings-section-header">Datenschutz</div>
           <div class="settings-row">
             <div class="settings-row-icon">🔒</div>

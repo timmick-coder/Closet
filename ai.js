@@ -75,6 +75,17 @@ function idbGetAllImages() {
     });
   });
 }
+function idbClearImages() {
+  _imgCache = {};
+  return _idbOpen().then(function(db) {
+    return new Promise(function(resolve) {
+      var tx = db.transaction('images', 'readwrite');
+      tx.objectStore('images').clear();
+      tx.oncomplete = function() { resolve(); };
+      tx.onerror    = function() { resolve(); };
+    });
+  });
+}
 function idbDeleteImage(id) {
   delete _imgCache[String(id)];
   return _idbOpen().then(function(db) {
@@ -5075,6 +5086,138 @@ function _closePostDetail() {
 function _openSettings() {
   var panel = document.getElementById('settings-panel');
   if (panel) panel.classList.add('active');
+  _updateBackupInfo();
+  // Sicherung schon vorbereiten: iOS erlaubt "Teilen" nur direkt nach dem Tipp,
+  // langes Zusammensuchen der Bilder danach würde das verhindern
+  _prepareBackup();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCHRANK SICHERN / LADEN (Backup als Datei)
+// ─────────────────────────────────────────────────────────────────────────────
+// Alle Daten liegen nur im Browser (localStorage + IndexedDB-Bilder). Die Sicherung
+// packt alles in eine JSON-Datei, die man in "Dateien" ablegen und auf einem anderen
+// Gerät / einer anderen Adresse (z. B. Vorschau-Version) wieder laden kann.
+var _BACKUP_FORMAT = 'stylesync-backup';
+var _preparedBackup = null; // { file, items, images }
+
+function _backupFileName() {
+  var d = new Date();
+  var pad = function(n) { return (n < 10 ? '0' : '') + n; };
+  return 'StyleSync-Sicherung-' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + '.json';
+}
+
+async function _prepareBackup() {
+  try {
+    var store = {};
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf('stylesync_') === 0 && k !== 'stylesync_last_backup') store[k] = localStorage.getItem(k);
+    }
+    var images = await idbGetAllImages();
+    var payload = {
+      format: _BACKUP_FORMAT, version: 1, createdAt: new Date().toISOString(),
+      localStorage: store, images: images
+    };
+    var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    _preparedBackup = {
+      file: new File([blob], _backupFileName(), { type: 'application/json' }),
+      items: loadWardrobe().length, images: Object.keys(images).length
+    };
+  } catch (e) {
+    console.warn('[backup] vorbereiten fehlgeschlagen', e);
+    _preparedBackup = null;
+  }
+  return _preparedBackup;
+}
+
+async function _exportBackup() {
+  var b = _preparedBackup || await _prepareBackup();
+  if (!b) { _showToast('❌ Sicherung fehlgeschlagen'); return; }
+  var done = function() {
+    try { localStorage.setItem('stylesync_last_backup', new Date().toISOString()); } catch (e) {}
+    _updateBackupInfo();
+  };
+  // iPhone/Android: Teilen-Menü → "In Dateien sichern" / Drive / AirDrop
+  if (navigator.canShare && navigator.canShare({ files: [b.file] })) {
+    try {
+      await navigator.share({ files: [b.file], title: 'StyleSync-Sicherung' });
+      done();
+      _showToast('✅ Sicherung erstellt (' + b.items + ' Teile)');
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // selbst abgebrochen
+      // sonst: auf normalen Download ausweichen
+    }
+  }
+  var url = URL.createObjectURL(b.file);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = b.file.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 4000);
+  done();
+  _showToast('✅ Sicherung heruntergeladen (' + b.items + ' Teile)');
+}
+
+function _importBackupPick() {
+  var input = document.getElementById('backup-file-input');
+  if (input) { input.value = ''; input.click(); }
+}
+
+async function _importBackupFile(file) {
+  if (!file) return;
+  var data;
+  try { data = JSON.parse(await file.text()); }
+  catch (e) { _showToast('❌ Datei konnte nicht gelesen werden'); return; }
+  if (!data || data.format !== _BACKUP_FORMAT || !data.localStorage) {
+    _showToast('❌ Keine StyleSync-Sicherung');
+    return;
+  }
+  var count = 0;
+  try { count = JSON.parse(data.localStorage.stylesync_wardrobe || '[]').length; } catch (e) {}
+  var when = data.createdAt ? new Date(data.createdAt).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : 'unbekannt';
+  var ok = confirm('Sicherung vom ' + when + ' mit ' + count + ' Teilen laden?\n\n'
+    + 'Dein aktueller Schrank, deine Outfits und Ordner auf diesem Gerät werden dabei ersetzt.');
+  if (!ok) return;
+  try {
+    // Alte StyleSync-Daten entfernen, dann Sicherung einspielen
+    Object.keys(localStorage).filter(function(k) { return k.indexOf('stylesync_') === 0; })
+      .forEach(function(k) { localStorage.removeItem(k); });
+    Object.keys(data.localStorage).forEach(function(k) {
+      if (k.indexOf('stylesync_') === 0) localStorage.setItem(k, data.localStorage[k]);
+    });
+    await idbClearImages();
+    var imgs = data.images || {};
+    for (var id in imgs) await idbPutImage(id, imgs[id]);
+  } catch (e) {
+    console.error('[backup] laden fehlgeschlagen', e);
+    _showToast('❌ Laden fehlgeschlagen: ' + (e.message || e));
+    return;
+  }
+  _showToast('✅ Sicherung geladen – App startet neu');
+  setTimeout(function() { location.reload(); }, 900);
+}
+
+function _updateBackupInfo() {
+  var el = document.getElementById('backup-last-info');
+  if (!el) return;
+  var last = null;
+  try { last = localStorage.getItem('stylesync_last_backup'); } catch (e) {}
+  el.textContent = last
+    ? 'Zuletzt gesichert: ' + new Date(last).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
+    : 'Noch nie gesichert';
+}
+
+// Browser bitten, die Daten nicht automatisch zu löschen (v. a. Safari räumt sonst auf)
+function _requestPersistentStorage() {
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persisted().then(function(p) { if (!p) navigator.storage.persist(); }).catch(function() {});
+    }
+  } catch (e) {}
 }
 function _closeSettings() {
   var panel = document.getElementById('settings-panel');
@@ -5856,6 +5999,8 @@ document.addEventListener('DOMContentLoaded', function() {
   _pruneGhostOutfitItems();
   // Bestehende Teile einmalig den Schrank-Kategorien zuordnen
   _migrateItemCategories();
+  // Browser bitten, die (nur lokal gespeicherten) Daten dauerhaft zu behalten
+  _requestPersistentStorage();
 
   _ensureAiStyles();
   renderWardrobeGrid();
