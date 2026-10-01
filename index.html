@@ -190,7 +190,10 @@
     }
     .plus-btn svg { width: 24px; height: 24px; stroke: white; fill: none; stroke-width: 2.5; stroke-linecap: round; }
 
-    .clothes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 0 16px; }
+    /* minmax(0,1fr): lange Namen dürfen eine Spalte nicht breiter machen (sonst ungleich breite Karten) */
+    .clothes-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0 16px; }
+    .clothes-grid .cloth-card { min-width: 0; }
+    .clothes-grid .cloth-name { overflow-wrap: anywhere; hyphens: auto; }
     .cloth-card {
       background: rgba(255,255,255,0.07); border-radius: 18px; padding: 14px 8px 12px;
       border: 1px solid rgba(255,255,255,0.12);
