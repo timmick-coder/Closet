@@ -194,6 +194,13 @@
     .clothes-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0 16px; }
     .clothes-grid .cloth-card { min-width: 0; }
     .clothes-grid .cloth-name { overflow-wrap: anywhere; hyphens: auto; }
+    /* Mehrere Farben ("Schwarz, Weiß, Rot"): in der Kachel umbrechen, max. 2 Zeilen */
+    .clothes-grid .cloth-color-row { max-width: 100%; align-items: flex-start; }
+    .clothes-grid .color-dot { margin-top: 3px; }
+    .clothes-grid .cloth-color-name {
+      min-width: 0; overflow-wrap: anywhere; line-height: 1.3; text-align: left;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
     .cloth-card {
       background: rgba(255,255,255,0.07); border-radius: 18px; padding: 14px 8px 12px;
       border: 1px solid rgba(255,255,255,0.12);
