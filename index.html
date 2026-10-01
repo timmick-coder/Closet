@@ -2034,6 +2034,8 @@
         <div class="profil-stats">
           <div class="profil-stat"><div class="pnum" id="profil-artikel-count">0</div><div class="plbl">Artikel</div></div>
           <div class="profil-stat"><div class="pnum" id="profil-outfits-count">0</div><div class="plbl">Outfits</div></div>
+          <!-- Follower: noch kein Server → vorerst 0 -->
+          <div class="profil-stat"><div class="pnum" id="profil-follower-count">0</div><div class="plbl">Follower</div></div>
           <div class="profil-stat"><div class="pnum" id="profil-posts-count">0</div><div class="plbl">Posts</div></div>
         </div>
         <div class="profil-posts-label"><span>Meine Posts</span><button class="new-post-btn" onclick="_openNewPostModal()">+ Neuer Beitrag</button></div>
@@ -2086,6 +2088,23 @@
           </div>
           <input type="file" id="backup-file-input" accept="application/json,.json" style="display:none"
                  onchange="_importBackupFile(this.files[0])" />
+          <div class="settings-section-header">Datenschutz</div>
+          <div class="settings-row">
+            <div class="settings-row-icon">🔒</div>
+            <div class="settings-row-label">Schrank für Freunde teilen</div>
+            <label class="settings-toggle"><input type="checkbox" data-setting="share_wardrobe" checked /><span class="settings-toggle-slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-icon">🌍</div>
+            <div class="settings-row-label">Profil öffentlich</div>
+            <label class="settings-toggle"><input type="checkbox" data-setting="public_profile" /><span class="settings-toggle-slider"></span></label>
+          </div>
+          <div class="settings-section-header">Allgemein</div>
+          <div class="settings-row">
+            <div class="settings-row-icon">🔔</div>
+            <div class="settings-row-label">Benachrichtigungen</div>
+            <label class="settings-toggle"><input type="checkbox" data-setting="notifications" checked /><span class="settings-toggle-slider"></span></label>
+          </div>
           <div class="settings-section-header">Hilfe</div>
           <div class="settings-row" onclick="_openInfoSheet('help')">
             <div class="settings-row-icon">📸</div>

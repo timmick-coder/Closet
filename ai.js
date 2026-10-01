@@ -5122,6 +5122,25 @@ function _openSettings() {
   _prepareBackup();
 }
 
+// Schalter in den Einstellungen (input[data-setting]) behalten ihren Zustand.
+// Wirkung haben sie noch keine (kein Server) – Benachrichtigungen folgen.
+var _SETTINGS_KEY = 'stylesync_settings';
+function _loadSettings() {
+  try { return JSON.parse(localStorage.getItem(_SETTINGS_KEY) || '{}'); } catch (e) { return {}; }
+}
+function _initSettingToggles() {
+  var s = _loadSettings();
+  document.querySelectorAll('input[data-setting]').forEach(function(input) {
+    var key = input.getAttribute('data-setting');
+    if (typeof s[key] === 'boolean') input.checked = s[key];
+    input.addEventListener('change', function() {
+      var cur = _loadSettings();
+      cur[key] = input.checked;
+      try { localStorage.setItem(_SETTINGS_KEY, JSON.stringify(cur)); } catch (e) {}
+    });
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // EIGENES PROFIL (Name, @Benutzername, Profilbild) – ersetzt "Anna Müller"-Demo
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5290,13 +5309,21 @@ function _updateStyleSummary() {
 // Text für den KI-Prompt (leer, wenn nichts angegeben)
 function _stylePromptText() {
   var p = _loadStylePrefs();
+  // Bewusst schwach gewichtet: nur leichte Orientierung, damit die Vorschläge
+  // abwechslungsreich bleiben. Nur "trägt nicht" wird respektiert.
   var lines = [];
-  if ((p.styles || []).length) lines.push('Mag diese Stile: ' + p.styles.join(', '));
-  if ((p.colors || []).length) lines.push('Lieblingsfarben: ' + p.colors.join(', '));
-  if ((p.occasions || []).length) lines.push('Braucht Outfits vor allem für: ' + p.occasions.join(', '));
-  if (p.avoid) lines.push('Mag NICHT / trägt nicht: ' + p.avoid);
-  if (p.notes) lines.push('Weitere Hinweise: ' + p.notes);
-  return lines.length ? '\n\nSTIL-PROFIL DES NUTZERS (berücksichtige es, wo es zum Wunsch passt):\n- ' + lines.join('\n- ') : '';
+  if ((p.styles || []).length) lines.push('Stile, die er/sie oft mag: ' + p.styles.join(', '));
+  if ((p.colors || []).length) lines.push('Farben, die er/sie gern trägt: ' + p.colors.join(', '));
+  if ((p.occasions || []).length) lines.push('Typische Anlässe: ' + p.occasions.join(', '));
+  if (p.notes) lines.push('Hinweise: ' + p.notes);
+  var text = '';
+  if (lines.length) {
+    text += '\n\nSTIL-VORLIEBEN (nur als leichte Orientierung – der WUNSCH hat Vorrang; '
+      + 'nicht jedes Outfit muss dazu passen, bleib abwechslungsreich und schlag ruhig auch andere Kombinationen vor):\n- '
+      + lines.join('\n- ');
+  }
+  if (p.avoid) text += '\n\nBitte vermeiden (trägt der Nutzer nicht): ' + p.avoid;
+  return text;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6245,6 +6272,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Eigenes Profil (Name/Bild) überall eintragen + Stil-Zusammenfassung in den Einstellungen
   _applyProfile();
   _updateStyleSummary();
+  _initSettingToggles();
 
   _ensureAiStyles();
   renderWardrobeGrid();
