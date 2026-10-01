@@ -768,12 +768,25 @@
     .profil-name-new { transition: font-size 0.35s ease; }
     .profil-edit { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.38s cubic-bezier(0.4,0,0.2,1); }
     .profil-edit-inner { overflow: hidden; min-height: 0; opacity: 0; transition: opacity 0.25s ease; }
-    .profil-hero.expanded { padding-bottom: 20px; }
-    .profil-hero.expanded .profil-identity { gap: 18px; }
-    .profil-hero.expanded .profil-avatar-new { width: 96px; height: 96px; font-size: 46px; border-width: 4px; }
-    .profil-hero.expanded .profil-name-new { font-size: 24px; }
-    .profil-hero.expanded .profil-edit { grid-template-rows: 1fr; }
-    .profil-hero.expanded .profil-edit-inner { opacity: 1; transition-delay: 0.12s; }
+    /* Große Profilansicht: Bild als großes abgerundetes Quadrat, Name/@ darunter zentriert */
+    .profil-hero.expanded { padding: 56px 20px 24px; }
+    .profil-hero.expanded .profil-identity { flex-direction: column; text-align: center; gap: 14px; }
+    .profil-hero.expanded .profil-avatar-new { width: 190px; height: 190px; border-radius: 32px; font-size: 92px; border-width: 4px; box-shadow: 0 14px 34px rgba(0,0,0,0.3); }
+    .profil-avatar-new { transition: width 0.35s ease, height 0.35s ease, font-size 0.35s ease, border-width 0.35s ease, border-radius 0.35s ease; }
+    .profil-avatar-new .avatar-photo { transition: border-radius 0.35s ease; }
+    .profil-hero.expanded .profil-avatar-new .avatar-photo { border-radius: 28px; }
+    .profil-hero.expanded .profil-name-new { font-size: 26px; }
+    .profil-hero.expanded .profil-handle-new { font-size: 15px; }
+    /* Kopf-Knöpfe: ⚙️ normal, ✕ / Bearbeiten nur in der großen Ansicht */
+    .profil-close-btn, .profil-edit-btn { position: absolute; top: 14px; z-index: 2; border: none; cursor: pointer; display: none; color: #fff; }
+    .profil-close-btn { left: 14px; width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.18); font-size: 16px; }
+    .profil-edit-btn { right: 14px; padding: 8px 14px; border-radius: 18px; background: rgba(255,255,255,0.22); font-size: 14px; font-weight: 800; }
+    .profil-hero.expanded .profil-close-btn, .profil-hero.expanded .profil-edit-btn { display: block; }
+    .profil-hero.expanded .profil-settings-btn, .profil-hero.editing .profil-edit-btn { display: none; }
+    /* Bearbeiten-Formular erst nach "Bearbeiten" */
+    .profil-hero.editing .profil-edit { grid-template-rows: 1fr; }
+    .profil-hero.editing .profil-edit-inner { opacity: 1; transition-delay: 0.12s; }
+    .profil-edit-inner { text-align: left; }
     .profil-edit-inner > :first-child { margin-top: 18px; }
     /* Formular auf blauem Grund */
     .profil-edit .pe-hint { color: rgba(255,255,255,0.85); }
@@ -2065,8 +2078,11 @@
       <div class="scroll-content">
         <div class="profil-hero" id="profil-hero">
           <button class="profil-settings-btn" onclick="_openSettings()">⚙️</button>
-          <!-- Name/Bild kommen aus dem eigenen Profil (_applyProfile in ai.js); Tippen = Kopf klappt zum Bearbeiten auf -->
-          <div class="profil-identity" onclick="_openProfileEdit()" style="cursor:pointer;">
+          <!-- Nur in der großen Profilansicht: schließen (links) / bearbeiten (rechts) -->
+          <button class="profil-close-btn" onclick="_collapseProfile()" aria-label="Schließen">✕</button>
+          <button class="profil-edit-btn" onclick="_startProfileEdit()">✎ Bearbeiten</button>
+          <!-- Name/Bild kommen aus dem eigenen Profil (_applyProfile in ai.js); Tippen = große Profilansicht -->
+          <div class="profil-identity" onclick="_toggleProfileExpanded()" style="cursor:pointer;">
             <div class="profil-avatar-new" id="profil-avatar">🙂</div>
             <div>
               <div class="profil-name-new" id="profil-name">Ich</div>

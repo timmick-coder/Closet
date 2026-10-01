@@ -5541,16 +5541,42 @@ function _applyProfile() {
   });
 }
 
-// Profil bearbeiten: der Profilkopf klappt nach unten auf (kein Pop-up)
-function _openProfileEdit(firstTime) {
+// Profilkopf: Tippen auf Name/Bild klappt eine große Profilansicht auf
+// (Bild als großes Quadrat, Name/@ darunter). Bearbeiten erst über "✎ Bearbeiten".
+function _expandProfile() {
   var hero = document.getElementById('profil-hero');
   if (!hero) return;
-  // Aus den Einstellungen heraus: zum Profil wechseln
+  var profil = document.getElementById('profil');
+  var scroll = profil && profil.querySelector('.scroll-content');
+  if (scroll) scroll.scrollTo({ top: 0, behavior: 'smooth' });
+  hero.classList.add('expanded');
+}
+function _collapseProfile() {
+  var hero = document.getElementById('profil-hero');
+  if (!hero) return;
+  if (hero.classList.contains('editing')) _closeProfileEdit();
+  hero.classList.remove('expanded');
+}
+function _toggleProfileExpanded() {
+  var hero = document.getElementById('profil-hero');
+  if (!hero || hero.classList.contains('editing')) return; // beim Bearbeiten nicht zuklappen
+  if (hero.classList.contains('expanded')) _collapseProfile(); else _expandProfile();
+}
+
+// Direkt zum Bearbeiten (Einstellungen → Profil bearbeiten, Willkommen beim ersten Öffnen)
+function _openProfileEdit(firstTime) {
   var settings = document.getElementById('settings-panel');
   if (settings && settings.classList.contains('active')) _closeSettings();
   var profil = document.getElementById('profil');
   if (profil && !profil.classList.contains('active') && typeof navigate === 'function') navigate('profil', document.getElementById('nav-profil'));
-  if (hero.classList.contains('expanded')) return; // schon offen – Eingaben nicht zurücksetzen
+  _expandProfile();
+  _startProfileEdit(firstTime);
+}
+
+// Formular unter der großen Profilansicht einblenden
+function _startProfileEdit(firstTime) {
+  var hero = document.getElementById('profil-hero');
+  if (!hero || hero.classList.contains('editing')) return; // schon offen – Eingaben nicht zurücksetzen
   var p = _loadProfile();
   _peDraft = { emoji: p.emoji || '🙂', photo: p.photo || null };
   var title = document.getElementById('pe-title');
@@ -5560,13 +5586,12 @@ function _openProfileEdit(firstTime) {
   document.getElementById('pe-name').value = p.name || '';
   document.getElementById('pe-handle').value = p.handle || '';
   _renderProfileDraft();
-  var scroll = profil && profil.querySelector('.scroll-content');
-  if (scroll) scroll.scrollTo({ top: 0, behavior: 'smooth' });
-  hero.classList.add('expanded');
+  hero.classList.add('editing');
 }
+// Bearbeiten beenden (Abbrechen/nach Speichern) – große Ansicht bleibt offen
 function _closeProfileEdit() {
   var hero = document.getElementById('profil-hero');
-  if (hero) hero.classList.remove('expanded');
+  if (hero) hero.classList.remove('editing');
   _peDraft = null;
   _applyProfile(); // Vorschau (Bild) auf gespeicherten Stand zurücksetzen
 }
