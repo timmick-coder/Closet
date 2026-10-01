@@ -5196,6 +5196,112 @@ async function _notify(title, body, opts) {
 
 function _handleNotificationAction(action) {
   if (action === 'scan-review') _onScanJobsPillTap();
+  if (action === 'daily-outfit') _startDailyOutfit();
+}
+
+// ── Outfit des Tages (Push vom Server, siehe api/push-*.js) ─────────────────
+function _b64urlToUint8(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  var bin = atob(s), out = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function _pushSubscription(create) {
+  var reg = _swReg || await navigator.serviceWorker.ready;
+  if (!reg.pushManager) throw new Error('Push wird hier nicht unterstützt');
+  var sub = await reg.pushManager.getSubscription();
+  if (!sub && create) {
+    var r = await fetch('/api/push-subscribe');
+    var j = await r.json().catch(function() { return {}; });
+    if (!r.ok || !j.key) throw new Error(j.error || 'Server für Benachrichtigungen ist noch nicht eingerichtet');
+    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: _b64urlToUint8(j.key) });
+  }
+  return sub;
+}
+async function _pushApi(action, sub) {
+  var r = await fetch('/api/push-subscribe', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: action, subscription: sub.toJSON ? sub.toJSON() : sub })
+  });
+  var j = await r.json().catch(function() { return {}; });
+  if (!r.ok) throw new Error(j.error || ('Fehler ' + r.status));
+  return j;
+}
+async function _enableDailyOutfit() {
+  if (!_notificationsEnabled()) throw new Error('Schalte zuerst „Benachrichtigungen“ ein');
+  var sub = await _pushSubscription(true);
+  await _pushApi('subscribe', sub);
+}
+async function _disableDailyOutfit() {
+  try {
+    var sub = await _pushSubscription(false);
+    if (sub) { await _pushApi('unsubscribe', sub).catch(function() {}); await sub.unsubscribe().catch(function() {}); }
+  } catch (e) {}
+}
+function _setDailyToggle(on) {
+  var input = document.querySelector('input[data-setting="daily_outfit"]');
+  if (input) input.checked = on;
+  var s = _loadSettings(); s.daily_outfit = on;
+  try { localStorage.setItem(_SETTINGS_KEY, JSON.stringify(s)); } catch (e) {}
+  var row = document.getElementById('daily-test-row');
+  if (row) row.style.display = on ? '' : 'none';
+}
+function _initDailyOutfitToggle() {
+  var input = document.querySelector('input[data-setting="daily_outfit"]');
+  if (!input) return;
+  _setDailyToggle(_loadSettings().daily_outfit === true && _notificationsEnabled());
+  input.addEventListener('change', function() {
+    if (input.checked) {
+      _enableDailyOutfit().then(function() {
+        _setDailyToggle(true);
+        _showToast('☀️ Ab morgen früh kommt dein Outfit des Tages');
+      }).catch(function(e) {
+        _setDailyToggle(false);
+        _showToast('⚠️ ' + (e.message || 'Konnte nicht eingeschaltet werden'));
+      });
+    } else {
+      _setDailyToggle(false);
+      _disableDailyOutfit();
+    }
+  });
+}
+async function _sendTestPush() {
+  try {
+    var sub = await _pushSubscription(false);
+    if (!sub) throw new Error('Schalte „Outfit des Tages“ erst ein');
+    await _pushApi('test', sub);
+    _showToast('🧪 Gesendet – kommt gleich (App kurz schließen)');
+  } catch (e) {
+    _showToast('⚠️ ' + (e.message || 'Test fehlgeschlagen'));
+  }
+}
+
+// Tipp auf "Outfit des Tages": KI Styling öffnen und ein Outfit für heute erstellen,
+// wenn möglich passend zum aktuellen Wetter am Standort
+function _startDailyOutfit() {
+  if (typeof navigate === 'function') navigate('ki-styling', document.getElementById('nav-ki'));
+  var go = function(weatherText) {
+    _autoLoadKiSuggestions(true, 'Ein Outfit für heute' + (weatherText ? ' – Wetter: ' + weatherText : ''), '');
+  };
+  _todayWeatherText().then(go).catch(function() { go(''); });
+}
+function _todayWeatherText() {
+  return new Promise(function(resolve, reject) {
+    if (!navigator.geolocation) { reject(); return; }
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      var lat = pos.coords.latitude.toFixed(2), lon = pos.coords.longitude.toFixed(2);
+      fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon
+        + '&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=1')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var c = d.daily.weather_code[0];
+          var desc = c === 0 ? 'sonnig' : c <= 3 ? 'teils bewölkt' : c <= 48 ? 'neblig' : c <= 67 ? 'Regen'
+            : c <= 77 ? 'Schnee' : c <= 82 ? 'Regenschauer' : 'Gewitter';
+          resolve(Math.round(d.daily.temperature_2m_min[0]) + '–' + Math.round(d.daily.temperature_2m_max[0]) + ' °C, ' + desc);
+        }).catch(reject);
+    }, reject, { timeout: 6000, maximumAge: 3600000 });
+  });
 }
 
 // Schalter "Benachrichtigungen": beim Einschalten Erlaubnis abfragen
@@ -5210,7 +5316,11 @@ function _initNotificationToggle() {
     if (msg) _showToast(msg);
   };
   input.addEventListener('change', function() {
-    if (!input.checked) return;
+    if (!input.checked) {
+      // Ohne Benachrichtigungen auch kein Outfit des Tages
+      if (_loadSettings().daily_outfit) { _setDailyToggle(false); _disableDailyOutfit(); }
+      return;
+    }
     if (!_notificationsSupported()) {
       var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
       setOff(isIOS ? '📲 Erst zum Home-Bildschirm hinzufügen, dann gehen Benachrichtigungen' : 'Dieser Browser unterstützt keine Benachrichtigungen');
@@ -6382,6 +6492,7 @@ document.addEventListener('DOMContentLoaded', function() {
   _initSettingToggles();
   _registerServiceWorker();
   _initNotificationToggle();
+  _initDailyOutfitToggle();
 
   _ensureAiStyles();
   renderWardrobeGrid();

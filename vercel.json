@@ -5,8 +5,14 @@
     },
     "api/removebg.js": {
       "maxDuration": 30
+    },
+    "api/push-daily.js": {
+      "maxDuration": 60
     }
   },
+  "crons": [
+    { "path": "/api/push-daily", "schedule": "0 6 * * *" }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]

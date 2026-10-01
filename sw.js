@@ -10,16 +10,16 @@ self.addEventListener('activate', function(event) {
   event.waitUntil(self.clients.claim());
 });
 
-// Push vom Server (Phase 2: "Outfit des Tages")
+// Push vom Server. Der tägliche Push kommt OHNE Inhalt → dann "Outfit des Tages".
 self.addEventListener('push', function(event) {
   var data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data && event.data.text() }; }
-  event.waitUntil(self.registration.showNotification(data.title || 'StyleSync', {
-    body: data.body || '',
+  event.waitUntil(self.registration.showNotification(data.title || '☀️ Dein Outfit des Tages', {
+    body: data.body || 'Tippe, und StyleSync stellt dir ein Outfit für heute zusammen – passend zum Wetter.',
     icon: '/icon.svg',
     badge: '/icon.svg',
-    tag: data.tag || 'stylesync',
-    data: { action: data.action || null }
+    tag: data.tag || 'daily-outfit',
+    data: { action: data.action || 'daily-outfit' }
   }));
 });
 

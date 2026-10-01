@@ -2105,6 +2105,18 @@
             <div class="settings-row-label">Benachrichtigungen</div>
             <label class="settings-toggle"><input type="checkbox" data-setting="notifications" checked /><span class="settings-toggle-slider"></span></label>
           </div>
+          <div class="settings-row">
+            <div class="settings-row-icon">☀️</div>
+            <div class="settings-row-label">Outfit des Tages
+              <div class="settings-row-sub">Jeden Morgen (ca. 7–8 Uhr) ein Outfit-Vorschlag</div>
+            </div>
+            <label class="settings-toggle"><input type="checkbox" data-setting="daily_outfit" /><span class="settings-toggle-slider"></span></label>
+          </div>
+          <div class="settings-row" id="daily-test-row" style="display:none;" onclick="_sendTestPush()">
+            <div class="settings-row-icon">🧪</div>
+            <div class="settings-row-label">Test-Benachrichtigung senden</div>
+            <div class="settings-row-arrow">›</div>
+          </div>
           <div class="settings-section-header">Hilfe</div>
           <div class="settings-row" onclick="_openInfoSheet('help')">
             <div class="settings-row-icon">📸</div>

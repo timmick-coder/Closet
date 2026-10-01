@@ -4,3 +4,6 @@ ios/
 android/
 dist/
 # env.js wird committed (leere Fallback-Version für GitHub Pages)
+
+# Geheime Push-Schlüssel (nur lokal, in Vercel eintragen)
+.push-keys.txt
