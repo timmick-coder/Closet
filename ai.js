@@ -885,9 +885,16 @@ async function _runScanJob(job, base64, mimeType) {
     job.aiInput = null; // Speicher freigeben
     job.src = null;
     _showToast('✅ ' + (analysis.name || 'Kleidungsstück') + ' erkannt – tippe zum Prüfen');
+    // App im Hintergrund? Dann echte Benachrichtigung
+    if (document.visibilityState === 'hidden') {
+      _notify('✅ ' + (analysis.name || 'Piece') + ' ist bereit', 'Tippe, um es zu prüfen und zu speichern.', { tag: 'scan-' + job.id, action: 'scan-review' });
+    }
   } catch (err) {
     job.status = 'error';
     job.error = (err && err.message) || 'KI-Analyse fehlgeschlagen.';
+    if (document.visibilityState === 'hidden') {
+      _notify('⚠️ Scan fehlgeschlagen', 'Tippe, um es erneut zu versuchen.', { tag: 'scan-' + job.id, action: 'scan-review' });
+    }
   }
   _renderScanJobsPill();
 }
@@ -5142,6 +5149,77 @@ function _initSettingToggles() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BENACHRICHTIGUNGEN (Service Worker sw.js)
+// ─────────────────────────────────────────────────────────────────────────────
+// iPhone: nur wenn die App auf dem Home-Bildschirm liegt (iOS 16.4+) und erlaubt wurde.
+var _swReg = null;
+
+function _registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js').then(function(reg) { _swReg = reg; })
+    .catch(function(e) { console.warn('[sw] Registrierung fehlgeschlagen', e); });
+  // Tipp auf eine Benachrichtigung, während die App schon offen ist
+  navigator.serviceWorker.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'notification-action') _handleNotificationAction(e.data.action);
+  });
+  // App wurde über eine Benachrichtigung neu geöffnet (?action=...)
+  var m = location.search.match(/[?&]action=([^&]+)/);
+  if (m) {
+    history.replaceState(null, '', location.pathname);
+    setTimeout(function() { _handleNotificationAction(decodeURIComponent(m[1])); }, 800);
+  }
+}
+
+function _notificationsSupported() {
+  return 'Notification' in window && 'serviceWorker' in navigator;
+}
+function _notificationsEnabled() {
+  return _notificationsSupported() && Notification.permission === 'granted' && _loadSettings().notifications !== false;
+}
+
+// Systembenachrichtigung zeigen (gibt true zurück, wenn es geklappt hat)
+async function _notify(title, body, opts) {
+  opts = opts || {};
+  if (!_notificationsEnabled()) return false;
+  try {
+    var reg = _swReg || await navigator.serviceWorker.ready;
+    await reg.showNotification(title, { body: body, icon: '/icon.svg', badge: '/icon.svg', tag: opts.tag, data: { action: opts.action || null } });
+    return true;
+  } catch (e) {
+    try { new Notification(title, { body: body }); return true; } catch (e2) { return false; }
+  }
+}
+
+function _handleNotificationAction(action) {
+  if (action === 'scan-review') _onScanJobsPillTap();
+}
+
+// Schalter "Benachrichtigungen": beim Einschalten Erlaubnis abfragen
+function _initNotificationToggle() {
+  var input = document.querySelector('input[data-setting="notifications"]');
+  if (!input) return;
+  input.checked = _notificationsEnabled();
+  var setOff = function(msg) {
+    input.checked = false;
+    var s = _loadSettings(); s.notifications = false;
+    try { localStorage.setItem(_SETTINGS_KEY, JSON.stringify(s)); } catch (e) {}
+    if (msg) _showToast(msg);
+  };
+  input.addEventListener('change', function() {
+    if (!input.checked) return;
+    if (!_notificationsSupported()) {
+      var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+      setOff(isIOS ? '📲 Erst zum Home-Bildschirm hinzufügen, dann gehen Benachrichtigungen' : 'Dieser Browser unterstützt keine Benachrichtigungen');
+      return;
+    }
+    Notification.requestPermission().then(function(p) {
+      if (p === 'granted') _showToast('🔔 Benachrichtigungen sind an');
+      else setOff('🔕 Benachrichtigungen sind in den Handy-Einstellungen blockiert');
+    });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // EIGENES PROFIL (Name, @Benutzername, Profilbild) – ersetzt "Anna Müller"-Demo
 // ─────────────────────────────────────────────────────────────────────────────
 var _PROFILE_KEY = 'stylesync_profile';
@@ -6273,6 +6351,8 @@ document.addEventListener('DOMContentLoaded', function() {
   _applyProfile();
   _updateStyleSummary();
   _initSettingToggles();
+  _registerServiceWorker();
+  _initNotificationToggle();
 
   _ensureAiStyles();
   renderWardrobeGrid();
