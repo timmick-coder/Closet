@@ -405,16 +405,37 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
   const wardrobeText = wardrobe.map(function(w, i) {
     const id = 'T' + (i + 1);
     byId[id] = w;
-    return id + ': ' + (w.emoji || '') + ' ' + w.name + ' (' + [w.type, w.color, w.season, w.style].filter(Boolean).join(', ') + ')';
+    const cat = _itemCategory(w) !== 'none' ? _catLabel(_itemCategory(w)) : '';
+    return id + ': ' + (w.emoji || '') + ' ' + w.name + ' (' + [cat, w.type, w.color, w.season, w.style].filter(Boolean).join(', ') + ')';
   }).join('\n');
 
-  const prompt = 'Du bist ein professioneller Mode-Stylist. Erstelle bis zu 3 Outfit-Vorschlaege AUSSCHLIESSLICH aus dem Schrank des Nutzers. '
-    + 'Jedes Teil hat eine ID (z.B. T1). Gib pro Outfit nur die IDs der verwendeten Teile in "itemIds" an. '
-    + 'Erfinde keine Kleidung. Wenn fuer einen Wunsch ein Teil fehlt, lass es weg. '
-    + 'Teile duerfen in mehreren Outfits vorkommen; ein Outfit darf auch nur aus wenigen Teilen bestehen.\n\n'
+  // Kontext: Datum/Jahreszeit + Wetter (nur wenn Standort schon erlaubt – keine neue Abfrage)
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const season = month <= 2 || month === 12 ? 'Winter' : month <= 5 ? 'Frühling' : month <= 8 ? 'Sommer' : 'Herbst';
+  let weather = '';
+  if (!/Wetter:/.test(description || '')) weather = await _weatherIfAllowed();
+  const recent = _loadRecentSuggestions();
+
+  const prompt = 'Du bist ein erfahrener, ehrlicher Mode-Stylist. Stelle bis zu 3 Outfits AUSSCHLIESSLICH aus dem Schrank des Nutzers zusammen. '
+    + 'Jedes Piece hat eine ID (z.B. T1); gib pro Outfit die IDs in "itemIds" an (Reihenfolge: Kopf bis Fuß). Erfinde keine Kleidung.\n\n'
+    + 'REGELN FÜR GUTE OUTFITS:\n'
+    + '1. VOLLSTÄNDIG: Jedes Outfit braucht ein Oberteil UND eine Hose/Shorts/einen Rock – oder ein Kleid. Schuhe gehören immer dazu, sofern Schuhe im Schrank sind. '
+    + 'Unter ca. 15 °C bzw. im Herbst/Winter kommt eine Jacke/ein Mantel dazu, sofern vorhanden. Höchstens eine Hose und höchstens ein Paar Schuhe pro Outfit. Accessoires optional (max. 2). '
+    + 'Gibt der Schrank nicht genug her, liefere LIEBER WENIGER Outfits als unvollständige.\n'
+    + '2. FARBEN: Baue auf neutralen Basisfarben auf (Schwarz, Weiß, Grau, Beige, Navy, Denim, Braun, Oliv). Höchstens 3 Farben pro Outfit, davon höchstens 1 kräftige Akzentfarbe. '
+    + 'Gut sind Ton-in-Ton, harmonische Nachbarfarben oder ein bewusster Kontrast zu einer neutralen Basis. Vermeide sich beißende Farben (z. B. Rot+Pink, Grün+Rot ohne neutrale Basis) und mehr als ein auffälliges Muster. Schuhe sollen farblich zum Rest passen.\n'
+    + '3. ANLASS & WETTER: Alle Pieces eines Outfits haben eine ähnliche Formalität (kein Anzugsakko zu Jogginghose, außer bewusst Streetwear). '
+    + 'Richte dich nach Jahreszeit und Wetter: keine dicken Wintersachen bei Wärme, keine Shorts/Sandalen bei Kälte.\n'
+    + '4. ABWECHSLUNG: Die Outfits müssen sich deutlich unterscheiden (andere Hauptteile, andere Wirkung, z. B. lässig / schicker / sportlich). '
+    + 'Verwende, wo der Schrank es erlaubt, zwischen zwei Outfits höchstens ein gemeinsames Piece.'
+    + (recent.length ? ' Wiederhole keine dieser kürzlich vorgeschlagenen Kombinationen:\n' + recent.map(function(r) { return '- ' + r.join(' + '); }).join('\n') : '')
+    + '\n5. Gib je Outfit eine kurze, konkrete Begründung auf Deutsch (1 Satz, warum Farben/Teile zusammenpassen und zum Anlass/Wetter passen) und eine ehrliche Passgenauigkeit 0–100.\n\n'
+    + 'HEUTE: ' + now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + ' (' + season + ')'
+    + (weather ? ', Wetter: ' + weather : '') + '\n\n'
     + 'SCHRANK DES NUTZERS:\n' + wardrobeText
     + _stylePromptText()
-    + '\n\nWUNSCH: ' + (description || 'Ein stylisches, passendes Outfit')
+    + '\n\nWUNSCH: ' + (description || 'Stylische, alltagstaugliche Outfits für heute')
     + (inspoContext ? '\nINSPIRATION: ' + inspoContext : '')
     + (inspoImageBase64 ? '\n\nNutze das hochgeladene Bild nur als Stil-Inspiration – die Teile muessen trotzdem aus dem Schrank kommen.' : '');
 
@@ -423,19 +444,21 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
   const body = {
     contents: [{ parts: parts }],
     generationConfig: {
+      temperature: 1.0, // etwas mehr Abwechslung zwischen den Anfragen
       responseMimeType: 'application/json',
       responseSchema: {
         type: 'ARRAY',
         items: {
           type: 'OBJECT',
           properties: {
-            name:    { type: 'STRING', description: 'Outfit-Name auf Deutsch' },
+            name:    { type: 'STRING', description: 'Kurzer, griffiger Outfit-Name auf Deutsch' },
             style:   { type: 'STRING', description: 'Stil-Kategorie auf Deutsch' },
-            match:   { type: 'INTEGER', description: 'Passgenauigkeit 0-100' },
-            weather: { type: 'STRING', description: 'Wetterbeschreibung mit Temperatur auf Deutsch' },
+            reason:  { type: 'STRING', description: 'Ein Satz: warum Farben/Teile zusammen und zu Anlass/Wetter passen' },
+            match:   { type: 'INTEGER', description: 'Ehrliche Passgenauigkeit 0-100' },
+            weather: { type: 'STRING', description: 'Für welches Wetter/welche Temperatur das Outfit passt' },
             itemIds: { type: 'ARRAY', items: { type: 'STRING', enum: Object.keys(byId) } }
           },
-          required: ['name', 'itemIds']
+          required: ['name', 'reason', 'itemIds']
         }
       }
     }
@@ -454,11 +477,32 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
     const items = (o.itemIds || []).map(function(id) { return String(id).trim(); })
       .filter(function(id) { return byId[id] && !seen[id] && (seen[id] = true); })
       .map(function(id) { return { id: byId[id].id, emoji: byId[id].emoji || '👕', name: byId[id].name }; });
-    return { name: o.name || 'Outfit', style: o.style || '', match: o.match || 90, weather: o.weather || '', items: items };
+    return { name: o.name || 'Outfit', style: o.style || '', reason: o.reason || '', match: o.match || 90, weather: o.weather || '', items: items };
   }).filter(function(o) { return o.items.length > 0; });
 
   if (outfits.length === 0) throw new Error('KI konnte kein Outfit aus deinem Schrank zusammenstellen. Bitte erneut versuchen.');
+  _rememberSuggestions(outfits);
   return outfits;
+}
+
+// Letzte Vorschläge merken, damit die KI sich nicht ständig wiederholt
+var _RECENT_KEY = 'stylesync_recent_suggestions';
+function _loadRecentSuggestions() {
+  try { return JSON.parse(localStorage.getItem(_RECENT_KEY) || '[]'); } catch (e) { return []; }
+}
+function _rememberSuggestions(outfits) {
+  var list = outfits.map(function(o) { return o.items.map(function(i) { return i.name; }); }).concat(_loadRecentSuggestions());
+  try { localStorage.setItem(_RECENT_KEY, JSON.stringify(list.slice(0, 9))); } catch (e) {}
+}
+
+// Wetter für die Outfit-Vorschläge – nur wenn der Standort schon erlaubt ist (keine neue Abfrage)
+async function _weatherIfAllowed() {
+  try {
+    if (!navigator.permissions || !navigator.geolocation) return '';
+    var p = await navigator.permissions.query({ name: 'geolocation' });
+    if (p.state !== 'granted') return '';
+    return await Promise.race([_todayWeatherText(), new Promise(function(r) { setTimeout(function() { r(''); }, 5000); })]);
+  } catch (e) { return ''; }
 }
 
 // ── Crop Screen ───────────────────────────────────────────────────────────────
@@ -4024,6 +4068,7 @@ function _autoLoadKiSuggestions(force, customDesc, colContext) {
           + '<span class="match-badge">' + (outfit.match || 90) + '% ✅</span>'
           + '<button class="heart-btn" data-heart-id="' + _escAttr(id) + '" onclick="_toggleFav(\'' + id + '\', this)">' + (fav ? '🩷' : '🤍') + '</button>'
           + '</div></div>'
+          + (outfit.reason ? '<div class="outfit-card-reason">💡 ' + outfit.reason + '</div>' : '')
           + '<div class="outfit-items-vertical">' + itemsHtml + '</div>'
           + '<button class="outfit-save-btn" onclick="_openSaveModal(\'' + id + '\')">💾 Speichern</button>'
           + '</div></div>';
