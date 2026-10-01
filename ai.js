@@ -950,7 +950,7 @@ function _renderScanJobsPill() {
   var icon, title, sub;
   if (ready.length) {
     icon = '✅';
-    title = ready.length === 1 ? (ready[0].result.name || 'Teil') + ' bereit' : ready.length + ' Teile bereit';
+    title = ready.length === 1 ? (ready[0].result.name || 'Piece') + ' bereit' : ready.length + ' Pieces bereit';
     sub = 'Tippen zum Prüfen & Speichern' + (busy.length ? ' · ' + busy.length + ' in Arbeit' : '');
   } else if (failed.length) {
     icon = '⚠️';
@@ -958,7 +958,7 @@ function _renderScanJobsPill() {
     sub = 'Tippen für Details' + (busy.length ? ' · ' + busy.length + ' in Arbeit' : '');
   } else {
     icon = '<span class="sjp-spin"></span>';
-    title = busy.length === 1 ? 'Teil wird analysiert' : busy.length + ' Teile werden analysiert';
+    title = busy.length === 1 ? 'Piece wird analysiert' : busy.length + ' Pieces werden analysiert';
     sub = active ? active.step : '';
   }
   pill.className = 'show' + (ready.length ? ' ready' : failed.length ? ' failed' : '');
