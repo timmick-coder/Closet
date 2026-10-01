@@ -403,6 +403,18 @@
     .feed-demo-banner { display: flex; gap: 10px; align-items: flex-start; margin: 0 20px 10px; padding: 10px 12px; border-radius: 14px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.35); font-size: 12.5px; line-height: 1.4; color: #fcd34d; }
     .feed-demo-banner b { color: #fbbf24; }
     .feed-demo-icon { font-size: 18px; line-height: 1; }
+    /* Feed noch nicht verfügbar: Abdeckung über dem Inhalt + "Bald"-Schild in der Navigation */
+    .feed-soon-overlay { position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(6,12,22,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+    .feed-soon-overlay.hidden { display: none; }
+    .feed-soon-card { width: 100%; max-width: 320px; text-align: center; background: #0e2240; border: 1px solid rgba(245,158,11,0.45); border-radius: 22px; padding: 26px 22px 20px; box-shadow: 0 16px 40px rgba(0,0,0,0.45); }
+    .feed-soon-icon { font-size: 44px; line-height: 1; }
+    .feed-soon-title { font-size: 20px; font-weight: 800; color: var(--text); margin-top: 10px; font-family: 'Playfair Display', Georgia, serif; }
+    .feed-soon-text { font-size: 14px; line-height: 1.5; color: var(--text2); margin-top: 10px; }
+    .feed-soon-text b { color: #fbbf24; }
+    .feed-soon-btn { margin-top: 18px; width: 100%; height: 46px; border: 1.5px solid var(--purple-border); border-radius: 14px; background: transparent; color: var(--text); font-size: 14px; font-weight: 700; cursor: pointer; }
+    .feed-soon-note { font-size: 11.5px; color: var(--text2); margin-top: 10px; opacity: 0.8; }
+    #nav-freunde { position: relative; }
+    .nav-soon-badge { position: absolute; top: 2px; right: 50%; transform: translateX(26px); background: #f59e0b; color: #0d1b2e; font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 8px; line-height: 1.4; letter-spacing: 0.02em; }
 
     /* ── Schrank-Kategorien verwalten ── */
     /* Overlay endet über der Bottom-Nav → Sheet begrenzen und scrollbar machen */
@@ -1859,8 +1871,19 @@
 
       <!-- Feed ist noch Demo (kein Server) – klar kennzeichnen, damit Tester nicht verwirrt sind -->
       <div class="feed-demo-banner">
-        <span class="feed-demo-icon">👀</span>
-        <div><b>Vorschau:</b> So wird der Feed aussehen. Die Personen hier sind Beispiele – echte Freunde kommen bald.</div>
+        <span class="feed-demo-icon">🚧</span>
+        <div><b>Noch nicht verfügbar – nur Vorschau.</b> Die Personen hier sind Beispiele. Echte Freunde, Posts und Kommentare kommen bald.</div>
+      </div>
+
+      <!-- Abdeckung: Feed ist noch nicht verfügbar; "Vorschau ansehen" blendet sie aus -->
+      <div class="feed-soon-overlay" id="feed-soon-overlay">
+        <div class="feed-soon-card">
+          <div class="feed-soon-icon">🚧</div>
+          <div class="feed-soon-title">Feed – bald verfügbar</div>
+          <div class="feed-soon-text">Hier siehst du bald die Outfits deiner Freunde, kannst ihnen folgen, liken und kommentieren.<br><br>Diese Funktion ist <b>noch nicht freigeschaltet</b>.</div>
+          <button class="feed-soon-btn" onclick="document.getElementById('feed-soon-overlay').classList.add('hidden')">Vorschau ansehen</button>
+          <div class="feed-soon-note">Die Vorschau zeigt nur Beispiel-Personen.</div>
+        </div>
       </div>
 
       <div class="scroll-content">
@@ -2810,6 +2833,7 @@
     <button class="nav-item" id="nav-freunde" onclick="navigate('freunde',this)">
       <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span class="nav-label">Feed</span>
+      <span class="nav-soon-badge">Bald</span>
     </button>
     <button class="nav-item" id="nav-profil" onclick="navigate('profil',this)">
       <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
