@@ -412,6 +412,7 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
     + 'Erfinde keine Kleidung. Wenn fuer einen Wunsch ein Teil fehlt, lass es weg. '
     + 'Teile duerfen in mehreren Outfits vorkommen; ein Outfit darf auch nur aus wenigen Teilen bestehen.\n\n'
     + 'SCHRANK DES NUTZERS:\n' + wardrobeText
+    + _stylePromptText()
     + '\n\nWUNSCH: ' + (description || 'Ein stylisches, passendes Outfit')
     + (inspoContext ? '\nINSPIRATION: ' + inspoContext : '')
     + (inspoImageBase64 ? '\n\nNutze das hochgeladene Bild nur als Stil-Inspiration – die Teile muessen trotzdem aus dem Schrank kommen.' : '');
@@ -4233,10 +4234,10 @@ function _buildOwnFeedPostCard(post) {
     var itemJson = _escAttr(JSON.stringify({ name: it.name, emoji: it.emoji, color: it.color, type: it.type, season: it.season }));
     return '<div class="outfit-chip-item" data-feed-item="' + itemJson + '"><span>' + (it.emoji || '👕') + '</span> ' + (it.name || '') + '</div>';
   }).join('');
-  return '<div class="post-card-new" data-feed-id="' + _escAttr(feedId) + '" data-own-post-id="' + _escAttr(feedId) + '" data-post-name="Anna Müller" data-post-avatar="👩‍🦱" data-post-bg="#D8CFFF" data-post-title="' + _escAttr(post.outfitName || 'Mein Look') + '" data-post-items="' + _escAttr(JSON.stringify(post.outfitItems || [])) + '">'
+  return '<div class="post-card-new" data-feed-id="' + _escAttr(feedId) + '" data-own-post-id="' + _escAttr(feedId) + '" data-post-name="' + _escAttr(_myName()) + '" data-post-avatar="' + _escAttr(_loadProfile().emoji || '🙂') + '" data-post-bg="#D8CFFF" data-post-title="' + _escAttr(post.outfitName || 'Mein Look') + '" data-post-items="' + _escAttr(JSON.stringify(post.outfitItems || [])) + '">'
     + '<div class="post-head">'
-    + '<div class="post-avatar-wrap"><div class="post-avatar-new" style="background:#D8CFFF;">👩‍🦱</div><div class="avatar-badge">' + visIcon + '</div></div>'
-    + '<div class="post-meta"><div class="post-name-new">Anna</div><div class="post-time-new">' + timeStr + '</div></div>'
+    + '<div class="post-avatar-wrap"><div class="post-avatar-new" style="background:#D8CFFF;">' + _myAvatarContent() + '</div><div class="avatar-badge">' + visIcon + '</div></div>'
+    + '<div class="post-meta"><div class="post-name-new">' + _myName() + '</div><div class="post-time-new">' + timeStr + '</div></div>'
     + '<button class="post-more-btn" data-more-post="' + _escAttr(feedId) + '">···</button>'
     + '</div>'
     + '<div class="post-more-menu" id="more-menu-' + _escAttr(feedId) + '">'
@@ -4488,9 +4489,9 @@ function _renderCommentList() {
     var likeCount = (c.likes || 0) + (liked ? 1 : 0);
     var canDelete = c.isOwn || _commentIsOwner;
     return '<div class="comment-item" data-comment-id="' + _escAttr(c.id) + '">'
-      + '<div class="comment-avatar" style="background:' + (c.authorBg || '#EDE9FF') + ';">' + (c.authorEmoji || '👤') + '</div>'
+      + '<div class="comment-avatar" style="background:' + (c.authorBg || '#EDE9FF') + ';">' + (c.isOwn ? _myAvatarContent() : (c.authorEmoji || '👤')) + '</div>'
       + '<div class="comment-body">'
-      + '<div class="comment-name">' + (c.author || 'Nutzer') + '</div>'
+      + '<div class="comment-name">' + (c.isOwn ? _myName() : (c.author || 'Nutzer')) + '</div>'
       + '<div class="comment-text">' + (c.text || '').replace(/</g, '&lt;') + '</div>'
       + '<div class="comment-meta">'
       + '<span class="comment-time">' + _formatCommentTime(c.timestamp) + '</span>'
@@ -4514,8 +4515,8 @@ function _sendComment() {
   var newComment = {
     id: 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 5),
     text: text,
-    author: 'Anna Müller',
-    authorEmoji: '👩‍🦱',
+    author: _myName(),
+    authorEmoji: _loadProfile().emoji || '🙂',
     authorBg: '#D8CFFF',
     timestamp: Date.now(),
     likes: 0,
@@ -4985,9 +4986,9 @@ function _renderPostDetailComments(postId) {
         var liked = !!commentLikes[c.id];
         var likeCount = (c.likes || 0) + (liked ? 1 : 0);
         return '<div class="comment-item" style="padding:10px 0;" data-comment-id="' + _escAttr(c.id) + '">'
-          + '<div class="comment-avatar" style="background:' + (c.authorBg || '#EDE9FF') + ';">' + (c.authorEmoji || '👤') + '</div>'
+          + '<div class="comment-avatar" style="background:' + (c.authorBg || '#EDE9FF') + ';">' + (c.isOwn ? _myAvatarContent() : (c.authorEmoji || '👤')) + '</div>'
           + '<div class="comment-body">'
-          + '<div class="comment-name">' + (c.author || 'Nutzer') + '</div>'
+          + '<div class="comment-name">' + (c.isOwn ? _myName() : (c.author || 'Nutzer')) + '</div>'
           + '<div class="comment-text">' + (c.text || '').replace(/</g, '&lt;') + '</div>'
           + '<div class="comment-meta">'
           + '<span class="comment-time">' + _formatCommentTime(c.timestamp) + '</span>'
@@ -5002,7 +5003,7 @@ function _renderPostDetailComments(postId) {
     + '<div style="font-size:15px;font-weight:800;color:var(--text);margin-bottom:12px;">💬 Kommentare (<span id="post-detail-comment-count">' + comments.length + '</span>)</div>'
     + '<div id="post-detail-comment-list">' + commentsHtml + '</div>'
     + '<div class="comment-input-row" style="margin-top:14px;padding:0;">'
-    + '<div class="comment-my-avatar">👩‍🦱</div>'
+    + '<div class="comment-my-avatar">' + _myAvatarContent() + '</div>'
     + '<input class="comment-input" id="post-detail-comment-input" placeholder="Schreibe einen Kommentar…" maxlength="300" />'
     + '<button class="comment-send-btn" onclick="_sendDetailComment(\'' + _escAttr(postId) + '\')">📤</button>'
     + '</div>'
@@ -5020,8 +5021,8 @@ function _sendDetailComment(postId) {
   var newComment = {
     id: 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 5),
     text: text,
-    author: 'Anna Müller',
-    authorEmoji: '👩‍🦱',
+    author: _myName(),
+    authorEmoji: _loadProfile().emoji || '🙂',
     authorBg: '#D8CFFF',
     timestamp: Date.now(),
     likes: 0,
@@ -5043,9 +5044,9 @@ function _sendDetailComment(postId) {
       var liked = !!commentLikes[c.id];
       var likeCount = (c.likes || 0) + (liked ? 1 : 0);
       return '<div class="comment-item" style="padding:10px 0;" data-comment-id="' + _escAttr(c.id) + '">'
-        + '<div class="comment-avatar" style="background:' + (c.authorBg || '#EDE9FF') + ';">' + (c.authorEmoji || '👤') + '</div>'
+        + '<div class="comment-avatar" style="background:' + (c.authorBg || '#EDE9FF') + ';">' + (c.isOwn ? _myAvatarContent() : (c.authorEmoji || '👤')) + '</div>'
         + '<div class="comment-body">'
-        + '<div class="comment-name">' + (c.author || 'Nutzer') + '</div>'
+        + '<div class="comment-name">' + (c.isOwn ? _myName() : (c.author || 'Nutzer')) + '</div>'
         + '<div class="comment-text">' + (c.text || '').replace(/</g, '&lt;') + '</div>'
         + '<div class="comment-meta">'
         + '<span class="comment-time">' + _formatCommentTime(c.timestamp) + '</span>'
@@ -5119,6 +5120,217 @@ function _openSettings() {
   // Sicherung schon vorbereiten: iOS erlaubt "Teilen" nur direkt nach dem Tipp,
   // langes Zusammensuchen der Bilder danach würde das verhindern
   _prepareBackup();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EIGENES PROFIL (Name, @Benutzername, Profilbild) – ersetzt "Anna Müller"-Demo
+// ─────────────────────────────────────────────────────────────────────────────
+var _PROFILE_KEY = 'stylesync_profile';
+var _PROFILE_EMOJIS = ['🙂', '😎', '🧑', '👩', '👨', '🧑‍🦱', '👱', '🧔', '👩‍🦰', '🦊', '🐻', '✨'];
+var _peDraft = null; // Entwurf während das Bearbeiten-Fenster offen ist
+
+function _loadProfile() {
+  try {
+    var p = JSON.parse(localStorage.getItem(_PROFILE_KEY) || 'null');
+    if (p) return p;
+  } catch (e) {}
+  return { name: '', handle: '', emoji: '🙂', photo: null, setup: false };
+}
+function _saveProfile(p) {
+  try { localStorage.setItem(_PROFILE_KEY, JSON.stringify(p)); } catch (e) { _showToast('❌ Profil konnte nicht gespeichert werden'); }
+}
+function _myName() { return _loadProfile().name || 'Ich'; }
+// Inhalt für runde Avatar-Elemente: Foto (füllt den Kreis) oder Emoji
+function _avatarContent(p) {
+  return p.photo ? '<span class="avatar-photo" style="background-image:url(\'' + p.photo + '\')"></span>' : (p.emoji || '🙂');
+}
+function _myAvatarContent() { return _avatarContent(_loadProfile()); }
+
+// Profil überall eintragen: Profil-Kopf, Kommentar-Eingabe, eigene Posts im Feed
+function _applyProfile() {
+  var p = _loadProfile();
+  var av = document.getElementById('profil-avatar');
+  if (av) av.innerHTML = _avatarContent(p);
+  var nm = document.getElementById('profil-name');
+  if (nm) nm.textContent = p.name || 'Ich';
+  var hd = document.getElementById('profil-handle');
+  if (hd) hd.textContent = p.handle ? '@' + p.handle : 'Profil einrichten ›';
+  document.querySelectorAll('.comment-my-avatar').forEach(function(el) { el.innerHTML = _avatarContent(p); });
+  document.querySelectorAll('[data-own-post-id]').forEach(function(card) {
+    var a = card.querySelector('.post-avatar-new');
+    if (a) a.innerHTML = _avatarContent(p);
+    var n = card.querySelector('.post-name-new');
+    if (n) n.textContent = p.name || 'Ich';
+    card.setAttribute('data-post-name', p.name || 'Ich');
+  });
+}
+
+function _openProfileEdit(firstTime) {
+  var p = _loadProfile();
+  _peDraft = { emoji: p.emoji || '🙂', photo: p.photo || null };
+  var title = document.getElementById('pe-title');
+  if (title) title.textContent = firstTime === true ? '👋 Willkommen! Richte dein Profil ein' : 'Profil bearbeiten';
+  document.getElementById('pe-name').value = p.name || '';
+  document.getElementById('pe-handle').value = p.handle || '';
+  _renderProfileDraft();
+  document.getElementById('profile-modal-overlay').classList.add('open');
+}
+function _closeProfileEdit() {
+  document.getElementById('profile-modal-overlay').classList.remove('open');
+  _peDraft = null;
+}
+function _renderProfileDraft() {
+  if (!_peDraft) return;
+  document.getElementById('pe-avatar').innerHTML = _avatarContent(_peDraft);
+  document.getElementById('pe-photo-remove').style.display = _peDraft.photo ? '' : 'none';
+  var row = document.getElementById('pe-emoji-row');
+  row.style.display = _peDraft.photo ? 'none' : '';
+  row.innerHTML = _PROFILE_EMOJIS.map(function(e) {
+    return '<div class="pe-emoji' + (e === _peDraft.emoji ? ' selected' : '') + '" onclick="_peDraft.emoji=\'' + e + '\';_renderProfileDraft()">' + e + '</div>';
+  }).join('');
+}
+// Foto quadratisch zuschneiden (Mitte) und klein speichern (256 px)
+function _profilePickPhoto(file) {
+  if (!file || !_peDraft) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var s = Math.min(img.naturalWidth, img.naturalHeight);
+      var c = document.createElement('canvas');
+      c.width = c.height = 256;
+      var ctx = c.getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, 256, 256);
+      _peDraft.photo = c.toDataURL('image/jpeg', 0.85);
+      _renderProfileDraft();
+    };
+    img.onerror = function() { _showToast('❌ Bild konnte nicht geladen werden'); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function _profileRemovePhoto() {
+  if (!_peDraft) return;
+  _peDraft.photo = null;
+  _renderProfileDraft();
+}
+function _saveProfileEdit() {
+  var name = document.getElementById('pe-name').value.trim();
+  if (!name) { _showToast('Bitte gib einen Namen ein'); document.getElementById('pe-name').focus(); return; }
+  // Benutzername: klein, nur a–z, 0–9, Punkt und Unterstrich; leer → aus dem Namen ableiten
+  var clean = function(s) {
+    return s.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+      .replace(/\s+/g, '_').replace(/[^a-z0-9._]/g, '').slice(0, 20);
+  };
+  var handle = clean(document.getElementById('pe-handle').value.replace(/^@/, '')) || clean(name);
+  _saveProfile({ name: name, handle: handle, emoji: _peDraft.emoji, photo: _peDraft.photo, setup: true });
+  _closeProfileEdit();
+  _applyProfile();
+  _showToast('✅ Profil gespeichert');
+}
+// Beim ersten Öffnen des Profil-Tabs einmal zum Einrichten einladen
+function _maybeAskProfileSetup() {
+  if (_loadProfile().setup) return;
+  try { if (sessionStorage.getItem('stylesync_profile_asked')) return; sessionStorage.setItem('stylesync_profile_asked', '1'); } catch (e) {}
+  setTimeout(function() { _openProfileEdit(true); }, 350);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MEIN STIL – Vorlieben, die in die KI-Outfit-Vorschläge einfließen
+// ─────────────────────────────────────────────────────────────────────────────
+var _STYLE_KEY = 'stylesync_style_prefs';
+var _STYLE_OPTIONS = {
+  styles: ['Casual', 'Streetwear', 'Smart Casual', 'Business', 'Elegant', 'Sportlich', 'Minimalistisch', 'Vintage', 'Preppy', 'Boho', 'Skater', 'Y2K'],
+  colors: ['Schwarz', 'Weiß', 'Grau', 'Beige', 'Braun', 'Navy', 'Blau', 'Grün', 'Olive', 'Rot', 'Rosa', 'Pastell', 'Erdtöne', 'Knallige Farben'],
+  occasions: ['Alltag', 'Schule / Uni', 'Arbeit', 'Sport', 'Party', 'Date', 'Festival', 'Urlaub', 'Feier / Hochzeit']
+};
+function _loadStylePrefs() {
+  try { return JSON.parse(localStorage.getItem(_STYLE_KEY) || 'null') || {}; } catch (e) { return {}; }
+}
+function _openStyleProfile() {
+  var p = _loadStylePrefs();
+  document.querySelectorAll('#style-modal-overlay .sp-chips').forEach(function(box) {
+    var group = box.getAttribute('data-group');
+    var on = p[group] || [];
+    box.innerHTML = _STYLE_OPTIONS[group].map(function(o) {
+      return '<div class="sp-chip' + (on.indexOf(o) >= 0 ? ' on' : '') + '" data-sp="' + _escAttr(o) + '">' + o + '</div>';
+    }).join('');
+  });
+  document.getElementById('sp-avoid').value = p.avoid || '';
+  document.getElementById('sp-notes').value = p.notes || '';
+  document.getElementById('style-modal-overlay').classList.add('open');
+}
+function _closeStyleProfile() {
+  document.getElementById('style-modal-overlay').classList.remove('open');
+}
+function _styleChipClick(e) {
+  var chip = e.target.closest('.sp-chip');
+  if (chip) chip.classList.toggle('on');
+}
+function _saveStyleProfile() {
+  var p = {};
+  document.querySelectorAll('#style-modal-overlay .sp-chips').forEach(function(box) {
+    p[box.getAttribute('data-group')] = [].map.call(box.querySelectorAll('.sp-chip.on'), function(c) { return c.getAttribute('data-sp'); });
+  });
+  p.avoid = document.getElementById('sp-avoid').value.trim();
+  p.notes = document.getElementById('sp-notes').value.trim();
+  try { localStorage.setItem(_STYLE_KEY, JSON.stringify(p)); } catch (e) {}
+  _closeStyleProfile();
+  _updateStyleSummary();
+  _showToast('✅ Stil gespeichert – fließt in neue Vorschläge ein');
+}
+function _updateStyleSummary() {
+  var el = document.getElementById('style-profile-summary');
+  if (!el) return;
+  var p = _loadStylePrefs();
+  var parts = [].concat(p.styles || [], p.colors || []).slice(0, 4);
+  el.textContent = parts.length ? parts.join(', ') : 'Hilft der KI bei Outfit-Vorschlägen';
+}
+// Text für den KI-Prompt (leer, wenn nichts angegeben)
+function _stylePromptText() {
+  var p = _loadStylePrefs();
+  var lines = [];
+  if ((p.styles || []).length) lines.push('Mag diese Stile: ' + p.styles.join(', '));
+  if ((p.colors || []).length) lines.push('Lieblingsfarben: ' + p.colors.join(', '));
+  if ((p.occasions || []).length) lines.push('Braucht Outfits vor allem für: ' + p.occasions.join(', '));
+  if (p.avoid) lines.push('Mag NICHT / trägt nicht: ' + p.avoid);
+  if (p.notes) lines.push('Weitere Hinweise: ' + p.notes);
+  return lines.length ? '\n\nSTIL-PROFIL DES NUTZERS (berücksichtige es, wo es zum Wunsch passt):\n- ' + lines.join('\n- ') : '';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INFO-FENSTER: Scan-Tipps / Über StyleSync & Datenschutz
+// ─────────────────────────────────────────────────────────────────────────────
+var _INFO_SHEETS = {
+  help: {
+    title: '📸 Tipps für gute Scans',
+    body: '<h4>Untergrund</h4><ul><li>Leg das Piece flach auf einen <b>einfarbigen</b> Untergrund.</li>'
+      + '<li><b>Dunkle Pieces auf hellem</b> Untergrund (z. B. weißes Laken), helle auf dunklem.</li></ul>'
+      + '<h4>Licht & Ausschnitt</h4><ul><li>Gutes, gleichmäßiges Licht, möglichst ohne harte Schatten.</li>'
+      + '<li>Beim Zuschneiden das Piece knapp einrahmen.</li></ul>'
+      + '<h4>Noch bessere Ergebnisse</h4><ul><li><b>iPhone:</b> In der Fotos-App das Piece gedrückt halten → „Teilen“ → „Bild sichern“. Das freigestellte Bild übernimmt StyleSync direkt.</li>'
+      + '<li><b>Markenteile:</b> Produktfoto aus dem Online-Shop speichern und hochladen.</li></ul>'
+  },
+  about: {
+    title: 'ℹ️ Über StyleSync',
+    body: '<p>StyleSync ist dein digitaler Kleiderschrank mit KI-Styling – noch in der Testphase.</p>'
+      + '<h4>Wo sind meine Daten?</h4><ul><li>Dein Schrank, deine Outfits und dein Profil liegen <b>nur auf diesem Gerät</b> (im Browser). Es gibt noch kein Konto und keine Cloud.</li>'
+      + '<li>Füge die App zum <b>Home-Bildschirm</b> hinzu und nutze <b>Einstellungen → Schrank sichern</b>, damit nichts verloren geht.</li></ul>'
+      + '<h4>Was wird verschickt?</h4><ul><li>Zum <b>Erkennen</b> eines Pieces und für <b>Outfit-Vorschläge</b> werden das Foto bzw. die Beschreibungen deiner Pieces an Google (Gemini-KI) gesendet.</li>'
+      + '<li>Das <b>Freistellen</b> (Hintergrund entfernen) passiert direkt auf deinem Gerät.</li></ul>'
+      + '<h4>Feed</h4><ul><li>Der Feed ist noch eine Vorschau mit Beispiel-Personen.</li></ul>'
+  }
+};
+function _openInfoSheet(kind) {
+  var s = _INFO_SHEETS[kind];
+  if (!s) return;
+  document.getElementById('info-title').textContent = s.title;
+  document.getElementById('info-body').innerHTML = s.body;
+  document.getElementById('info-modal-overlay').classList.add('open');
+}
+function _closeInfoSheet() {
+  document.getElementById('info-modal-overlay').classList.remove('open');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6030,6 +6242,9 @@ document.addEventListener('DOMContentLoaded', function() {
   _migrateItemCategories();
   // Browser bitten, die (nur lokal gespeicherten) Daten dauerhaft zu behalten
   _requestPersistentStorage();
+  // Eigenes Profil (Name/Bild) überall eintragen + Stil-Zusammenfassung in den Einstellungen
+  _applyProfile();
+  _updateStyleSummary();
 
   _ensureAiStyles();
   renderWardrobeGrid();
@@ -6373,8 +6588,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 var liked = !!commentLikes[c.id];
                 var likeCount = (c.likes || 0) + (liked ? 1 : 0);
                 return '<div class="comment-item" style="padding:10px 0;" data-comment-id="' + _escAttr(c.id) + '">'
-                  + '<div class="comment-avatar" style="background:' + (c.authorBg || '#EDE9FF') + ';">' + (c.authorEmoji || '👤') + '</div>'
-                  + '<div class="comment-body"><div class="comment-name">' + (c.author || 'Nutzer') + '</div>'
+                  + '<div class="comment-avatar" style="background:' + (c.authorBg || '#EDE9FF') + ';">' + (c.isOwn ? _myAvatarContent() : (c.authorEmoji || '👤')) + '</div>'
+                  + '<div class="comment-body"><div class="comment-name">' + (c.isOwn ? _myName() : (c.author || 'Nutzer')) + '</div>'
                   + '<div class="comment-text">' + (c.text || '').replace(/</g, '&lt;') + '</div>'
                   + '<div class="comment-meta"><span class="comment-time">' + _formatCommentTime(c.timestamp) + '</span>'
                   + '<button class="comment-like-btn' + (liked ? ' liked' : '') + '" data-clid="' + _escAttr(c.id) + '">❤️ ' + likeCount + '</button>'
@@ -6441,6 +6656,7 @@ document.addEventListener('DOMContentLoaded', function() {
       mutations.forEach(function(m) {
         if (m.type === 'attributes' && m.attributeName === 'class' && profilScreen.classList.contains('active')) {
           _renderProfilePosts();
+          _maybeAskProfileSetup();
         }
       });
     });

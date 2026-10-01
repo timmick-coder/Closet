@@ -365,6 +365,38 @@
     }
     .modal-input:focus { border-color: var(--purple); }
 
+    /* ── Profil bearbeiten / Mein Stil / Info ── */
+    /* Werden auch aus den Einstellungen geöffnet (z-index 400) → darüber legen */
+    #profile-modal-overlay, #style-modal-overlay, #info-modal-overlay { z-index: 450; }
+    .pe-sheet { max-height: 92%; overflow-y: auto; box-sizing: border-box; scrollbar-width: none; }
+    .pe-sheet::-webkit-scrollbar { display: none; }
+    .pe-hint { font-size: 13px; color: var(--text2); margin-bottom: 16px; line-height: 1.45; }
+    .pe-avatar-row { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+    .pe-avatar { width: 76px; height: 76px; border-radius: 50%; background: var(--purple-light); border: 2px solid var(--purple); display: flex; align-items: center; justify-content: center; font-size: 38px; flex-shrink: 0; overflow: hidden; }
+    .pe-avatar-btns { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .pe-btn { border: none; background: var(--purple); color: #fff; border-radius: 12px; padding: 10px 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .pe-btn-ghost { background: transparent; border: 1.5px solid var(--purple-border); color: var(--text2); }
+    .pe-emoji-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .pe-emoji { width: 40px; height: 40px; border-radius: 12px; background: var(--bg); border: 1.5px solid transparent; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; }
+    .pe-emoji.selected { border-color: var(--purple); background: var(--purple-light); }
+    .pe-label { display: block; font-size: 12px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text2); margin: 4px 0 8px; }
+    .pe-handle-wrap { display: flex; align-items: center; border: 1.5px solid var(--purple-border); border-radius: 14px; background: var(--bg); padding: 0 14px; margin-bottom: 18px; }
+    .pe-handle-wrap span { color: var(--text2); font-size: 15px; font-weight: 700; }
+    .pe-handle-wrap input { flex: 1; min-width: 0; border: none; background: transparent; padding: 13px 4px; font-size: 15px; color: var(--text); outline: none; }
+    .avatar-photo { display: block; width: 100%; height: 100%; border-radius: 50%; background: center / cover no-repeat; }
+    .sp-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .sp-chip { padding: 7px 12px; border-radius: 18px; background: var(--bg); border: 1.5px solid var(--purple-border); color: var(--text2); font-size: 13px; font-weight: 700; cursor: pointer; -webkit-user-select: none; user-select: none; }
+    .sp-chip.on { background: var(--purple); border-color: var(--purple); color: #fff; }
+    .sp-text { min-height: 64px; resize: none; font-family: inherit; box-sizing: border-box; }
+    .info-body { font-size: 14px; color: var(--text); line-height: 1.55; margin-bottom: 18px; }
+    .info-body h4 { font-size: 14px; margin: 14px 0 4px; color: var(--text); }
+    .info-body p, .info-body li { color: var(--text2); }
+    .info-body ul { padding-left: 18px; margin: 4px 0; }
+    /* Feed ist Demo */
+    .feed-demo-banner { display: flex; gap: 10px; align-items: flex-start; margin: 0 20px 10px; padding: 10px 12px; border-radius: 14px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.35); font-size: 12.5px; line-height: 1.4; color: #fcd34d; }
+    .feed-demo-banner b { color: #fbbf24; }
+    .feed-demo-icon { font-size: 18px; line-height: 1; }
+
     /* ── Schrank-Kategorien verwalten ── */
     /* Overlay endet über der Bottom-Nav → Sheet begrenzen und scrollbar machen */
     .cat-sheet { max-height: 92%; overflow-y: auto; box-sizing: border-box; scrollbar-width: none; }
@@ -1740,6 +1772,12 @@
         <button class="tab-pill" onclick="switchTab('freunde-feed', this)">Freunde</button>
       </div>
 
+      <!-- Feed ist noch Demo (kein Server) – klar kennzeichnen, damit Tester nicht verwirrt sind -->
+      <div class="feed-demo-banner">
+        <span class="feed-demo-icon">👀</span>
+        <div><b>Vorschau:</b> So wird der Feed aussehen. Die Personen hier sind Beispiele – echte Freunde kommen bald.</div>
+      </div>
+
       <div class="scroll-content">
 
         <!-- ENTDECKEN PANEL -->
@@ -1980,11 +2018,12 @@
       <div class="scroll-content">
         <div class="profil-hero">
           <button class="profil-settings-btn" onclick="_openSettings()">⚙️</button>
-          <div class="profil-identity">
-            <div class="profil-avatar-new">👩‍🦱</div>
+          <!-- Name/Bild kommen aus dem eigenen Profil (_applyProfile in ai.js); Tippen = bearbeiten -->
+          <div class="profil-identity" onclick="_openProfileEdit()" style="cursor:pointer;">
+            <div class="profil-avatar-new" id="profil-avatar">🙂</div>
             <div>
-              <div class="profil-name-new">Anna Müller</div>
-              <div class="profil-handle-new">@annas_style</div>
+              <div class="profil-name-new" id="profil-name">Ich</div>
+              <div class="profil-handle-new" id="profil-handle">Profil einrichten ›</div>
               <div class="profil-streak" id="profil-streak-row">
                 <div class="streak-badge-pill streak-c3" id="profil-streak-pill" onclick="_openStreakPanel()">🔥 7 Tage Streak</div>
                 <div class="streak-freeze-pill" id="profil-freeze-pill">❄️ 1 Freeze</div>
@@ -1995,7 +2034,6 @@
         <div class="profil-stats">
           <div class="profil-stat"><div class="pnum" id="profil-artikel-count">0</div><div class="plbl">Artikel</div></div>
           <div class="profil-stat"><div class="pnum" id="profil-outfits-count">0</div><div class="plbl">Outfits</div></div>
-          <div class="profil-stat"><div class="pnum">284</div><div class="plbl">Follower</div></div>
           <div class="profil-stat"><div class="pnum" id="profil-posts-count">0</div><div class="plbl">Posts</div></div>
         </div>
         <div class="profil-posts-label"><span>Meine Posts</span><button class="new-post-btn" onclick="_openNewPostModal()">+ Neuer Beitrag</button></div>
@@ -2016,10 +2054,19 @@
           <div class="settings-title">Einstellungen</div>
         </div>
         <div class="settings-scroll">
-          <div class="settings-section-header">Konto</div>
-          <div class="settings-row">
+          <div class="settings-section-header">Profil</div>
+          <div class="settings-row" onclick="_openProfileEdit()">
             <div class="settings-row-icon">👤</div>
-            <div class="settings-row-label">Profil bearbeiten</div>
+            <div class="settings-row-label">Profil bearbeiten
+              <div class="settings-row-sub">Name, Benutzername, Profilbild</div>
+            </div>
+            <div class="settings-row-arrow">›</div>
+          </div>
+          <div class="settings-row" onclick="_openStyleProfile()">
+            <div class="settings-row-icon">🎨</div>
+            <div class="settings-row-label">Mein Stil
+              <div class="settings-row-sub" id="style-profile-summary">Hilft der KI bei Outfit-Vorschlägen</div>
+            </div>
             <div class="settings-row-arrow">›</div>
           </div>
           <div class="settings-section-header">Daten</div>
@@ -2039,41 +2086,16 @@
           </div>
           <input type="file" id="backup-file-input" accept="application/json,.json" style="display:none"
                  onchange="_importBackupFile(this.files[0])" />
-          <div class="settings-section-header">Datenschutz</div>
-          <div class="settings-row">
-            <div class="settings-row-icon">🔒</div>
-            <div class="settings-row-label">Schrank für Freunde teilen</div>
-            <label class="settings-toggle"><input type="checkbox" checked /><span class="settings-toggle-slider"></span></label>
-          </div>
-          <div class="settings-row">
-            <div class="settings-row-icon">🌍</div>
-            <div class="settings-row-label">Profil öffentlich</div>
-            <label class="settings-toggle"><input type="checkbox" /><span class="settings-toggle-slider"></span></label>
-          </div>
-          <div class="settings-section-header">Allgemein</div>
-          <div class="settings-row">
-            <div class="settings-row-icon">🔔</div>
-            <div class="settings-row-label">Benachrichtigungen</div>
-            <label class="settings-toggle"><input type="checkbox" checked /><span class="settings-toggle-slider"></span></label>
-          </div>
-          <div class="settings-row">
-            <div class="settings-row-icon">🎨</div>
-            <div class="settings-row-label">Style Präferenzen</div>
+          <div class="settings-section-header">Hilfe</div>
+          <div class="settings-row" onclick="_openInfoSheet('help')">
+            <div class="settings-row-icon">📸</div>
+            <div class="settings-row-label">Tipps für gute Scans</div>
             <div class="settings-row-arrow">›</div>
           </div>
-          <div class="settings-section-header">Support</div>
-          <div class="settings-row">
-            <div class="settings-row-icon">❓</div>
-            <div class="settings-row-label">Hilfe & Support</div>
-            <div class="settings-row-arrow">›</div>
-          </div>
-          <div class="settings-row">
+          <div class="settings-row" onclick="_openInfoSheet('about')">
             <div class="settings-row-icon">ℹ️</div>
-            <div class="settings-row-label">Über Closet</div>
+            <div class="settings-row-label">Über StyleSync & Datenschutz</div>
             <div class="settings-row-arrow">›</div>
-          </div>
-          <div class="settings-logout-row">
-            <button class="settings-logout-btn" onclick="_showToast('👋 Tschüss!')">🚪 Ausloggen</button>
           </div>
         </div>
       </div>
@@ -2158,7 +2180,7 @@
         </div>
         <div class="comment-list" id="comment-list"></div>
         <div class="comment-input-row">
-          <div class="comment-my-avatar">👩‍🦱</div>
+          <div class="comment-my-avatar">🙂</div>
           <input class="comment-input" id="comment-input" placeholder="Schreibe einen Kommentar…" maxlength="300" />
           <button class="comment-send-btn" onclick="_sendComment()">→</button>
         </div>
@@ -2349,6 +2371,59 @@
   </div>
 
   <!-- Speichern in Kollektion Modal -->
+  <!-- Profil bearbeiten (auch beim ersten Öffnen des Profils) -->
+  <div class="modal-overlay" id="profile-modal-overlay" onclick="if (event.target === this) _closeProfileEdit()">
+    <div class="modal-sheet pe-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="pe-title" style="margin-bottom:6px;">Profil bearbeiten</div>
+      <div class="pe-hint" id="pe-hint">So erscheinst du in StyleSync – bei deinen Posts und Kommentaren.</div>
+      <div class="pe-avatar-row">
+        <div class="pe-avatar" id="pe-avatar">🙂</div>
+        <div class="pe-avatar-btns">
+          <button class="pe-btn" onclick="document.getElementById('pe-photo-input').click()">📷 Foto wählen</button>
+          <button class="pe-btn pe-btn-ghost" id="pe-photo-remove" onclick="_profileRemovePhoto()">Foto entfernen</button>
+        </div>
+      </div>
+      <div class="pe-emoji-row" id="pe-emoji-row"></div>
+      <label class="pe-label" for="pe-name">Name</label>
+      <input class="modal-input" id="pe-name" maxlength="30" placeholder="z. B. Tim" />
+      <label class="pe-label" for="pe-handle">Benutzername</label>
+      <div class="pe-handle-wrap"><span>@</span><input id="pe-handle" maxlength="20" placeholder="dein_style" autocapitalize="off" autocorrect="off" spellcheck="false" /></div>
+      <button class="modal-confirm" onclick="_saveProfileEdit()">Speichern</button>
+      <input type="file" id="pe-photo-input" accept="image/*" style="display:none" onchange="_profilePickPhoto(this.files[0]); this.value=''" />
+    </div>
+  </div>
+
+  <!-- Mein Stil (fließt in die KI-Outfit-Vorschläge ein) -->
+  <div class="modal-overlay" id="style-modal-overlay" onclick="if (event.target === this) _closeStyleProfile()">
+    <div class="modal-sheet pe-sheet" onclick="_styleChipClick(event)">
+      <div class="modal-handle"></div>
+      <div class="modal-title" style="margin-bottom:6px;">Mein Stil</div>
+      <div class="pe-hint">Die KI berücksichtigt das bei deinen Outfit-Vorschlägen. Alles ist freiwillig.</div>
+      <div class="pe-label">Stile, die ich mag</div>
+      <div class="sp-chips" data-group="styles"></div>
+      <div class="pe-label">Lieblingsfarben</div>
+      <div class="sp-chips" data-group="colors"></div>
+      <div class="pe-label">Wofür ich Outfits brauche</div>
+      <div class="sp-chips" data-group="occasions"></div>
+      <label class="pe-label" for="sp-avoid">Das trage ich nicht / mag ich nicht</label>
+      <textarea class="modal-input sp-text" id="sp-avoid" maxlength="200" placeholder="z. B. keine Röcke, kein Neon, nichts Enges"></textarea>
+      <label class="pe-label" for="sp-notes">Sonst noch wichtig</label>
+      <textarea class="modal-input sp-text" id="sp-notes" maxlength="200" placeholder="z. B. eher bequem, gern Layering, Sneaker statt Lederschuhe"></textarea>
+      <button class="modal-confirm" onclick="_saveStyleProfile()">Speichern</button>
+    </div>
+  </div>
+
+  <!-- Info: Scan-Tipps / Über & Datenschutz -->
+  <div class="modal-overlay" id="info-modal-overlay" onclick="if (event.target === this) _closeInfoSheet()">
+    <div class="modal-sheet pe-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="info-title"></div>
+      <div class="info-body" id="info-body"></div>
+      <button class="modal-confirm" onclick="_closeInfoSheet()">Alles klar</button>
+    </div>
+  </div>
+
   <!-- Schrank-Kategorien verwalten -->
   <div class="modal-overlay" id="cat-modal-overlay" onclick="_closeCategoryManagerOutside(event)">
     <div class="modal-sheet cat-sheet" onclick="_categoryManagerClick(event)">
