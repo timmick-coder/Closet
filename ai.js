@@ -398,7 +398,8 @@ async function removeBackground(base64, mimeType, onStep) {
 // zurückgeben. Die Outfits werden danach aus den echten Schrank-Teilen zusammengesetzt –
 // so kann die KI keine Kleidung erfinden.
 async function generateOutfitsWithGemini(description, inspoContext, inspoImageBase64, inspoImageMime) {
-  const wardrobe = loadWardrobe();
+  // Stilrichtung "Maskulin": Röcke/Kleider/Blusen gar nicht erst anbieten
+  const wardrobe = loadWardrobe().filter(function(w) { return !_excludedByDirection(w); });
   if (wardrobe.length === 0) throw new Error('Füge zuerst Kleidung zu deinem Schrank hinzu!');
   const byId = {};
   const wardrobeText = wardrobe.map(function(w, i) {
@@ -1581,7 +1582,10 @@ function _renderCategoryManager() {
   if (sugg) {
     var have = {};
     cats.forEach(function(c) { have[c.label.toLowerCase()] = true; });
-    var avail = _CATEGORY_SUGGESTIONS.concat(_DEFAULT_CATEGORIES).filter(function(s) { return !have[s.label.toLowerCase()]; });
+    var masc = _styleDirection() === 'Maskulin';
+    var avail = _CATEGORY_SUGGESTIONS.concat(_DEFAULT_CATEGORIES).filter(function(s) {
+      return !have[s.label.toLowerCase()] && !(masc && _FEMININE_CATS.indexOf(s.id) >= 0);
+    });
     sugg.innerHTML = avail.map(function(s) {
       return '<div class="chip cat-sugg" data-cat-add="' + _escAttr(s.label) + '">+ ' + s.emoji + ' ' + s.label + '</div>';
     }).join('');
@@ -5338,6 +5342,7 @@ function _maybeAskProfileSetup() {
 // ─────────────────────────────────────────────────────────────────────────────
 var _STYLE_KEY = 'stylesync_style_prefs';
 var _STYLE_OPTIONS = {
+  direction: ['Maskulin', 'Feminin', 'Unisex'],
   styles: ['Casual', 'Streetwear', 'Smart Casual', 'Business', 'Elegant', 'Sportlich', 'Minimalistisch', 'Vintage', 'Preppy', 'Boho', 'Skater', 'Y2K'],
   colors: ['Schwarz', 'Weiß', 'Grau', 'Beige', 'Braun', 'Navy', 'Blau', 'Grün', 'Olive', 'Rot', 'Rosa', 'Pastell', 'Erdtöne', 'Knallige Farben'],
   occasions: ['Alltag', 'Schule / Uni', 'Arbeit', 'Sport', 'Party', 'Date', 'Festival', 'Urlaub', 'Feier / Hochzeit']
@@ -5363,7 +5368,27 @@ function _closeStyleProfile() {
 }
 function _styleChipClick(e) {
   var chip = e.target.closest('.sp-chip');
-  if (chip) chip.classList.toggle('on');
+  if (!chip) return;
+  // Einzelauswahl (Stilrichtung): andere Chips der Gruppe abwählen
+  var box = chip.closest('.sp-chips');
+  if (box && box.hasAttribute('data-single') && !chip.classList.contains('on')) {
+    box.querySelectorAll('.sp-chip.on').forEach(function(c) { c.classList.remove('on'); });
+  }
+  chip.classList.toggle('on');
+}
+
+// Gewählte Stilrichtung: 'Maskulin' | 'Feminin' | 'Unisex' | ''
+function _styleDirection() {
+  return (_loadStylePrefs().direction || [])[0] || '';
+}
+// Typisch feminine Teile (für "Maskulin" ausblenden)
+var _FEMININE_CATS = ['kleider', 'roecke', 'blusen'];
+// "kleid" aber nicht "Kleidungsstück"
+var _FEMININE_RE = /kleid(?!ung)|dress|\br(ö|oe)cke?\b|\brock\b|skirt|bluse/i;
+function _excludedByDirection(item) {
+  if (_styleDirection() !== 'Maskulin') return false;
+  if (_FEMININE_CATS.indexOf(item.category) >= 0) return true;
+  return _FEMININE_RE.test((item.name || '') + ' ' + (item.type || ''));
 }
 function _saveStyleProfile() {
   var p = {};
@@ -5381,7 +5406,7 @@ function _updateStyleSummary() {
   var el = document.getElementById('style-profile-summary');
   if (!el) return;
   var p = _loadStylePrefs();
-  var parts = [].concat(p.styles || [], p.colors || []).slice(0, 4);
+  var parts = [].concat(p.direction || [], p.styles || [], p.colors || []).slice(0, 4);
   el.textContent = parts.length ? parts.join(', ') : 'Hilft der KI bei Outfit-Vorschlägen';
 }
 // Text für den KI-Prompt (leer, wenn nichts angegeben)
@@ -5400,6 +5425,10 @@ function _stylePromptText() {
       + 'nicht jedes Outfit muss dazu passen, bleib abwechslungsreich und schlag ruhig auch andere Kombinationen vor):\n- '
       + lines.join('\n- ');
   }
+  // Stilrichtung ist eine feste Vorgabe (keine bloße Orientierung)
+  var dir = (p.direction || [])[0];
+  if (dir === 'Maskulin') text += '\n\nSTILRICHTUNG: maskulin – stelle maskuline Outfits zusammen, KEINE Röcke, Kleider oder Blusen.';
+  else if (dir === 'Feminin') text += '\n\nSTILRICHTUNG: feminin – stelle feminine Outfits zusammen.';
   if (p.avoid) text += '\n\nBitte vermeiden (trägt der Nutzer nicht): ' + p.avoid;
   return text;
 }
