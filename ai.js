@@ -1015,7 +1015,7 @@ function showScanOverlay(state, data) {
       var catSelect = document.getElementById('scan-edit-category');
       if (catSelect) {
         var catId = (data.category && _catById(data.category)) ? data.category : _guessCategory(data);
-        catSelect.innerHTML = _categoryOptionsHtml(catId);
+        _fillCategorySelect(catSelect, catId);
       }
       set('scan-edit-color', data.color);
       set('scan-edit-style', data.style);
@@ -1364,7 +1364,32 @@ function _categoryOptionsHtml(selectedId) {
     return '<option value="' + _escAttr(c.id) + '"' + (c.id === selectedId ? ' selected' : '') + '>' + c.emoji + ' ' + c.label + '</option>';
   }).join('');
   html += '<option value=""' + (!selectedId || selectedId === 'none' ? ' selected' : '') + '>Ohne Kategorie</option>';
+  html += '<option value="__new__">＋ Neue Kategorie…</option>';
   return html;
+}
+
+// Kategorie-Auswahl befüllen und aktuellen Wert merken (für Abbruch bei "Neue Kategorie")
+function _fillCategorySelect(sel, selectedId) {
+  if (!sel) return;
+  sel.innerHTML = _categoryOptionsHtml(selectedId);
+  sel.setAttribute('data-prev', sel.value);
+}
+
+// "＋ Neue Kategorie…" gewählt → Namen abfragen, anlegen und direkt auswählen.
+// Gibt true zurück, wenn danach ein gültiger Wert ausgewählt ist.
+function _handleCategorySelect(sel) {
+  if (!sel) return false;
+  if (sel.value !== '__new__') { sel.setAttribute('data-prev', sel.value); return true; }
+  var name = (prompt('Name der neuen Kategorie:') || '').trim();
+  if (!name) { sel.value = sel.getAttribute('data-prev') || ''; return false; }
+  // Gibt es schon? Dann einfach die vorhandene auswählen statt doppelt anzulegen
+  var cat = _loadCategories().find(function(c) { return c.label.toLowerCase() === name.toLowerCase(); });
+  var created = false;
+  if (!cat) { cat = _addCategory(name); created = !!cat; }
+  _fillCategorySelect(sel, cat ? cat.id : (sel.getAttribute('data-prev') || ''));
+  if (created) _showToast('✅ Kategorie „' + cat.label + '“ angelegt');
+  _renderCategoryChips();
+  return !!cat;
 }
 
 // Chip-Leiste im Schrank: Alle + Kategorien (+ Ohne Kategorie) + Bearbeiten
@@ -1653,7 +1678,7 @@ function _populateItemDetail(item) {
   // Selects
   var seasonMap = { 'Sommer':'Sommer|s-sommer','Winter':'Winter|s-winter','Frühling':'Frühling|s-fruhjahr','Ganzjährig':'Ganzjährig|s-ganzjahrig' };
   var catEl = document.getElementById('idp-e-category');
-  if (catEl) catEl.innerHTML = _categoryOptionsHtml(_itemCategory(item));
+  if (catEl) _fillCategorySelect(catEl, _itemCategory(item));
   var seasonEl = document.getElementById('idp-e-season');
   if (seasonEl) seasonEl.value = seasonMap[item.season] || 'Ganzjährig|s-ganzjahrig';
   var styleEl = document.getElementById('idp-e-style');
@@ -1696,6 +1721,10 @@ function _populateItemDetail(item) {
 
 function _saveItemField() {
   if (!_currentItemId) return;
+  // "＋ Neue Kategorie…" gewählt: erst anlegen lassen; abgebrochen → nichts speichern
+  var newCatSel = document.getElementById('idp-e-category');
+  if (newCatSel && newCatSel.value === '__new__' && !_handleCategorySelect(newCatSel)) return;
+  if (newCatSel) newCatSel.setAttribute('data-prev', newCatSel.value);
   var items = loadWardrobe();
   var idx = items.findIndex(function(i) { return i.id === _currentItemId; });
   if (idx < 0) return;
