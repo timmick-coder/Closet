@@ -1687,8 +1687,11 @@ function _openItemDetail(itemId) {
   _populateItemDetail(item);
   var panel = document.getElementById('item-detail-panel');
   if (panel) panel.classList.add('active');
+  _updateItemPos();
+  _initItemSwipe();
   // Bild aus IDB nachladen
   idbGetAllImages().then(function(imgs) {
+    if (_currentItemId !== itemId) return; // inzwischen weitergeblättert
     var dataUrl = imgs[String(itemId)];
     if (!dataUrl) return;
     var imgEl = document.getElementById('idp-image');
@@ -1703,6 +1706,73 @@ function _closeItemDetail() {
   if (panel) panel.classList.remove('active');
   _hideDeleteConfirm();
   _currentItemId = null;
+}
+
+// ── Blättern im Artikel-Detail: nach links/rechts wischen ────────────────────
+// Reihenfolge = wie im Schrank sichtbar (inkl. aktivem Filter / Suche)
+function _visibleWardrobeIds() {
+  return [].slice.call(document.querySelectorAll('#clothes-grid .ai-wardrobe-item'))
+    .filter(function(c) { return c.style.display !== 'none'; })
+    .map(function(c) { return c.getAttribute('data-item-id'); });
+}
+function _updateItemPos() {
+  var el = document.getElementById('idp-pos');
+  if (!el) return;
+  var ids = _visibleWardrobeIds();
+  var i = ids.indexOf(String(_currentItemId));
+  el.textContent = i >= 0 && ids.length > 1 ? (i + 1) + ' / ' + ids.length : '';
+}
+function _showAdjacentItem(dir) {
+  var ids = _visibleWardrobeIds();
+  var i = ids.indexOf(String(_currentItemId));
+  var scroll = document.getElementById('idp-scroll');
+  var anim = function(cls) {
+    if (!scroll) return;
+    scroll.classList.remove('from-right', 'from-left', 'bounce');
+    void scroll.offsetWidth; // Animation neu starten
+    scroll.classList.add(cls);
+  };
+  if (i < 0) return;
+  var next = ids[i + dir];
+  if (!next) {
+    // Anfang/Ende erreicht: kurz "anstoßen"
+    if (scroll) scroll.style.setProperty('--bounce', (dir > 0 ? -12 : 12) + 'px');
+    anim('bounce');
+    return;
+  }
+  // Änderungen am aktuellen Piece sicher speichern, bevor weitergeblättert wird
+  _saveItemField();
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  _hideDeleteConfirm();
+  _openItemDetail(next);
+  anim(dir > 0 ? 'from-right' : 'from-left');
+}
+var _itemSwipeReady = false;
+function _initItemSwipe() {
+  if (_itemSwipeReady) return;
+  var panel = document.getElementById('item-detail-panel');
+  if (!panel) return;
+  _itemSwipeReady = true;
+  var sx = 0, sy = 0, active = false;
+  panel.addEventListener('touchstart', function(e) {
+    var t = e.touches[0];
+    // Linker Rand (≤ 30 px) gehört der "Zurück"-Wischgeste; Eingabefelder nicht stören
+    active = t.clientX > 30 && !e.target.closest('input, textarea, select');
+    sx = t.clientX; sy = t.clientY;
+  }, { passive: true });
+  panel.addEventListener('touchend', function(e) {
+    if (!active) return;
+    active = false;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.6) _showAdjacentItem(dx < 0 ? 1 : -1);
+  });
+  // Am PC: Pfeiltasten
+  document.addEventListener('keydown', function(e) {
+    if (!panel.classList.contains('active') || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
+    if (e.key === 'ArrowRight') _showAdjacentItem(1);
+    if (e.key === 'ArrowLeft') _showAdjacentItem(-1);
+  });
 }
 
 function _populateItemDetail(item) {

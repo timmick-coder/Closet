@@ -1282,6 +1282,13 @@
     .idp-back { background:none; border:none; font-size:22px; cursor:pointer; color:var(--purple); padding:4px 8px 4px 0; line-height:1; font-weight:700; }
     .idp-title { font-size:16px; font-weight:800; color:var(--text); }
     .idp-scroll { flex:1; overflow-y:auto; }
+    .idp-pos { width:44px; text-align:right; font-size:12px; font-weight:700; color:var(--text2); white-space:nowrap; }
+    @keyframes idpFromRight { from { transform:translateX(40%); opacity:0; } to { transform:none; opacity:1; } }
+    @keyframes idpFromLeft  { from { transform:translateX(-40%); opacity:0; } to { transform:none; opacity:1; } }
+    @keyframes idpBounce { 0%,100% { transform:none; } 40% { transform:translateX(var(--bounce, 12px)); } }
+    .idp-scroll.from-right { animation:idpFromRight 0.22s ease-out; }
+    .idp-scroll.from-left  { animation:idpFromLeft 0.22s ease-out; }
+    .idp-scroll.bounce     { animation:idpBounce 0.25s ease-out; }
     .idp-image-wrap { background:radial-gradient(ellipse at 40% 30%, rgba(77,141,255,0.22) 0%, rgba(13,27,46,0.95) 70%); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-bottom:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; height:260px; position:relative; flex-shrink:0; overflow:hidden; perspective:600px; }
     .idp-image-wrap::before { content:''; position:absolute; bottom:0; left:10%; right:10%; height:40px; background:radial-gradient(ellipse at 50% 100%, rgba(0,0,0,0.45) 0%, transparent 70%); border-radius:50%; filter:blur(6px); }
     .idp-image { width:80%; height:80%; object-fit:contain; filter:drop-shadow(0 18px 28px rgba(0,0,0,0.55)) drop-shadow(0 4px 8px rgba(77,141,255,0.25)); transform:translateY(-8px) scale(1.05); }
@@ -1465,7 +1472,8 @@
       <div class="idp-header">
         <button class="idp-back" onclick="_closeItemDetail()">←</button>
         <div class="idp-title" id="idp-view-title">Artikel</div>
-        <div style="width:44px"></div>
+        <!-- Position im Schrank; nach links/rechts wischen = nächstes/vorheriges Piece -->
+        <div class="idp-pos" id="idp-pos"></div>
       </div>
 
       <div class="idp-scroll" id="idp-scroll">
