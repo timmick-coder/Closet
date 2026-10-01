@@ -377,13 +377,10 @@
 
     /* ── Profil bearbeiten / Mein Stil / Info ── */
     /* Werden auch aus den Einstellungen geöffnet (z-index 400) → darüber legen */
-    #profile-modal-overlay, #style-modal-overlay, #info-modal-overlay { z-index: 450; }
+    #style-modal-overlay, #info-modal-overlay { z-index: 450; }
     .pe-sheet { max-height: 92%; overflow-y: auto; box-sizing: border-box; scrollbar-width: none; }
     .pe-sheet::-webkit-scrollbar { display: none; }
     .pe-hint { font-size: 13px; color: var(--text2); margin-bottom: 16px; line-height: 1.45; }
-    .pe-avatar-row { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
-    .pe-avatar { width: 76px; height: 76px; border-radius: 50%; background: var(--purple-light); border: 2px solid var(--purple); display: flex; align-items: center; justify-content: center; font-size: 38px; flex-shrink: 0; overflow: hidden; }
-    .pe-avatar-btns { display: flex; flex-direction: column; gap: 8px; flex: 1; }
     .pe-btn { border: none; background: var(--purple); color: #fff; border-radius: 12px; padding: 10px 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
     .pe-btn-ghost { background: transparent; border: 1.5px solid var(--purple-border); color: var(--text2); }
     .pe-emoji-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -762,7 +759,38 @@
     .profil-identity { display:flex; align-items:center; gap:14px; }
     .profil-name-new { font-size: 20px; font-weight: 800; color: white; }
     .profil-handle-new { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 3px; }
-    .profil-avatar-new { width: 62px; height: 62px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 30px; border: 3px solid rgba(255,255,255,0.4); flex-shrink: 0; }
+    .profil-avatar-new { width: 62px; height: 62px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 30px; border: 3px solid rgba(255,255,255,0.4); flex-shrink: 0; overflow: hidden; }
+
+    /* Profil bearbeiten: Kopf klappt nach unten auf (grid 0fr → 1fr animiert die echte Höhe) */
+    .profil-hero { transition: padding 0.35s ease; }
+    .profil-identity { transition: gap 0.35s ease; }
+    .profil-avatar-new { transition: width 0.35s ease, height 0.35s ease, font-size 0.35s ease, border-width 0.35s ease; }
+    .profil-name-new { transition: font-size 0.35s ease; }
+    .profil-edit { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.38s cubic-bezier(0.4,0,0.2,1); }
+    .profil-edit-inner { overflow: hidden; min-height: 0; opacity: 0; transition: opacity 0.25s ease; }
+    .profil-hero.expanded { padding-bottom: 20px; }
+    .profil-hero.expanded .profil-identity { gap: 18px; }
+    .profil-hero.expanded .profil-avatar-new { width: 96px; height: 96px; font-size: 46px; border-width: 4px; }
+    .profil-hero.expanded .profil-name-new { font-size: 24px; }
+    .profil-hero.expanded .profil-edit { grid-template-rows: 1fr; }
+    .profil-hero.expanded .profil-edit-inner { opacity: 1; transition-delay: 0.12s; }
+    .profil-edit-inner > :first-child { margin-top: 18px; }
+    /* Formular auf blauem Grund */
+    .profil-edit .pe-hint { color: rgba(255,255,255,0.85); }
+    .profil-edit .pe-label { color: rgba(255,255,255,0.75); }
+    .pe-photo-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .pe-photo-row .pe-btn { flex: 1; }
+    .profil-edit .pe-btn { background: #fff; color: var(--purple-mid); }
+    .profil-edit .pe-btn-ghost { background: transparent; border: 1.5px solid rgba(255,255,255,0.55); color: #fff; }
+    .profil-edit .pe-emoji { background: rgba(255,255,255,0.15); }
+    .profil-edit .pe-emoji.selected { background: rgba(255,255,255,0.35); border-color: #fff; }
+    .pe-input { width: 100%; box-sizing: border-box; border: 1.5px solid rgba(255,255,255,0.35); border-radius: 14px; padding: 12px 14px; font-size: 15px; color: #fff; background: rgba(255,255,255,0.12); outline: none; margin-bottom: 14px; }
+    .pe-input::placeholder, .profil-edit .pe-handle-wrap input::placeholder { color: rgba(255,255,255,0.55); }
+    .profil-edit .pe-handle-wrap { border-color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.12); }
+    .profil-edit .pe-handle-wrap span, .profil-edit .pe-handle-wrap input { color: #fff; }
+    .pe-actions { display: flex; gap: 10px; }
+    .pe-actions .pe-btn { flex: 1; height: 46px; }
+    .profil-edit .pe-btn-save { flex: 2; background: #fff; color: var(--purple-mid); font-weight: 800; }
 
     /* ── Einstellungen Panel ── */
     .settings-panel { display:none; position:absolute; inset:0; background:var(--bg); z-index:400; flex-direction:column; overflow:hidden; }
@@ -2035,9 +2063,9 @@
     <!-- ═══════════ PROFIL ═══════════ -->
     <div id="profil" class="screen">
       <div class="scroll-content">
-        <div class="profil-hero">
+        <div class="profil-hero" id="profil-hero">
           <button class="profil-settings-btn" onclick="_openSettings()">⚙️</button>
-          <!-- Name/Bild kommen aus dem eigenen Profil (_applyProfile in ai.js); Tippen = bearbeiten -->
+          <!-- Name/Bild kommen aus dem eigenen Profil (_applyProfile in ai.js); Tippen = Kopf klappt zum Bearbeiten auf -->
           <div class="profil-identity" onclick="_openProfileEdit()" style="cursor:pointer;">
             <div class="profil-avatar-new" id="profil-avatar">🙂</div>
             <div>
@@ -2047,6 +2075,26 @@
                 <div class="streak-badge-pill streak-c3" id="profil-streak-pill" onclick="_openStreakPanel()">🔥 7 Tage Streak</div>
                 <div class="streak-freeze-pill" id="profil-freeze-pill">❄️ 1 Freeze</div>
               </div>
+            </div>
+          </div>
+          <!-- Profil bearbeiten: klappt im Kopf auf (statt Pop-up) -->
+          <div class="profil-edit" id="profil-edit">
+            <div class="profil-edit-inner">
+              <div class="pe-hint" id="pe-title">So erscheinst du in StyleSync – bei deinen Posts und Kommentaren.</div>
+              <div class="pe-photo-row">
+                <button class="pe-btn" onclick="document.getElementById('pe-photo-input').click()">📷 Foto wählen</button>
+                <button class="pe-btn pe-btn-ghost" id="pe-photo-remove" onclick="_profileRemovePhoto()">Foto entfernen</button>
+              </div>
+              <div class="pe-emoji-row" id="pe-emoji-row"></div>
+              <label class="pe-label" for="pe-name">Name</label>
+              <input class="pe-input" id="pe-name" maxlength="30" placeholder="z. B. Tim" />
+              <label class="pe-label" for="pe-handle">Benutzername</label>
+              <div class="pe-handle-wrap"><span>@</span><input id="pe-handle" maxlength="20" placeholder="dein_style" autocapitalize="off" autocorrect="off" spellcheck="false" /></div>
+              <div class="pe-actions">
+                <button class="pe-btn pe-btn-ghost" onclick="_closeProfileEdit()">Abbrechen</button>
+                <button class="pe-btn pe-btn-save" onclick="_saveProfileEdit()">Speichern</button>
+              </div>
+              <input type="file" id="pe-photo-input" accept="image/*" style="display:none" onchange="_profilePickPhoto(this.files[0]); this.value=''" />
             </div>
           </div>
         </div>
@@ -2421,28 +2469,6 @@
   </div>
 
   <!-- Speichern in Kollektion Modal -->
-  <!-- Profil bearbeiten (auch beim ersten Öffnen des Profils) -->
-  <div class="modal-overlay" id="profile-modal-overlay" onclick="if (event.target === this) _closeProfileEdit()">
-    <div class="modal-sheet pe-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-title" id="pe-title" style="margin-bottom:6px;">Profil bearbeiten</div>
-      <div class="pe-hint" id="pe-hint">So erscheinst du in StyleSync – bei deinen Posts und Kommentaren.</div>
-      <div class="pe-avatar-row">
-        <div class="pe-avatar" id="pe-avatar">🙂</div>
-        <div class="pe-avatar-btns">
-          <button class="pe-btn" onclick="document.getElementById('pe-photo-input').click()">📷 Foto wählen</button>
-          <button class="pe-btn pe-btn-ghost" id="pe-photo-remove" onclick="_profileRemovePhoto()">Foto entfernen</button>
-        </div>
-      </div>
-      <div class="pe-emoji-row" id="pe-emoji-row"></div>
-      <label class="pe-label" for="pe-name">Name</label>
-      <input class="modal-input" id="pe-name" maxlength="30" placeholder="z. B. Tim" />
-      <label class="pe-label" for="pe-handle">Benutzername</label>
-      <div class="pe-handle-wrap"><span>@</span><input id="pe-handle" maxlength="20" placeholder="dein_style" autocapitalize="off" autocorrect="off" spellcheck="false" /></div>
-      <button class="modal-confirm" onclick="_saveProfileEdit()">Speichern</button>
-      <input type="file" id="pe-photo-input" accept="image/*" style="display:none" onchange="_profilePickPhoto(this.files[0]); this.value=''" />
-    </div>
-  </div>
 
   <!-- Mein Stil (fließt in die KI-Outfit-Vorschläge ein) -->
   <div class="modal-overlay" id="style-modal-overlay" onclick="if (event.target === this) _closeStyleProfile()">

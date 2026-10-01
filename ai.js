@@ -5541,23 +5541,39 @@ function _applyProfile() {
   });
 }
 
+// Profil bearbeiten: der Profilkopf klappt nach unten auf (kein Pop-up)
 function _openProfileEdit(firstTime) {
+  var hero = document.getElementById('profil-hero');
+  if (!hero) return;
+  // Aus den Einstellungen heraus: zum Profil wechseln
+  var settings = document.getElementById('settings-panel');
+  if (settings && settings.classList.contains('active')) _closeSettings();
+  var profil = document.getElementById('profil');
+  if (profil && !profil.classList.contains('active') && typeof navigate === 'function') navigate('profil', document.getElementById('nav-profil'));
+  if (hero.classList.contains('expanded')) return; // schon offen – Eingaben nicht zurücksetzen
   var p = _loadProfile();
   _peDraft = { emoji: p.emoji || '🙂', photo: p.photo || null };
   var title = document.getElementById('pe-title');
-  if (title) title.textContent = firstTime === true ? '👋 Willkommen! Richte dein Profil ein' : 'Profil bearbeiten';
+  if (title) title.textContent = firstTime === true
+    ? '👋 Willkommen! Richte dein Profil ein – so erscheinst du bei deinen Posts und Kommentaren.'
+    : 'So erscheinst du in StyleSync – bei deinen Posts und Kommentaren.';
   document.getElementById('pe-name').value = p.name || '';
   document.getElementById('pe-handle').value = p.handle || '';
   _renderProfileDraft();
-  document.getElementById('profile-modal-overlay').classList.add('open');
+  var scroll = profil && profil.querySelector('.scroll-content');
+  if (scroll) scroll.scrollTo({ top: 0, behavior: 'smooth' });
+  hero.classList.add('expanded');
 }
 function _closeProfileEdit() {
-  document.getElementById('profile-modal-overlay').classList.remove('open');
+  var hero = document.getElementById('profil-hero');
+  if (hero) hero.classList.remove('expanded');
   _peDraft = null;
+  _applyProfile(); // Vorschau (Bild) auf gespeicherten Stand zurücksetzen
 }
 function _renderProfileDraft() {
   if (!_peDraft) return;
-  document.getElementById('pe-avatar').innerHTML = _avatarContent(_peDraft);
+  // Live-Vorschau direkt im (großen) Profilbild oben
+  document.getElementById('profil-avatar').innerHTML = _avatarContent(_peDraft);
   document.getElementById('pe-photo-remove').style.display = _peDraft.photo ? '' : 'none';
   var row = document.getElementById('pe-emoji-row');
   row.style.display = _peDraft.photo ? 'none' : '';
