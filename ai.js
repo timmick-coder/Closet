@@ -1117,7 +1117,7 @@ async function _checkScanDuplicate(data) {
   if (_scanResult !== data) return;
   _scanDuplicateId = dup ? dup.id : null;
   if (dup) {
-    if (textEl) textEl.textContent = '⚠️ Sieht aus wie dein „' + (dup.name || 'Teil') + '“ – hast du das schon im Schrank?';
+    if (textEl) textEl.textContent = '⚠️ Sieht aus wie dein „' + (dup.name || 'Piece') + '“ – hast du das schon im Schrank?';
     if (thumb) {
       thumb.style.backgroundImage = dup.imageDataUrl ? 'url(\'' + dup.imageDataUrl + '\')' : '';
       thumb.textContent = dup.imageDataUrl ? '' : (dup.emoji || '👕');
@@ -1146,7 +1146,7 @@ function _discardDuplicateScan() {
   _scanDuplicateId = null;
   var banner = document.getElementById('scan-duplicate-banner');
   if (banner) banner.style.display = 'none';
-  _showToast('🗑️ Vorhandenes Teil gelöscht');
+  _showToast('🗑️ Vorhandenes Piece gelöscht');
 }
 async function processScanFile(file) {
   if (!file) return;
@@ -1560,8 +1560,8 @@ function _renderCategoryManager() {
           + '<div class="cat-row-emoji">' + c.emoji + '</div>'
           + '<div class="cat-row-info"><div class="cat-row-name">' + c.label + '</div>'
           + '<div class="cat-row-count">' + (pending && n
-              ? n + (n === 1 ? ' Teil wird' : ' Teile werden') + ' neu einsortiert'
-              : n + (n === 1 ? ' Teil' : ' Teile')) + '</div></div>'
+              ? n + (n === 1 ? ' Piece wird' : ' Pieces werden') + ' neu einsortiert'
+              : n + (n === 1 ? ' Piece' : ' Pieces')) + '</div></div>'
           + (pending
               ? '<button class="cat-row-confirm" data-cat-remove="' + _escAttr(c.id) + '">Entfernen</button>'
               : '<button class="cat-row-remove" data-cat-ask="' + _escAttr(c.id) + '" aria-label="Entfernen">✕</button>')
@@ -2658,7 +2658,7 @@ function _outfitTitle(outfit) {
   var n = (outfit.items || []).length;
   return '<div class="col-grid-title">'
     + '<div class="col-grid-name">' + (outfit.name || 'Outfit') + '</div>'
-    + '<div class="col-grid-sub">' + n + (n === 1 ? ' Teil' : ' Teile') + '</div>'
+    + '<div class="col-grid-sub">' + n + (n === 1 ? ' Piece' : ' Pieces') + '</div>'
     + '</div>';
 }
 
@@ -5172,7 +5172,7 @@ async function _exportBackup() {
     try {
       await navigator.share({ files: [b.file], title: 'StyleSync-Sicherung' });
       done();
-      _showToast('✅ Sicherung erstellt (' + b.items + ' Teile)');
+      _showToast('✅ Sicherung erstellt (' + b.items + ' Pieces)');
       return;
     } catch (e) {
       if (e && e.name === 'AbortError') return; // selbst abgebrochen
@@ -5188,7 +5188,7 @@ async function _exportBackup() {
   a.remove();
   setTimeout(function() { URL.revokeObjectURL(url); }, 4000);
   done();
-  _showToast('✅ Sicherung heruntergeladen (' + b.items + ' Teile)');
+  _showToast('✅ Sicherung heruntergeladen (' + b.items + ' Pieces)');
 }
 
 function _importBackupPick() {
@@ -5208,7 +5208,7 @@ async function _importBackupFile(file) {
   var count = 0;
   try { count = JSON.parse(data.localStorage.stylesync_wardrobe || '[]').length; } catch (e) {}
   var when = data.createdAt ? new Date(data.createdAt).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' }) : 'unbekannt';
-  var ok = confirm('Sicherung vom ' + when + ' mit ' + count + ' Teilen laden?\n\n'
+  var ok = confirm('Sicherung vom ' + when + ' mit ' + count + ' Pieces laden?\n\n'
     + 'Dein aktueller Schrank, deine Outfits und Ordner auf diesem Gerät werden dabei ersetzt.');
   if (!ok) return;
   try {
@@ -5544,7 +5544,7 @@ function _openFriendKI() {
 
   var matches = profile.kiMatches || [];
   var introName = profile.name.split(' ')[0];
-  scroll.innerHTML = '<div class="fp-ki-intro">Diese Teile von ' + introName + ' passen zu deinen Outfits:</div>'
+  scroll.innerHTML = '<div class="fp-ki-intro">Diese Pieces von ' + introName + ' passen zu deinen Outfits:</div>'
     + (matches.length === 0
       ? '<div class="fp-private-msg"><div class="fp-private-icon">🤔</div><div class="fp-private-text">Keine passenden Items gefunden.</div></div>'
       : matches.map(function(m) {
@@ -7042,7 +7042,7 @@ function _renderKofferPackliste() {
     groups[cat].push(item);
   });
 
-  var html = '<div style="font-size:13px;color:var(--text2);margin-bottom:12px;">' + allItems.length + ' Teile insgesamt</div>';
+  var html = '<div style="font-size:13px;color:var(--text2);margin-bottom:12px;">' + allItems.length + ' Pieces insgesamt</div>';
   _kofferCategoryOrder.forEach(function(cat) {
     var items = groups[cat];
     if (!items || items.length === 0) return;
