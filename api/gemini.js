@@ -12,7 +12,11 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const key = process.env.GEMINI_API_KEY;
+  // Vorschau-Deployments (z. B. dev-Branch) nutzen einen eigenen Schlüssel aus einem
+  // anderen Google-Projekt, damit Entwicklung nicht das Kontingent der Tester verbraucht.
+  // VERCEL_ENV setzt Vercel automatisch ('production' | 'preview' | 'development').
+  const isPreview = process.env.VERCEL_ENV !== 'production';
+  const key = (isPreview && process.env.GEMINI_API_KEY_PREVIEW) || process.env.GEMINI_API_KEY;
   if (!key) {
     return res.status(500).json({ error: 'Gemini API-Key nicht konfiguriert' });
   }
