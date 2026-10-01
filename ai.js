@@ -1054,11 +1054,53 @@ function hideScanOverlay() {
 // ── Duplikat-Erkennung: gescanntes Teil evtl. schon im Schrank ────────────────
 var _scanDuplicateId = null;
 
-// Früher reichte ein gleicher Name ("Weißes T-Shirt") – dadurch galten zwei
-// verschiedene Shirts als Duplikat. Jetzt entscheidet das Aussehen: beide
-// freigestellten Bilder werden verkleinert verglichen (Farbabstand 0–255).
-// Getestet: dasselbe Teil neu fotografiert ≈ 16, verschiedene Teile ≈ 43–52.
-var DUPLICATE_MAX_DIST = 28;
+// Duplikat nur, wenn ALLES passt – sonst schlug die Warnung schon bei gleicher
+// Farbe an. Gemessen (freigestellte Bilder):
+//   gleiches Piece neu fotografiert: Gesamtbild 11–15, Details 7–15, Umriss 0,70–0,87, Seitenverh. ≤ 1,09
+//   verschiedene Pieces (auch gleiche Farbe): Gesamtbild 46–56, Details 26–33, Umriss ≤ 0,36, Seitenverh. ≥ 1,69
+var DUPLICATE_MAX_DIST = 22;      // Gesamtbild (24×24, Farbabstand 0–255)
+var DUPLICATE_MAX_HAMMING = 20;   // Details/Muster (dHash, 0–64 abweichende Bits)
+var DUPLICATE_MIN_IOU = 0.6;      // Umriss-Überdeckung (0–1)
+var DUPLICATE_MAX_ASPECT = 1.25;  // Seitenverhältnis (1 = gleich)
+
+// Umriss (32×32-Maske) + Detail-Hash (9×8 Helligkeit) + Seitenverhältnis eines freigestellten Bildes
+function _shapeFeatures(url) {
+  return new Promise(function(resolve) {
+    if (!url) { resolve(null); return; }
+    var img = new Image();
+    img.onload = function() {
+      try {
+        var S = 32, c = document.createElement('canvas');
+        c.width = c.height = S;
+        var x = c.getContext('2d');
+        var s = Math.min(S / img.naturalWidth, S / img.naturalHeight);
+        x.drawImage(img, (S - img.naturalWidth * s) / 2, (S - img.naturalHeight * s) / 2, img.naturalWidth * s, img.naturalHeight * s);
+        var d = x.getImageData(0, 0, S, S).data, mask = [];
+        for (var k = 0; k < S * S; k++) mask.push(d[k * 4 + 3] > 128);
+        var c2 = document.createElement('canvas');
+        c2.width = 9; c2.height = 8;
+        var y = c2.getContext('2d');
+        y.fillStyle = '#808080';
+        y.fillRect(0, 0, 9, 8);
+        var s2 = Math.min(9 / img.naturalWidth, 8 / img.naturalHeight);
+        y.drawImage(img, (9 - img.naturalWidth * s2) / 2, (8 - img.naturalHeight * s2) / 2, img.naturalWidth * s2, img.naturalHeight * s2);
+        var e = y.getImageData(0, 0, 9, 8).data, L = [], hash = [];
+        for (var j = 0; j < 72; j++) L.push(0.299 * e[j * 4] + 0.587 * e[j * 4 + 1] + 0.114 * e[j * 4 + 2]);
+        for (var row = 0; row < 8; row++) for (var col = 0; col < 8; col++) hash.push(L[row * 9 + col] > L[row * 9 + col + 1]);
+        resolve({ mask: mask, hash: hash, aspect: img.naturalWidth / img.naturalHeight });
+      } catch (err) { resolve(null); }
+    };
+    img.onerror = function() { resolve(null); };
+    img.src = url;
+  });
+}
+function _shapeMatch(a, b) {
+  var inter = 0, uni = 0, ham = 0;
+  for (var k = 0; k < a.mask.length; k++) { if (a.mask[k] && b.mask[k]) inter++; if (a.mask[k] || b.mask[k]) uni++; }
+  for (var h = 0; h < 64; h++) if (a.hash[h] !== b.hash[h]) ham++;
+  var aspect = Math.max(a.aspect, b.aspect) / Math.min(a.aspect, b.aspect);
+  return (uni ? inter / uni : 0) >= DUPLICATE_MIN_IOU && ham <= DUPLICATE_MAX_HAMMING && aspect <= DUPLICATE_MAX_ASPECT;
+}
 
 // Kleine 24×24-Signatur eines Bildes (auf grauem Grund, Seitenverhältnis erhalten)
 function _imageSignature(url) {
@@ -1092,17 +1134,25 @@ function _signatureDistance(a, b) {
 async function _findDuplicateWardrobeItem(data) {
   var wardrobe = loadWardrobe();
   var sig = await _imageSignature(data && data.imageDataUrl);
+  var feat = sig ? await _shapeFeatures(data.imageDataUrl) : null;
+  var cat = (data && data.category && _catById(data.category)) ? data.category : _guessCategory(data || {});
   var best = null, bestDist = Infinity;
   for (var i = 0; i < wardrobe.length; i++) {
     var w = wardrobe[i];
-    if (sig && w.imageDataUrl) {
-      var wsig = await _imageSignature(w.imageDataUrl);
-      if (!wsig) continue;
-      var dist = _signatureDistance(sig, wsig);
-      if (dist < bestDist) { bestDist = dist; best = w; }
-    }
+    if (!sig || !w.imageDataUrl) continue;
+    // Andere Kategorie (z. B. Shirt vs. Hose) ist nie ein Duplikat
+    var wcat = _itemCategory(w);
+    if (cat && wcat !== 'none' && cat !== wcat) continue;
+    var wsig = await _imageSignature(w.imageDataUrl);
+    if (!wsig) continue;
+    var dist = _signatureDistance(sig, wsig);
+    if (dist > DUPLICATE_MAX_DIST || dist >= bestDist) continue;
+    // Gesamtbild ähnlich → zusätzlich Umriss, Details und Seitenverhältnis prüfen
+    var wfeat = await _shapeFeatures(w.imageDataUrl);
+    if (feat && wfeat && !_shapeMatch(feat, wfeat)) continue;
+    bestDist = dist; best = w;
   }
-  if (best && bestDist <= DUPLICATE_MAX_DIST) return best;
+  if (best) return best;
   // Ohne Bilder: nur warnen, wenn Name UND Farbe exakt gleich sind
   if (!sig) {
     var name = (data && data.name || '').trim().toLowerCase();
