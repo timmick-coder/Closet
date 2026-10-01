@@ -3826,11 +3826,25 @@ var _genSelectedCollection = null;
 var _genSelectedInspo = null;
 var _genMode = 'browse'; // 'browse' = kein API Call | 'generate' = API Call
 
-function _openGenerateModal(mode) {
+// Ordner-"+": Auswahl zwischen selbst zusammenstellen und KI
+function _openAddChoice() {
+  var sub = document.getElementById('ki-add-choice-sub');
+  var name = _currentCollectionName === '__favoriten__' ? 'Favoriten' : (_currentCollectionName || '');
+  if (sub) sub.textContent = name ? 'zu „' + name + '“' : '';
+  var el = document.getElementById('ki-add-choice');
+  if (el) el.classList.add('active');
+}
+function _closeAddChoice() {
+  var el = document.getElementById('ki-add-choice');
+  if (el) el.classList.remove('active');
+}
+
+// presetCollection: Ordner, der bereits ausgewählt sein soll (z. B. aus dem Ordner-"+")
+function _openGenerateModal(mode, presetCollection) {
   var modal = document.getElementById('ki-generate-modal');
   if (!modal) return;
   _genMode = mode || 'browse';
-  _genSelectedCollection = null;
+  _genSelectedCollection = presetCollection || null;
   _genSelectedInspo = null;
   var desc = document.getElementById('ki-gen-description');
   if (desc) desc.value = '';
@@ -3915,8 +3929,10 @@ function _confirmGenerate() {
     var outfitsInCol = _loadOutfits().filter(function(o) {
       return (o.kollektionen || []).indexOf(_genSelectedCollection) >= 0;
     });
+    // Ordnername gibt Anlass/Stil vor (wichtig auch bei leeren Ordnern, z. B. "Business")
+    colContext = 'Die Outfits sind für den Ordner "' + colLabel + '" gedacht – richte Stil und Anlass danach aus.';
     if (outfitsInCol.length > 0) {
-      colContext = 'Lass dich von Outfits aus der Kollektion "' + colLabel + '" inspirieren: '
+      colContext += ' Lass dich von Outfits aus diesem Ordner inspirieren: '
         + outfitsInCol.slice(0, 5).map(function(o) { return o.name || 'Outfit'; }).join(', ');
     }
   } else if (_genSelectedInspo) {
