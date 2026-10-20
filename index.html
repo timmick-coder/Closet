@@ -615,8 +615,11 @@
     .mq-body .mq-head { fill: rgba(42,37,32,0.05); }
     .mq-body .mq-shadow { fill: rgba(70,55,40,0.13); stroke: none; }
     .mq-piece { position: absolute; display: flex; align-items: center; justify-content: center; }
-    .mq-piece img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(60,45,30,0.25)); pointer-events: none; -webkit-user-drag: none; }
+    .mq-piece img { width: 100%; height: 100%; object-fit: fill; filter: drop-shadow(0 4px 6px rgba(60,45,30,0.25)); pointer-events: none; -webkit-user-drag: none; }
     .mq-emoji { font-size: 34px; line-height: 1; filter: drop-shadow(0 3px 5px rgba(60,45,30,0.25)); }
+    /* Fotos erst zeigen, wenn sie vermessen und im richtigen Maßstab platziert sind */
+    .mq-piece[data-fit]:not(.mq-fitted) img { opacity: 0; }
+    .mq-piece.mq-fitted img { opacity: 1; transition: opacity 0.2s; }
     .mq-piece.mq-tap { cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform 0.15s; }
     .mq-piece.mq-tap:active { transform: scale(0.97); }
     .mq-piece.mq-tap:active::after { content: attr(data-name); position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);

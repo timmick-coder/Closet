@@ -678,9 +678,52 @@ function _croquisSvg(b) {
     + '</svg>';
 }
 
-// Box [x0, y0, x1, y1] in Figur-Einheiten → Prozent + Ausrichtung des Bildes
-function _mqBox(b, align, z) {
-  return { left: b[0], top: b[1] / 1.6, width: b[2] - b[0], height: (b[3] - b[1]) / 1.6, align: align, z: z };
+// ── Einheitlicher Maßstab: jedes Piece bekommt seine echte Größe am Körper ────
+// Statt jedes Bild in "seinen" Bereich zu quetschen (dadurch passten die Pieces
+// größenmäßig nicht zueinander), hat jede Art eine Soll-Länge bzw. -Breite in
+// Figur-Einheiten. Beim Laden wird gemessen, wo im Bild das Kleidungsstück wirklich
+// ist (ohne durchsichtigen Rand); daraus ergeben sich Größe und Position.
+//   spec = { mode: 'h'|'w', size, ax, ay, anchor: 'top'|'bottom'|'center', maxW, maxH, z, aspect }
+//   ax/ay = Ankerpunkt (x Mitte; y oben/unten/Mitte) in Figur-Einheiten
+function _mqLayout(spec, aspect, bbox) {
+  bbox = bbox || { x: 0, y: 0, w: 1, h: 1 };
+  var gw, gh; // sichtbares Kleidungsstück
+  if (spec.mode === 'h') { gh = spec.size; gw = gh * aspect; if (gw > spec.maxW) { gw = spec.maxW; gh = gw / aspect; } }
+  else { gw = spec.size; gh = gw / aspect; if (gh > spec.maxH) { gh = spec.maxH; gw = gh * aspect; } }
+  var gy0 = spec.anchor === 'top' ? spec.ay : spec.anchor === 'bottom' ? spec.ay - gh : spec.ay - gh / 2;
+  var gx0 = spec.ax - gw / 2;
+  var iw = gw / bbox.w, ih = gh / bbox.h; // ganzes Bild inkl. Rand
+  return { left: gx0 - bbox.x * iw, top: (gy0 - bbox.y * ih) / 1.6, width: iw, height: ih / 1.6 };
+}
+function _mqStyle(l, z) {
+  return 'left:' + l.left.toFixed(2) + '%;top:' + l.top.toFixed(2) + '%;width:' + l.width.toFixed(2) + '%;height:' + l.height.toFixed(2) + '%;z-index:' + z + ';';
+}
+// Nach dem Laden eines Fotos: sichtbaren Bereich messen und exakt platzieren
+var _mqBBoxCache = {};
+function _mqFit(img) {
+  var piece = img.parentElement;
+  var spec;
+  try { spec = JSON.parse(piece.getAttribute('data-fit')); } catch (e) { return; }
+  var key = img.currentSrc || img.src;
+  var bbox = _mqBBoxCache[key];
+  if (!bbox) {
+    bbox = { x: 0, y: 0, w: 1, h: 1 };
+    try {
+      var S = 96, sc = Math.min(1, S / Math.max(img.naturalWidth, img.naturalHeight));
+      var cw = Math.max(1, Math.round(img.naturalWidth * sc)), ch = Math.max(1, Math.round(img.naturalHeight * sc));
+      var c = document.createElement('canvas'); c.width = cw; c.height = ch;
+      var x = c.getContext('2d'); x.drawImage(img, 0, 0, cw, ch);
+      var d = x.getImageData(0, 0, cw, ch).data, minX = cw, minY = ch, maxX = -1, maxY = -1;
+      for (var yy = 0; yy < ch; yy++) for (var xx = 0; xx < cw; xx++) {
+        if (d[(yy * cw + xx) * 4 + 3] > 24) { if (xx < minX) minX = xx; if (xx > maxX) maxX = xx; if (yy < minY) minY = yy; if (yy > maxY) maxY = yy; }
+      }
+      if (maxX >= 0) bbox = { x: minX / cw, y: minY / ch, w: (maxX - minX + 1) / cw, h: (maxY - minY + 1) / ch };
+    } catch (e) {}
+    _mqBBoxCache[key] = bbox;
+  }
+  var aspect = (bbox.w * img.naturalWidth) / (bbox.h * img.naturalHeight);
+  piece.setAttribute('style', _mqStyle(_mqLayout(spec, aspect, bbox), spec.z));
+  piece.classList.add('mq-fitted');
 }
 
 // opts.mini: kleine Variante für Kacheln (ohne Beschriftung, nicht antippbar)
@@ -688,7 +731,6 @@ function _makeMannequin(outfit, opts) {
   opts = opts || {};
   var wardrobe = loadWardrobe();
   var body = _MQ_BODY[_styleDirection()] || _MQ_BODY.Neutral;
-  var sw = body.sw;
   var groups = { head: [], outer: [], top: [], onepiece: [], bottom: [], shoes: [], side: [] };
   (outfit.items || []).forEach(function(item) {
     var w = wardrobe.find(function(x) { return item.id && String(x.id) === String(item.id); })
@@ -702,69 +744,64 @@ function _makeMannequin(outfit, opts) {
     else groups.side.push(entry);
   });
 
-  // Proportionen an der schlanken Mode-Figur: Oberteile ~ Schulterbreite (+ Ärmel),
-  // Hosen ~ Beinlänge, Schuhe klein und realistisch
-  var boxes = [];
-  if (groups.head[0]) boxes.push([groups.head[0], _mqBox([42, 0, 58, 11], '50% 100%', 6)]);
+  // Soll-Größen an der Figur (Kragen y≈18.5, Bund y≈58, Boden y≈153)
+  var place = []; // [entry, spec]
+  if (groups.head[0]) place.push([groups.head[0], { mode: 'w', size: 13, ax: 50, ay: 11.5, anchor: 'bottom', maxW: 16, maxH: 11, z: 6, aspect: 1.4 }]);
   if (groups.onepiece[0]) {
     var t = groups.onepiece[0].text;
-    var len = _MINI_RE.test(t) ? 92 : _MAXI_RE.test(t) ? 146 : 114;
-    boxes.push([groups.onepiece[0], _mqBox([14, 18.5, 86, len], '50% 0%', 3)]);
+    var len = _MINI_RE.test(t) ? 70 : _MAXI_RE.test(t) ? 126 : 94;
+    place.push([groups.onepiece[0], { mode: 'h', size: len, ax: 50, ay: 18.5, anchor: 'top', maxW: 62, maxH: 999, z: 3, aspect: 0.6 }]);
   }
   var outer = groups.outer[0];
   var longCoat = outer && _LONGCOAT_RE.test(outer.text);
   var torso = [outer, groups.top[0], groups.top[1]].filter(Boolean);
-  if (torso.length === 1) {
-    var single = outer
-      ? [50 - sw - 13, 18, 50 + sw + 13, longCoat ? 112 : 74]
-      : [50 - sw - 11, 18.5, 50 + sw + 11, 70];
-    boxes.push([torso[0], _mqBox(single, '50% 0%', 4)]);
-  } else if (torso.length === 2) {
-    boxes.push([torso[0], _mqBox([50 - sw - 17, 18, 50 + sw + 3, longCoat ? 110 : 74], '50% 0%', 5)]);
-    boxes.push([torso[1], _mqBox([50 - sw - 3, 19.5, 50 + sw + 17, 70], '50% 0%', 4)]);
-  } else if (torso.length === 3) {
-    boxes.push([torso[0], _mqBox([50 - sw - 20, 18, 50 + sw - 2, longCoat ? 108 : 72], '50% 0%', 5)]);
-    boxes.push([torso[1], _mqBox([50 - sw - 9, 19.5, 50 + sw + 9, 70], '50% 0%', 4)]);
-    boxes.push([torso[2], _mqBox([50 - sw + 2, 21, 50 + sw + 20, 68], '50% 0%', 3)]);
-  }
+  var cx = { 1: [50], 2: [43, 57], 3: [38, 50, 62] }[torso.length] || [];
+  torso.forEach(function(entry, i) {
+    var isOuter = entry === outer;
+    var h = isOuter ? (longCoat ? 92 : 54) : (i === 0 ? 48 : 46);
+    place.push([entry, { mode: 'h', size: h, ax: cx[i], ay: isOuter ? 18 : 18.5 + i, anchor: 'top', maxW: isOuter ? 66 : 60, maxH: 999, z: 5 - i, aspect: isOuter ? (longCoat ? 0.6 : 0.95) : 1.0 }]);
+  });
   if (groups.bottom[0]) {
-    var bt = groups.bottom[0].text, bottom;
-    // Breite großzügig, damit die LÄNGE (Bund → Saum) das Bild skaliert
-    if (_SHORTS_RE.test(bt)) bottom = [22, 58, 78, 92];
-    else if (_SKIRT_RE.test(bt)) bottom = [20, 58, 80, _MINI_RE.test(bt) ? 86 : _MAXI_RE.test(bt) ? 144 : 104];
-    else bottom = [18, 58, 82, 147];
-    boxes.push([groups.bottom[0], _mqBox(bottom, '50% 0%', 2)]);
+    var bt = groups.bottom[0].text, bh, ba;
+    if (_SHORTS_RE.test(bt)) { bh = 34; ba = 1.1; }
+    else if (_SKIRT_RE.test(bt)) { bh = _MINI_RE.test(bt) ? 28 : _MAXI_RE.test(bt) ? 86 : 46; ba = 0.9; }
+    else { bh = 89; ba = 0.42; }
+    place.push([groups.bottom[0], { mode: 'h', size: bh, ax: 50, ay: 58, anchor: 'top', maxW: 52, maxH: 999, z: 2, aspect: ba }]);
   }
-  if (groups.shoes[0]) boxes.push([groups.shoes[0], _mqBox([36, 140, 64, 153.5], '50% 100%', 7)]);
+  if (groups.shoes[0]) place.push([groups.shoes[0], { mode: 'w', size: 27, ax: 50, ay: 153, anchor: 'bottom', maxW: 30, maxH: 15, z: 7, aspect: 1.6 }]);
   groups.side.slice(0, 3).forEach(function(entry, i) {
-    boxes.push([entry, _mqBox([72, 70 + i * 18, 88, 85 + i * 18], '50% 50%', 8)]);
+    place.push([entry, { mode: 'h', size: 13, ax: 81, ay: 78 + i * 18, anchor: 'center', maxW: 16, maxH: 14, z: 8, aspect: 1 }]);
   });
 
-  var html = boxes.map(function(pair) {
-    var e = pair[0], b = pair[1];
+  var html = place.map(function(pair) {
+    var e = pair[0], spec = pair[1];
+    // Erste Schätzung mit typischem Seitenverhältnis; Fotos werden nach dem Laden exakt angepasst
+    var l = _mqLayout(spec, spec.aspect);
     var content = e.photo
-      ? '<img src="' + _escAttr(e.photo) + '" alt="" draggable="false" style="object-position:' + b.align + ';">'
-      : '<span class="mq-emoji" style="font-size:' + Math.max(5, Math.min(b.height, b.width * 1.6) * 0.5).toFixed(1) + 'cqh;">' + (e.item.emoji || '👕') + '</span>';
+      ? '<img src="' + _escAttr(e.photo) + '" alt="" draggable="false" onload="_mqFit(this)">'
+      : '<span class="mq-emoji" style="font-size:' + Math.max(5, Math.min(l.height, l.width * 1.6) * 0.75).toFixed(1) + 'cqh;">' + (e.item.emoji || '👕') + '</span>';
     var tap = (!opts.mini && e.w)
       ? ' onclick="event.stopPropagation();_openItemDetail(\'' + _escAttr(String(e.w.id)) + '\')"' : '';
-    return '<div class="mq-piece' + (tap ? ' mq-tap' : '') + '" data-name="' + _escAttr(e.item.name || '') + '"' + tap
-      + ' style="left:' + b.left + '%;top:' + b.top + '%;width:' + b.width + '%;height:' + b.height + '%;z-index:' + b.z + ';">'
-      + content + '</div>';
+    return '<div class="mq-piece' + (tap ? ' mq-tap' : '') + '" data-name="' + _escAttr(e.item.name || '') + '"'
+      + (e.photo ? ' data-fit="' + _escAttr(JSON.stringify(spec)) + '"' : '') + tap
+      + ' style="' + _mqStyle(l, spec.z) + '">' + content + '</div>';
   }).join('');
 
   var stage = '<div class="mq-stage">' + _croquisSvg(body) + html + '</div>';
   if (opts.mini) return '<div class="mq mq-sketch mq-mini">' + stage + '</div>';
 
   // Beschriftungen wie in einer Modeskizze: Name rechts, feine Linie zum Piece
-  var labels = boxes.map(function(pair) {
-    var b = pair[1];
-    return { name: pair[0].item.name || '', y: b.top + b.height * (pair[0] === groups.shoes[0] ? 0.6 : 0.35), x: b.left + b.width * 0.82 };
+  var labels = place.map(function(pair) {
+    var s = pair[1], h = s.mode === 'h' ? s.size : s.size / s.aspect;
+    var yMid = s.anchor === 'top' ? s.ay + h * 0.35 : s.anchor === 'bottom' ? s.ay - h * 0.5 : s.ay;
+    var halfW = Math.min(s.mode === 'w' ? s.size : s.size * s.aspect, s.maxW) / 2;
+    return { name: pair[0].item.name || '', y: yMid / 1.6, x: Math.min(s.ax + halfW * 0.7, 96) };
   }).sort(function(a, b) { return a.y - b.y; });
   for (var i = 1; i < labels.length; i++) if (labels[i].y - labels[i - 1].y < 9) labels[i].y = labels[i - 1].y + 9;
   // Bühne nimmt 62 % der Breite ein → x in Gesamt-Prozent umrechnen
   var lines = labels.map(function(l) {
-    var x1 = Math.min(l.x, 96) * 0.62, y1 = l.y;
-    return '<path d="M' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' L66 ' + l.y.toFixed(1) + '"/><circle cx="' + x1.toFixed(1) + '" cy="' + y1.toFixed(1) + '" r="0.7"/>';
+    var x1 = l.x * 0.62;
+    return '<path d="M' + x1.toFixed(1) + ' ' + l.y.toFixed(1) + ' L66 ' + l.y.toFixed(1) + '"/><circle cx="' + x1.toFixed(1) + '" cy="' + l.y.toFixed(1) + '" r="0.7"/>';
   }).join('');
   var labelHtml = labels.map(function(l) {
     return '<div class="mq-label" style="top:' + l.y.toFixed(1) + '%;">' + l.name + '</div>';
