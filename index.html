@@ -595,45 +595,6 @@
     .outfit-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
     .outfit-card-name { font-size: 17px; font-weight: 700; color: var(--text); font-family: 'Playfair Display', Georgia, serif; }
     .outfit-card-style { font-size: 13px; font-weight: 600; color: var(--purple); margin-top: 2px; }
-    /* Outfit an einer Figur (Anzieh-Puppe) + Umschalter Figur/Liste */
-    .ov-toggle { display: flex; gap: 6px; justify-content: center; margin: 2px 0 10px; }
-    .ov-toggle button { border: 1.5px solid var(--purple-border); background: transparent; color: var(--text2); border-radius: 16px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
-    .ov-wrap:not(.mode-list) [data-ov="figur"], .ov-wrap.mode-list [data-ov="liste"] { background: var(--purple); border-color: var(--purple); color: #fff; }
-    .ov-wrap .ov-list { display: none; }
-    .ov-wrap.mode-list .ov-list { display: block; }
-    .ov-wrap.mode-list .ov-figure { display: none; }
-    /* Figur als Mode-Skizze auf Papier (Croquis). Bühne = Seitenverhältnis 5:8 (viewBox 100×160) */
-    .mq { position: relative; width: 100%; margin: 0 auto 10px; border-radius: 18px; overflow: hidden; }
-    .mq-sketch { background: radial-gradient(ellipse at 45% 35%, #fbf9f5 0%, #f2ede5 62%, #e6dfd3 100%);
-      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.25); }
-    .mq-annotated { max-width: 340px; aspect-ratio: 8.06 / 8; }  /* Bühne 62 % + Beschriftung rechts */
-    .mq-mini { aspect-ratio: 5 / 8; }
-    .mq-stage { position: absolute; left: 0; top: 0; height: 100%; aspect-ratio: 5 / 8; container-type: size; }
-    .mq-mini .mq-stage { width: 100%; }
-    .mq-body { position: absolute; inset: 0; width: 100%; height: 100%; }
-    .mq-body * { fill: none; stroke: rgba(42,37,32,0.62); stroke-width: 0.9px; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
-    .mq-body .mq-head { fill: rgba(42,37,32,0.05); }
-    .mq-body .mq-shadow { fill: rgba(70,55,40,0.13); stroke: none; }
-    .mq-piece { position: absolute; display: flex; align-items: center; justify-content: center; }
-    .mq-piece img { width: 100%; height: 100%; object-fit: fill; filter: drop-shadow(0 4px 6px rgba(60,45,30,0.25)); pointer-events: none; -webkit-user-drag: none; }
-    .mq-emoji { font-size: 34px; line-height: 1; filter: drop-shadow(0 3px 5px rgba(60,45,30,0.25)); }
-    /* Fotos erst zeigen, wenn sie vermessen und im richtigen Maßstab platziert sind */
-    .mq-piece[data-fit]:not(.mq-fitted) img { opacity: 0; }
-    .mq-piece.mq-fitted img { opacity: 1; transition: opacity 0.2s; }
-    .mq-piece.mq-tap { cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform 0.15s; }
-    .mq-piece.mq-tap:active { transform: scale(0.97); }
-    .mq-piece.mq-tap:active::after { content: attr(data-name); position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-      background: rgba(30,26,22,0.85); color: #fff; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 10px; white-space: nowrap; pointer-events: none; z-index: 10; }
-    /* Beschriftungen wie in einer Modeskizze */
-    .mq-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9; }
-    .mq-lines path { fill: none; stroke: rgba(60,52,44,0.5); stroke-width: 0.8px; vector-effect: non-scaling-stroke; }
-    .mq-lines circle { fill: rgba(60,52,44,0.6); }
-    .mq-label { position: absolute; left: 67%; right: 3%; transform: translateY(-50%); z-index: 9;
-      font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 12.5px; line-height: 1.2; color: #3b342d; }
-    /* Kleine Skizze in Outfit-Kacheln */
-    .col-grid-preview .mq-mini { height: 100%; width: auto; max-width: none; margin: 0 auto; border-radius: 0; box-shadow: none; background: none; }
-    .col-grid-preview .mq-mini .mq-emoji { font-size: 16px; }
-    .col-grid-preview:has(.mq-mini) { padding: 0; background: radial-gradient(ellipse at 45% 35%, #fbf9f5 0%, #f2ede5 62%, #e6dfd3 100%); }
     .outfit-card-reason { font-size: 12.5px; line-height: 1.45; color: var(--text2); background: rgba(77,141,255,0.08); border-radius: 12px; padding: 8px 10px; margin: 2px 0 10px; }
     .match-badge { background: #DCFCE7; color: #15803D; font-size: 12px; font-weight: 800; padding: 5px 12px; border-radius: 20px; white-space: nowrap; }
     .outfit-items-row { display: flex; gap: 16px; margin-bottom: 14px; }

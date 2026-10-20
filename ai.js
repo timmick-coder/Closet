@@ -609,208 +609,6 @@ function _qualityCheckOutfits(list, ctx, existing) {
   return { valid: valid, problems: problems };
 }
 
-// ── Outfit an einer Figur zeigen ("Anzieh-Puppe" aus den eigenen Fotos) ──────
-// Pieces werden nach Rolle auf einer Silhouette platziert; Umschalter Figur/Liste.
-var _OUTFIT_VIEW_KEY = 'stylesync_outfit_view';
-function _outfitViewMode() {
-  try { return localStorage.getItem(_OUTFIT_VIEW_KEY) || 'figur'; } catch (e) { return 'figur'; }
-}
-function _setOutfitViewMode(mode) {
-  try { localStorage.setItem(_OUTFIT_VIEW_KEY, mode); } catch (e) {}
-  document.querySelectorAll('.ov-wrap').forEach(function(el) { el.classList.toggle('mode-list', mode === 'liste'); });
-  // Kacheln (Gespeichert, Vorschläge, offener Ordner) passend neu zeichnen
-  try {
-    _renderKiSavedSection();
-    var colPanel = document.getElementById('ki-collection-panel');
-    if (colPanel && colPanel.classList.contains('active') && _currentCollectionName) _openCollection(_currentCollectionName);
-  } catch (e) {}
-}
-// Hülle mit Umschalter; listHtml = die bisherige Liste der Pieces
-function _outfitVisualHtml(outfit, listHtml) {
-  return '<div class="ov-wrap' + (_outfitViewMode() === 'liste' ? ' mode-list' : '') + '">'
-    + '<div class="ov-toggle">'
-    + '<button data-ov="figur" onclick="event.stopPropagation();_setOutfitViewMode(\'figur\')">👤 Figur</button>'
-    + '<button data-ov="liste" onclick="event.stopPropagation();_setOutfitViewMode(\'liste\')">☰ Liste</button>'
-    + '</div>'
-    + '<div class="ov-figure">' + _makeMannequin(outfit) + '</div>'
-    + '<div class="ov-list">' + listHtml + '</div>'
-    + '</div>';
-}
-// Figur als Mode-Skizze (Croquis) auf Papier. Koordinaten in "Figur-Einheiten"
-// (viewBox 0 0 100 160, lang gestreckte ~9-Kopf-Proportion):
-// Kopf y≈8, Kragen y≈19, Schultern y≈22, Taille/Bund y≈60, Knie y≈106, Knöchel y≈145, Boden y≈152.
-// Die Zeichnung liegt UNTER den Pieces – sichtbar bleiben nur Kopf, Hals, Hände,
-// Unterschenkel/Knöchel. Dadurch wirken die Pieces angezogen statt aufgeklebt.
-var _MQ_BODY = {
-  Maskulin: { sw: 10, ww: 7.2, hw: 7.8 },
-  Feminin:  { sw: 8,  ww: 5.2, hw: 8.6 },
-  Neutral:  { sw: 9,  ww: 6.2, hw: 8.0 }
-};
-var _HEADWEAR_RE = /mütze|cap\b|hut\b|beanie|kappe|stirnband/i;
-var _SHORTS_RE = /short|bermuda|hotpants/i;
-var _LONGCOAT_RE = /mantel|parka|trench|coat|daunen/i;
-var _SKIRT_RE = /\brock\b|röcke|skirt/i;
-var _MINI_RE = /\bmini/i, _MAXI_RE = /\bmaxi|bodenlang/i;
-
-// Croquis-Linien (Kohle-Stil) für eine Körperform
-function _croquisSvg(b) {
-  var L = function(x) { return (50 - x).toFixed(1); }, R = function(x) { return (50 + x).toFixed(1); };
-  var sw = b.sw, ww = b.ww, hw = b.hw;
-  var side = function(f) { // eine Körperhälfte; f = L oder R
-    return 'M' + f(2.3) + ' 14 C' + f(2.4) + ' 17 ' + f(2.6) + ' 19 ' + f(4) + ' 20.5'                 // Hals
-      + ' C' + f(sw - 3) + ' 21.5 ' + f(sw) + ' 22 ' + f(sw) + ' 26'                                     // Schulter
-      + ' C' + f(sw - 0.5) + ' 38 ' + f(ww) + ' 48 ' + f(ww) + ' 56'                                     // Flanke → Taille
-      + ' C' + f(ww) + ' 60 ' + f(hw) + ' 62 ' + f(hw) + ' 68'                                           // Hüfte
-      + ' C' + f(hw - 0.5) + ' 86 ' + f(5.6) + ' 98 ' + f(5.4) + ' 106'                                  // Oberschenkel → Knie
-      + ' C' + f(5.3) + ' 120 ' + f(4.6) + ' 136 ' + f(4.2) + ' 145'                                     // Wade → Knöchel
-      + ' M' + f(1.2) + ' 74 C' + f(1.6) + ' 88 ' + f(2.4) + ' 98 ' + f(2.6) + ' 106'                   // Innenbein
-      + ' C' + f(2.6) + ' 120 ' + f(2.4) + ' 136 ' + f(2.5) + ' 145'
-      + ' M' + f(sw - 0.2) + ' 27 C' + f(sw + 2.6) + ' 36 ' + f(sw + 3.2) + ' 46 ' + f(sw + 2.8) + ' 58'  // Arm außen
-      + ' M' + f(sw - 2.6) + ' 32 C' + f(sw - 1) + ' 40 ' + f(sw + 0.2) + ' 48 ' + f(sw + 0.4) + ' 58';  // Arm innen
-  };
-  var hand = function(f) { return '<ellipse cx="' + f(sw + 1.7) + '" cy="61" rx="1.6" ry="2.6"/>'; };
-  var foot = function(f) { return '<path d="M' + f(4.2) + ' 145 C' + f(4.6) + ' 148 ' + f(5.6) + ' 150.5 ' + f(7) + ' 151.5 L' + f(2.2) + ' 151.5 L' + f(2.5) + ' 145"/>'; };
-  return '<svg class="mq-body" viewBox="0 0 100 160" preserveAspectRatio="none" aria-hidden="true">'
-    + '<ellipse class="mq-shadow" cx="50" cy="152.5" rx="17" ry="2.2"/>'
-    + '<ellipse class="mq-head" cx="50" cy="8.3" rx="4.4" ry="5.6"/>'
-    + '<path d="' + side(L) + '"/><path d="' + side(R) + '"/>'
-    + hand(L) + hand(R) + foot(L) + foot(R)
-    + '</svg>';
-}
-
-// ── Einheitlicher Maßstab: jedes Piece bekommt seine echte Größe am Körper ────
-// Statt jedes Bild in "seinen" Bereich zu quetschen (dadurch passten die Pieces
-// größenmäßig nicht zueinander), hat jede Art eine Soll-Länge bzw. -Breite in
-// Figur-Einheiten. Beim Laden wird gemessen, wo im Bild das Kleidungsstück wirklich
-// ist (ohne durchsichtigen Rand); daraus ergeben sich Größe und Position.
-//   spec = { mode: 'h'|'w', size, ax, ay, anchor: 'top'|'bottom'|'center', maxW, maxH, z, aspect }
-//   ax/ay = Ankerpunkt (x Mitte; y oben/unten/Mitte) in Figur-Einheiten
-function _mqLayout(spec, aspect, bbox) {
-  bbox = bbox || { x: 0, y: 0, w: 1, h: 1 };
-  var gw, gh; // sichtbares Kleidungsstück
-  if (spec.mode === 'h') { gh = spec.size; gw = gh * aspect; if (gw > spec.maxW) { gw = spec.maxW; gh = gw / aspect; } }
-  else { gw = spec.size; gh = gw / aspect; if (gh > spec.maxH) { gh = spec.maxH; gw = gh * aspect; } }
-  var gy0 = spec.anchor === 'top' ? spec.ay : spec.anchor === 'bottom' ? spec.ay - gh : spec.ay - gh / 2;
-  var gx0 = spec.ax - gw / 2;
-  var iw = gw / bbox.w, ih = gh / bbox.h; // ganzes Bild inkl. Rand
-  return { left: gx0 - bbox.x * iw, top: (gy0 - bbox.y * ih) / 1.6, width: iw, height: ih / 1.6 };
-}
-function _mqStyle(l, z) {
-  return 'left:' + l.left.toFixed(2) + '%;top:' + l.top.toFixed(2) + '%;width:' + l.width.toFixed(2) + '%;height:' + l.height.toFixed(2) + '%;z-index:' + z + ';';
-}
-// Nach dem Laden eines Fotos: sichtbaren Bereich messen und exakt platzieren
-var _mqBBoxCache = {};
-function _mqFit(img) {
-  var piece = img.parentElement;
-  var spec;
-  try { spec = JSON.parse(piece.getAttribute('data-fit')); } catch (e) { return; }
-  var key = img.currentSrc || img.src;
-  var bbox = _mqBBoxCache[key];
-  if (!bbox) {
-    bbox = { x: 0, y: 0, w: 1, h: 1 };
-    try {
-      var S = 96, sc = Math.min(1, S / Math.max(img.naturalWidth, img.naturalHeight));
-      var cw = Math.max(1, Math.round(img.naturalWidth * sc)), ch = Math.max(1, Math.round(img.naturalHeight * sc));
-      var c = document.createElement('canvas'); c.width = cw; c.height = ch;
-      var x = c.getContext('2d'); x.drawImage(img, 0, 0, cw, ch);
-      var d = x.getImageData(0, 0, cw, ch).data, minX = cw, minY = ch, maxX = -1, maxY = -1;
-      for (var yy = 0; yy < ch; yy++) for (var xx = 0; xx < cw; xx++) {
-        if (d[(yy * cw + xx) * 4 + 3] > 24) { if (xx < minX) minX = xx; if (xx > maxX) maxX = xx; if (yy < minY) minY = yy; if (yy > maxY) maxY = yy; }
-      }
-      if (maxX >= 0) bbox = { x: minX / cw, y: minY / ch, w: (maxX - minX + 1) / cw, h: (maxY - minY + 1) / ch };
-    } catch (e) {}
-    _mqBBoxCache[key] = bbox;
-  }
-  var aspect = (bbox.w * img.naturalWidth) / (bbox.h * img.naturalHeight);
-  piece.setAttribute('style', _mqStyle(_mqLayout(spec, aspect, bbox), spec.z));
-  piece.classList.add('mq-fitted');
-}
-
-// opts.mini: kleine Variante für Kacheln (ohne Beschriftung, nicht antippbar)
-function _makeMannequin(outfit, opts) {
-  opts = opts || {};
-  var wardrobe = loadWardrobe();
-  var body = _MQ_BODY[_styleDirection()] || _MQ_BODY.Neutral;
-  var groups = { head: [], outer: [], top: [], onepiece: [], bottom: [], shoes: [], side: [] };
-  (outfit.items || []).forEach(function(item) {
-    var w = wardrobe.find(function(x) { return item.id && String(x.id) === String(item.id); })
-      || wardrobe.find(function(x) { return (x.name || '').toLowerCase() === (item.name || '').toLowerCase(); })
-      || null;
-    var info = w || { name: item.name, type: '' };
-    var role = _pieceRole(info);
-    var entry = { item: item, w: w, photo: _findWardrobePhoto(item), text: ((item.name || '') + ' ' + (info.type || '')) };
-    if (role === 'acc' && _HEADWEAR_RE.test(entry.text) && !groups.head.length) groups.head.push(entry);
-    else if (groups[role]) groups[role].push(entry);
-    else groups.side.push(entry);
-  });
-
-  // Soll-Größen an der Figur (Kragen y≈18.5, Bund y≈58, Boden y≈153)
-  var place = []; // [entry, spec]
-  if (groups.head[0]) place.push([groups.head[0], { mode: 'w', size: 13, ax: 50, ay: 11.5, anchor: 'bottom', maxW: 16, maxH: 11, z: 6, aspect: 1.4 }]);
-  if (groups.onepiece[0]) {
-    var t = groups.onepiece[0].text;
-    var len = _MINI_RE.test(t) ? 70 : _MAXI_RE.test(t) ? 126 : 94;
-    place.push([groups.onepiece[0], { mode: 'h', size: len, ax: 50, ay: 18.5, anchor: 'top', maxW: 62, maxH: 999, z: 3, aspect: 0.6 }]);
-  }
-  var outer = groups.outer[0];
-  var longCoat = outer && _LONGCOAT_RE.test(outer.text);
-  var torso = [outer, groups.top[0], groups.top[1]].filter(Boolean);
-  var cx = { 1: [50], 2: [43, 57], 3: [38, 50, 62] }[torso.length] || [];
-  torso.forEach(function(entry, i) {
-    var isOuter = entry === outer;
-    var h = isOuter ? (longCoat ? 92 : 54) : (i === 0 ? 48 : 46);
-    place.push([entry, { mode: 'h', size: h, ax: cx[i], ay: isOuter ? 18 : 18.5 + i, anchor: 'top', maxW: isOuter ? 66 : 60, maxH: 999, z: 5 - i, aspect: isOuter ? (longCoat ? 0.6 : 0.95) : 1.0 }]);
-  });
-  if (groups.bottom[0]) {
-    var bt = groups.bottom[0].text, bh, ba;
-    if (_SHORTS_RE.test(bt)) { bh = 34; ba = 1.1; }
-    else if (_SKIRT_RE.test(bt)) { bh = _MINI_RE.test(bt) ? 28 : _MAXI_RE.test(bt) ? 86 : 46; ba = 0.9; }
-    else { bh = 89; ba = 0.42; }
-    place.push([groups.bottom[0], { mode: 'h', size: bh, ax: 50, ay: 58, anchor: 'top', maxW: 52, maxH: 999, z: 2, aspect: ba }]);
-  }
-  if (groups.shoes[0]) place.push([groups.shoes[0], { mode: 'w', size: 27, ax: 50, ay: 153, anchor: 'bottom', maxW: 30, maxH: 15, z: 7, aspect: 1.6 }]);
-  groups.side.slice(0, 3).forEach(function(entry, i) {
-    place.push([entry, { mode: 'h', size: 13, ax: 81, ay: 78 + i * 18, anchor: 'center', maxW: 16, maxH: 14, z: 8, aspect: 1 }]);
-  });
-
-  var html = place.map(function(pair) {
-    var e = pair[0], spec = pair[1];
-    // Erste Schätzung mit typischem Seitenverhältnis; Fotos werden nach dem Laden exakt angepasst
-    var l = _mqLayout(spec, spec.aspect);
-    var content = e.photo
-      ? '<img src="' + _escAttr(e.photo) + '" alt="" draggable="false" onload="_mqFit(this)">'
-      : '<span class="mq-emoji" style="font-size:' + Math.max(5, Math.min(l.height, l.width * 1.6) * 0.75).toFixed(1) + 'cqh;">' + (e.item.emoji || '👕') + '</span>';
-    var tap = (!opts.mini && e.w)
-      ? ' onclick="event.stopPropagation();_openItemDetail(\'' + _escAttr(String(e.w.id)) + '\')"' : '';
-    return '<div class="mq-piece' + (tap ? ' mq-tap' : '') + '" data-name="' + _escAttr(e.item.name || '') + '"'
-      + (e.photo ? ' data-fit="' + _escAttr(JSON.stringify(spec)) + '"' : '') + tap
-      + ' style="' + _mqStyle(l, spec.z) + '">' + content + '</div>';
-  }).join('');
-
-  var stage = '<div class="mq-stage">' + _croquisSvg(body) + html + '</div>';
-  if (opts.mini) return '<div class="mq mq-sketch mq-mini">' + stage + '</div>';
-
-  // Beschriftungen wie in einer Modeskizze: Name rechts, feine Linie zum Piece
-  var labels = place.map(function(pair) {
-    var s = pair[1], h = s.mode === 'h' ? s.size : s.size / s.aspect;
-    var yMid = s.anchor === 'top' ? s.ay + h * 0.35 : s.anchor === 'bottom' ? s.ay - h * 0.5 : s.ay;
-    var halfW = Math.min(s.mode === 'w' ? s.size : s.size * s.aspect, s.maxW) / 2;
-    return { name: pair[0].item.name || '', y: yMid / 1.6, x: Math.min(s.ax + halfW * 0.7, 96) };
-  }).sort(function(a, b) { return a.y - b.y; });
-  for (var i = 1; i < labels.length; i++) if (labels[i].y - labels[i - 1].y < 9) labels[i].y = labels[i - 1].y + 9;
-  // Bühne nimmt 62 % der Breite ein → x in Gesamt-Prozent umrechnen
-  var lines = labels.map(function(l) {
-    var x1 = l.x * 0.62;
-    return '<path d="M' + x1.toFixed(1) + ' ' + l.y.toFixed(1) + ' L66 ' + l.y.toFixed(1) + '"/><circle cx="' + x1.toFixed(1) + '" cy="' + l.y.toFixed(1) + '" r="0.7"/>';
-  }).join('');
-  var labelHtml = labels.map(function(l) {
-    return '<div class="mq-label" style="top:' + l.y.toFixed(1) + '%;">' + l.name + '</div>';
-  }).join('');
-  return '<div class="mq mq-sketch mq-annotated">' + stage
-    + '<svg class="mq-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + lines + '</svg>'
-    + labelHtml + '</div>';
-}
-
 // Verständliche Meldung, wenn sich gar kein vollständiges Outfit bauen lässt
 function _missingForOutfitsMessage(wardrobe) {
   var roles = wardrobe.map(_pieceRole);
@@ -3154,8 +2952,6 @@ function _doRenameCollection(oldName, newName) {
 // ── Outfit-Board: Teile von Kopf bis Fuß, freigestellt übereinander ──────────
 var _BOARD_MAX = 4;
 function _makeOutfitBoard(outfit) {
-  // Ansicht "Figur": auch in Kacheln die kleine Figur zeigen
-  if (_outfitViewMode() === 'figur') return _makeMannequin(outfit, { mini: true });
   var all = [].concat(outfit.items || []).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); });
   var shown = all.slice(0, _BOARD_MAX);
   var html = shown.map(function(item) {
@@ -3586,7 +3382,7 @@ function _openOutfitDetail(id, collectionName) {
       : '';
     content.innerHTML = '<div style="padding:4px 0 0;">'
       + inspoBanner
-      + _outfitVisualHtml(outfit, '<div class="outfit-items-vertical" style="border-top:none;padding-top:0;">' + itemsHtml + '</div>')
+      + '<div class="outfit-items-vertical" style="border-top:none;padding-top:0;">' + itemsHtml + '</div>'
       + '<div class="detail-action-row">'
       + '<button class="detail-fav-btn" data-heart-id="' + _escAttr(id) + '" onclick="_toggleFav(\'' + id + '\', this)">' + (fav ? '🩷' : '🤍') + '</button>'
       + '<button class="detail-save-btn" onclick="_openSaveModal(\'' + id + '\')">💾 Speichern</button>'
@@ -4424,7 +4220,7 @@ function _autoLoadKiSuggestions(force, customDesc, colContext) {
           + '<button class="heart-btn" data-heart-id="' + _escAttr(id) + '" onclick="_toggleFav(\'' + id + '\', this)">' + (fav ? '🩷' : '🤍') + '</button>'
           + '</div></div>'
           + (outfit.reason ? '<div class="outfit-card-reason">💡 ' + outfit.reason + '</div>' : '')
-          + _outfitVisualHtml(outfit, '<div class="outfit-items-vertical">' + itemsHtml + '</div>')
+          + '<div class="outfit-items-vertical">' + itemsHtml + '</div>'
           + '<button class="outfit-save-btn" onclick="_openSaveModal(\'' + id + '\')">💾 Speichern</button>'
           + '</div></div>';
       }).join('');
