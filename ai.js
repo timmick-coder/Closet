@@ -609,6 +609,85 @@ function _qualityCheckOutfits(list, ctx, existing) {
   return { valid: valid, problems: problems };
 }
 
+// ── Outfit an einer Figur zeigen ("Anzieh-Puppe" aus den eigenen Fotos) ──────
+// Pieces werden nach Rolle auf einer Silhouette platziert; Umschalter Figur/Liste.
+var _OUTFIT_VIEW_KEY = 'stylesync_outfit_view';
+function _outfitViewMode() {
+  try { return localStorage.getItem(_OUTFIT_VIEW_KEY) || 'figur'; } catch (e) { return 'figur'; }
+}
+function _setOutfitViewMode(mode) {
+  try { localStorage.setItem(_OUTFIT_VIEW_KEY, mode); } catch (e) {}
+  document.querySelectorAll('.ov-wrap').forEach(function(el) { el.classList.toggle('mode-list', mode === 'liste'); });
+}
+// Hülle mit Umschalter; listHtml = die bisherige Liste der Pieces
+function _outfitVisualHtml(outfit, listHtml) {
+  return '<div class="ov-wrap' + (_outfitViewMode() === 'liste' ? ' mode-list' : '') + '">'
+    + '<div class="ov-toggle">'
+    + '<button data-ov="figur" onclick="event.stopPropagation();_setOutfitViewMode(\'figur\')">👤 Figur</button>'
+    + '<button data-ov="liste" onclick="event.stopPropagation();_setOutfitViewMode(\'liste\')">☰ Liste</button>'
+    + '</div>'
+    + '<div class="ov-figure">' + _makeMannequin(outfit) + '</div>'
+    + '<div class="ov-list">' + listHtml + '</div>'
+    + '</div>';
+}
+// Plätze auf der Figur in % (links, oben, Breite, Höhe) + Ebene
+var _MQ_ZONES = {
+  head:     [36, 0.5, 28, 11, 4],
+  outer:    [11, 13, 78, 41, 1],
+  top:      [18, 14, 64, 34, 3],
+  top2:     [24, 12, 52, 30, 2],
+  onepiece: [19, 14, 62, 60, 3],
+  bottom:   [24, 45, 52, 43, 2],
+  shoes:    [21, 86.5, 58, 13, 4]
+};
+var _HEADWEAR_RE = /mütze|cap\b|hut\b|beanie|kappe|stirnband/i;
+function _makeMannequin(outfit) {
+  var wardrobe = loadWardrobe();
+  var groups = { head: [], outer: [], top: [], onepiece: [], bottom: [], shoes: [], side: [] };
+  (outfit.items || []).forEach(function(item) {
+    var w = wardrobe.find(function(x) { return item.id && String(x.id) === String(item.id); })
+      || wardrobe.find(function(x) { return (x.name || '').toLowerCase() === (item.name || '').toLowerCase(); })
+      || { name: item.name, type: '' };
+    var role = _pieceRole(w);
+    var entry = { item: item, photo: _findWardrobePhoto(item) };
+    if (role === 'acc' && _HEADWEAR_RE.test(item.name || '') && !groups.head.length) groups.head.push(entry);
+    else if (groups[role]) groups[role].push(entry);
+    else groups.side.push(entry); // weitere Accessoires/Sonstiges seitlich
+  });
+  var piece = function(entry, z) {
+    var content = entry.photo
+      ? '<img src="' + _escAttr(entry.photo) + '" alt="' + _escAttr(entry.item.name || '') + '" draggable="false">'
+      : '<span class="mq-emoji">' + (entry.item.emoji || '👕') + '</span>';
+    return '<div class="mq-piece" style="left:' + z[0] + '%;top:' + z[1] + '%;width:' + z[2] + '%;height:' + z[3] + '%;z-index:' + z[4] + ';">' + content + '</div>';
+  };
+  var html = '';
+  if (groups.head[0]) html += piece(groups.head[0], _MQ_ZONES.head);
+  if (groups.onepiece[0]) html += piece(groups.onepiece[0], _MQ_ZONES.onepiece);
+  // Oberkörper: Jacke + Oberteile würden sich komplett verdecken → leicht versetzt
+  // auffächern (Jacke vorne links, Oberteile schauen dahinter hervor)
+  var torso = [groups.outer[0], groups.top[0], groups.top[1]].filter(Boolean);
+  var fan = {
+    1: [_MQ_ZONES.top],
+    2: [[6, 13, 56, 38, 3], [38, 15, 56, 36, 2]],
+    3: [[2, 13, 49, 36, 4], [26, 15, 49, 34, 3], [49, 17, 49, 32, 2]]
+  }[torso.length] || [];
+  if (torso.length === 1 && groups.outer[0]) fan = [_MQ_ZONES.outer]; // nur Jacke: etwas größer
+  torso.forEach(function(entry, i) { html += piece(entry, fan[i]); });
+  if (groups.bottom[0]) html += piece(groups.bottom[0], _MQ_ZONES.bottom);
+  if (groups.shoes[0]) html += piece(groups.shoes[0], _MQ_ZONES.shoes);
+  // Weitere Accessoires rechts neben den Beinen (dort ist Platz)
+  groups.side.slice(0, 3).forEach(function(entry, i) { html += piece(entry, [78, 50 + i * 14, 21, 13, 5]); });
+  // Dezente Silhouette (Kopf, Oberkörper mit Armen, Beine, Füße)
+  var svg = '<svg class="mq-body" viewBox="0 0 100 160" preserveAspectRatio="xMidYMid meet" aria-hidden="true">'
+    + '<circle cx="50" cy="10" r="7.5"/>'
+    + '<path d="M46 17h8v5h-8z"/>'
+    + '<path d="M31 24 Q50 20 69 24 L77 66 Q74 68 71 66 L65 38 L64 74 L36 74 L35 38 L29 66 Q26 68 23 66 Z"/>'
+    + '<path d="M36 74 H64 L62 140 H53 L50 86 L47 140 H38 Z"/>'
+    + '<ellipse cx="42" cy="143" rx="7" ry="3.2"/><ellipse cx="58" cy="143" rx="7" ry="3.2"/>'
+    + '</svg>';
+  return '<div class="mq">' + svg + html + '</div>';
+}
+
 // Verständliche Meldung, wenn sich gar kein vollständiges Outfit bauen lässt
 function _missingForOutfitsMessage(wardrobe) {
   var roles = wardrobe.map(_pieceRole);
@@ -3382,7 +3461,7 @@ function _openOutfitDetail(id, collectionName) {
       : '';
     content.innerHTML = '<div style="padding:4px 0 0;">'
       + inspoBanner
-      + '<div class="outfit-items-vertical" style="border-top:none;padding-top:0;">' + itemsHtml + '</div>'
+      + _outfitVisualHtml(outfit, '<div class="outfit-items-vertical" style="border-top:none;padding-top:0;">' + itemsHtml + '</div>')
       + '<div class="detail-action-row">'
       + '<button class="detail-fav-btn" data-heart-id="' + _escAttr(id) + '" onclick="_toggleFav(\'' + id + '\', this)">' + (fav ? '🩷' : '🤍') + '</button>'
       + '<button class="detail-save-btn" onclick="_openSaveModal(\'' + id + '\')">💾 Speichern</button>'
@@ -4220,7 +4299,7 @@ function _autoLoadKiSuggestions(force, customDesc, colContext) {
           + '<button class="heart-btn" data-heart-id="' + _escAttr(id) + '" onclick="_toggleFav(\'' + id + '\', this)">' + (fav ? '🩷' : '🤍') + '</button>'
           + '</div></div>'
           + (outfit.reason ? '<div class="outfit-card-reason">💡 ' + outfit.reason + '</div>' : '')
-          + '<div class="outfit-items-vertical">' + itemsHtml + '</div>'
+          + _outfitVisualHtml(outfit, '<div class="outfit-items-vertical">' + itemsHtml + '</div>')
           + '<button class="outfit-save-btn" onclick="_openSaveModal(\'' + id + '\')">💾 Speichern</button>'
           + '</div></div>';
       }).join('');
