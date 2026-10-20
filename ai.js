@@ -641,20 +641,21 @@ function _outfitVisualHtml(outfit, listHtml) {
 // Pieces werden daran ausgerichtet: Oberteile hängen am Kragen (oben), Hosen sitzen
 // am Bund (oben, Taille), Schuhe stehen auf dem Boden (unten).
 var _MQ_BODY = {
-  // Silhouetten je Stilrichtung (Oberkörper mit Armen, Beine, Füße)
+  // Silhouetten je Stilrichtung – bewusst OHNE Arme und schmal, damit die Kleidung
+  // den Körper überdeckt und die Figur nur als zarter Hinweis dahinter liegt
   Maskulin: {
-    torso: 'M44 21 C44 24 41 25.5 36 26.5 C29 28 25 31 24 37 L20 69 C19.5 73 23.5 74 24.5 70 L29 45 L31 47 L32 76 C32 78.5 34 79.5 36 79.5 L64 79.5 C66 79.5 68 78.5 68 76 L69 47 L71 45 L75.5 70 C76.5 74 80.5 73 80 69 L76 37 C75 31 71 28 64 26.5 C59 25.5 56 24 56 21 Z',
-    legs: 'M36 79 L35.5 145 C35.5 148.5 44 148.5 44 145 L48.5 92 L51.5 92 L56 145 C56 148.5 64.5 148.5 64.5 145 L64 79 Z',
+    torso: 'M44 21 C44 24 42 25 38 26 C33 27 31 29 31 34 L33 76 C33 78 34.5 79 36.5 79 L63.5 79 C65.5 79 67 78 67 76 L69 34 C69 29 67 27 62 26 C58 25 56 24 56 21 Z',
+    legs: 'M37.5 79 L38 144 C38 147 44.5 147 44.5 144 L48.5 92 L51.5 92 L55.5 144 C55.5 147 62 147 62 144 L62.5 79 Z',
     shoulders: [24, 76]
   },
   Feminin: {
-    torso: 'M45 21 C45 24 42 25.5 38 26.5 C32 28 29 31 28 37 L24.5 67 C24 71 28 72 29 68 L32.5 45 L34 47 C35 55 39 58 39 63 C39 70 34.5 76 34 83 L66 83 C65.5 76 61 70 61 63 C61 58 65 55 66 47 L67.5 45 L71 68 C72 72 76 71 75.5 67 L72 37 C71 31 68 28 62 26.5 C58 25.5 55 24 55 21 Z',
-    legs: 'M34 82 L37 145 C37 148.5 45 148.5 45 145 L48.5 96 L51.5 96 L55 145 C55 148.5 63 148.5 63 145 L66 82 Z',
+    torso: 'M45 21 C45 24 43 25 40 26 C36 27 34 29 34 34 C35 50 39 56 39.5 63 C39.5 70 36 76 35.5 82 L64.5 82 C64 76 60.5 70 60.5 63 C61 56 65 50 66 34 C66 29 64 27 60 26 C57 25 55 24 55 21 Z',
+    legs: 'M36.5 82 L38.5 144 C38.5 147 45 147 45 144 L48.5 96 L51.5 96 L55 144 C55 147 61.5 147 61.5 144 L63.5 82 Z',
     shoulders: [28, 72]
   },
   Neutral: {
-    torso: 'M44.5 21 C44.5 24 41.5 25.5 37 26.5 C30.5 28 27 31 26 37 L22 68 C21.5 72 25.5 73 26.5 69 L30.5 45 L32.5 47 L33.5 77 C33.5 79.5 35 80.5 37 80.5 L63 80.5 C65 80.5 66.5 79.5 66.5 77 L67.5 47 L69.5 45 L73.5 69 C74.5 73 78.5 72 78 68 L74 37 C73 31 69.5 28 63 26.5 C58.5 25.5 55.5 24 55.5 21 Z',
-    legs: 'M35.5 80 L36 145 C36 148.5 44.5 148.5 44.5 145 L48.5 94 L51.5 94 L55.5 145 C55.5 148.5 64 148.5 64 145 L64.5 80 Z',
+    torso: 'M44.5 21 C44.5 24 42.5 25 39 26 C34.5 27 32.5 29 32.5 34 L34 77 C34 79 35.5 80 37.5 80 L62.5 80 C64.5 80 66 79 66 77 L67.5 34 C67.5 29 65.5 27 61 26 C57.5 25 55.5 24 55.5 21 Z',
+    legs: 'M37 80 L38 144 C38 147 44.5 147 44.5 144 L48.5 94 L51.5 94 L55.5 144 C55.5 147 62 147 62 144 L63 80 Z',
     shoulders: [26, 74]
   }
 };
@@ -743,11 +744,11 @@ function _makeMannequin(outfit, opts) {
 
   var svg = '<svg class="mq-body" viewBox="0 0 100 160" preserveAspectRatio="none" aria-hidden="true">'
     + '<ellipse class="mq-shadow" cx="50" cy="154" rx="27" ry="3.5"/>'
-    + '<circle cx="50" cy="12.5" r="8"/>'
+    + '<circle class="mq-head" cx="50" cy="12.5" r="7.5"/>'
     + '<path d="' + body.torso + '"/>'
     + '<path d="' + body.legs + '"/>'
-    + '<ellipse cx="' + (body === _MQ_BODY.Feminin ? 41 : 40) + '" cy="148.5" rx="6.5" ry="2.6"/>'
-    + '<ellipse cx="' + (body === _MQ_BODY.Feminin ? 59 : 60) + '" cy="148.5" rx="6.5" ry="2.6"/>'
+    + '<ellipse cx="41.5" cy="147" rx="4.5" ry="2"/>'
+    + '<ellipse cx="58.5" cy="147" rx="4.5" ry="2"/>'
     + '</svg>';
   return '<div class="mq' + (opts.mini ? ' mq-mini' : '') + '">' + svg + html + '</div>';
 }
