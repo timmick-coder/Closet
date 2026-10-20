@@ -618,6 +618,12 @@ function _outfitViewMode() {
 function _setOutfitViewMode(mode) {
   try { localStorage.setItem(_OUTFIT_VIEW_KEY, mode); } catch (e) {}
   document.querySelectorAll('.ov-wrap').forEach(function(el) { el.classList.toggle('mode-list', mode === 'liste'); });
+  // Kacheln (Gespeichert, Vorschläge, offener Ordner) passend neu zeichnen
+  try {
+    _renderKiSavedSection();
+    var colPanel = document.getElementById('ki-collection-panel');
+    if (colPanel && colPanel.classList.contains('active') && _currentCollectionName) _openCollection(_currentCollectionName);
+  } catch (e) {}
 }
 // Hülle mit Umschalter; listHtml = die bisherige Liste der Pieces
 function _outfitVisualHtml(outfit, listHtml) {
@@ -630,62 +636,120 @@ function _outfitVisualHtml(outfit, listHtml) {
     + '<div class="ov-list">' + listHtml + '</div>'
     + '</div>';
 }
-// Plätze auf der Figur in % (links, oben, Breite, Höhe) + Ebene
-var _MQ_ZONES = {
-  head:     [36, 0.5, 28, 11, 4],
-  outer:    [11, 13, 78, 41, 1],
-  top:      [18, 14, 64, 34, 3],
-  top2:     [24, 12, 52, 30, 2],
-  onepiece: [19, 14, 62, 60, 3],
-  bottom:   [24, 45, 52, 43, 2],
-  shoes:    [21, 86.5, 58, 13, 4]
+// Figur: Koordinaten in "Figur-Einheiten" (viewBox 0 0 100 160).
+// Feste Körperpunkte: Hals y≈22, Schultern y≈27, Taille y≈78, Knöchel y≈146, Boden y≈155.
+// Pieces werden daran ausgerichtet: Oberteile hängen am Kragen (oben), Hosen sitzen
+// am Bund (oben, Taille), Schuhe stehen auf dem Boden (unten).
+var _MQ_BODY = {
+  // Silhouetten je Stilrichtung (Oberkörper mit Armen, Beine, Füße)
+  Maskulin: {
+    torso: 'M44 21 C44 24 41 25.5 36 26.5 C29 28 25 31 24 37 L20 69 C19.5 73 23.5 74 24.5 70 L29 45 L31 47 L32 76 C32 78.5 34 79.5 36 79.5 L64 79.5 C66 79.5 68 78.5 68 76 L69 47 L71 45 L75.5 70 C76.5 74 80.5 73 80 69 L76 37 C75 31 71 28 64 26.5 C59 25.5 56 24 56 21 Z',
+    legs: 'M36 79 L35.5 145 C35.5 148.5 44 148.5 44 145 L48.5 92 L51.5 92 L56 145 C56 148.5 64.5 148.5 64.5 145 L64 79 Z',
+    shoulders: [24, 76]
+  },
+  Feminin: {
+    torso: 'M45 21 C45 24 42 25.5 38 26.5 C32 28 29 31 28 37 L24.5 67 C24 71 28 72 29 68 L32.5 45 L34 47 C35 55 39 58 39 63 C39 70 34.5 76 34 83 L66 83 C65.5 76 61 70 61 63 C61 58 65 55 66 47 L67.5 45 L71 68 C72 72 76 71 75.5 67 L72 37 C71 31 68 28 62 26.5 C58 25.5 55 24 55 21 Z',
+    legs: 'M34 82 L37 145 C37 148.5 45 148.5 45 145 L48.5 96 L51.5 96 L55 145 C55 148.5 63 148.5 63 145 L66 82 Z',
+    shoulders: [28, 72]
+  },
+  Neutral: {
+    torso: 'M44.5 21 C44.5 24 41.5 25.5 37 26.5 C30.5 28 27 31 26 37 L22 68 C21.5 72 25.5 73 26.5 69 L30.5 45 L32.5 47 L33.5 77 C33.5 79.5 35 80.5 37 80.5 L63 80.5 C65 80.5 66.5 79.5 66.5 77 L67.5 47 L69.5 45 L73.5 69 C74.5 73 78.5 72 78 68 L74 37 C73 31 69.5 28 63 26.5 C58.5 25.5 55.5 24 55.5 21 Z',
+    legs: 'M35.5 80 L36 145 C36 148.5 44.5 148.5 44.5 145 L48.5 94 L51.5 94 L55.5 145 C55.5 148.5 64 148.5 64 145 L64.5 80 Z',
+    shoulders: [26, 74]
+  }
 };
 var _HEADWEAR_RE = /mütze|cap\b|hut\b|beanie|kappe|stirnband/i;
-function _makeMannequin(outfit) {
+var _SHORTS_RE = /short|bermuda|hotpants/i;
+var _LONGCOAT_RE = /mantel|parka|trench|coat|daunen/i;
+var _SKIRT_RE = /\brock\b|röcke|skirt/i;
+var _MINI_RE = /\bmini/i, _MAXI_RE = /\bmaxi|bodenlang/i;
+
+// Box [x0, y0, x1, y1] in Figur-Einheiten → CSS (Prozent) + Ausrichtung des Bildes
+function _mqBox(b, align, z) {
+  return { left: b[0], top: b[1] / 1.6, width: b[2] - b[0], height: (b[3] - b[1]) / 1.6, align: align, z: z };
+}
+
+// opts.mini: kleine Variante für Kacheln (nicht antippbar)
+function _makeMannequin(outfit, opts) {
+  opts = opts || {};
   var wardrobe = loadWardrobe();
+  var body = _MQ_BODY[_styleDirection()] || _MQ_BODY.Neutral;
+  var sh = body.shoulders;
   var groups = { head: [], outer: [], top: [], onepiece: [], bottom: [], shoes: [], side: [] };
   (outfit.items || []).forEach(function(item) {
     var w = wardrobe.find(function(x) { return item.id && String(x.id) === String(item.id); })
       || wardrobe.find(function(x) { return (x.name || '').toLowerCase() === (item.name || '').toLowerCase(); })
-      || { name: item.name, type: '' };
-    var role = _pieceRole(w);
-    var entry = { item: item, photo: _findWardrobePhoto(item) };
-    if (role === 'acc' && _HEADWEAR_RE.test(item.name || '') && !groups.head.length) groups.head.push(entry);
+      || null;
+    var info = w || { name: item.name, type: '' };
+    var role = _pieceRole(info);
+    var entry = { item: item, w: w, photo: _findWardrobePhoto(item), text: ((item.name || '') + ' ' + (info.type || '')) };
+    if (role === 'acc' && _HEADWEAR_RE.test(entry.text) && !groups.head.length) groups.head.push(entry);
     else if (groups[role]) groups[role].push(entry);
     else groups.side.push(entry); // weitere Accessoires/Sonstiges seitlich
   });
-  var piece = function(entry, z) {
-    var content = entry.photo
-      ? '<img src="' + _escAttr(entry.photo) + '" alt="' + _escAttr(entry.item.name || '') + '" draggable="false">'
-      : '<span class="mq-emoji">' + (entry.item.emoji || '👕') + '</span>';
-    return '<div class="mq-piece" style="left:' + z[0] + '%;top:' + z[1] + '%;width:' + z[2] + '%;height:' + z[3] + '%;z-index:' + z[4] + ';">' + content + '</div>';
-  };
-  var html = '';
-  if (groups.head[0]) html += piece(groups.head[0], _MQ_ZONES.head);
-  if (groups.onepiece[0]) html += piece(groups.onepiece[0], _MQ_ZONES.onepiece);
-  // Oberkörper: Jacke + Oberteile würden sich komplett verdecken → leicht versetzt
-  // auffächern (Jacke vorne links, Oberteile schauen dahinter hervor)
-  var torso = [groups.outer[0], groups.top[0], groups.top[1]].filter(Boolean);
-  var fan = {
-    1: [_MQ_ZONES.top],
-    2: [[6, 13, 56, 38, 3], [38, 15, 56, 36, 2]],
-    3: [[2, 13, 49, 36, 4], [26, 15, 49, 34, 3], [49, 17, 49, 32, 2]]
-  }[torso.length] || [];
-  if (torso.length === 1 && groups.outer[0]) fan = [_MQ_ZONES.outer]; // nur Jacke: etwas größer
-  torso.forEach(function(entry, i) { html += piece(entry, fan[i]); });
-  if (groups.bottom[0]) html += piece(groups.bottom[0], _MQ_ZONES.bottom);
-  if (groups.shoes[0]) html += piece(groups.shoes[0], _MQ_ZONES.shoes);
-  // Weitere Accessoires rechts neben den Beinen (dort ist Platz)
-  groups.side.slice(0, 3).forEach(function(entry, i) { html += piece(entry, [78, 50 + i * 14, 21, 13, 5]); });
-  // Dezente Silhouette (Kopf, Oberkörper mit Armen, Beine, Füße)
-  var svg = '<svg class="mq-body" viewBox="0 0 100 160" preserveAspectRatio="xMidYMid meet" aria-hidden="true">'
-    + '<circle cx="50" cy="10" r="7.5"/>'
-    + '<path d="M46 17h8v5h-8z"/>'
-    + '<path d="M31 24 Q50 20 69 24 L77 66 Q74 68 71 66 L65 38 L64 74 L36 74 L35 38 L29 66 Q26 68 23 66 Z"/>'
-    + '<path d="M36 74 H64 L62 140 H53 L50 86 L47 140 H38 Z"/>'
-    + '<ellipse cx="42" cy="143" rx="7" ry="3.2"/><ellipse cx="58" cy="143" rx="7" ry="3.2"/>'
+
+  var boxes = [];
+  if (groups.head[0]) boxes.push([groups.head[0], _mqBox([38, 0, 62, 17], '50% 100%', 6)]);
+  // Kleid: Länge nach Name (Mini / Midi / Maxi)
+  if (groups.onepiece[0]) {
+    var t = groups.onepiece[0].text;
+    var len = _MINI_RE.test(t) ? 104 : _MAXI_RE.test(t) ? 148 : 124;
+    boxes.push([groups.onepiece[0], _mqBox([sh[0] - 1, 22, sh[1] + 1, len], '50% 0%', 3)]);
+  }
+  // Oberkörper: Jacke + Oberteile; bei mehreren leicht versetzt auffächern
+  var outer = groups.outer[0];
+  var longCoat = outer && _LONGCOAT_RE.test(outer.text);
+  var torso = [outer, groups.top[0], groups.top[1]].filter(Boolean);
+  if (torso.length === 1) {
+    var single = outer
+      ? [sh[0] - 8, 21, sh[1] + 8, longCoat ? 122 : 88]
+      : [sh[0] - 4, 22, sh[1] + 4, 86];
+    boxes.push([torso[0], _mqBox(single, '50% 0%', 4)]);
+  } else if (torso.length === 2) {
+    boxes.push([torso[0], _mqBox([8, 21, 64, longCoat ? 118 : 88], '50% 0%', 5)]);
+    boxes.push([torso[1], _mqBox([36, 23, 92, 84], '50% 0%', 4)]);
+  } else if (torso.length === 3) {
+    boxes.push([torso[0], _mqBox([3, 21, 57, longCoat ? 116 : 86], '50% 0%', 5)]);
+    boxes.push([torso[1], _mqBox([25, 23, 79, 84], '50% 0%', 4)]);
+    boxes.push([torso[2], _mqBox([47, 25, 97, 82], '50% 0%', 3)]);
+  }
+  // Unterteil: Bund an der Taille; Länge nach Art (Shorts / Rock Mini-Midi-Maxi / lange Hose)
+  if (groups.bottom[0]) {
+    var bt = groups.bottom[0].text, bottom;
+    if (_SHORTS_RE.test(bt)) bottom = [29, 77, 71, 110];
+    else if (_SKIRT_RE.test(bt)) bottom = [27, 77, 73, _MINI_RE.test(bt) ? 100 : _MAXI_RE.test(bt) ? 146 : 118];
+    else bottom = [29, 77, 71, 150];
+    boxes.push([groups.bottom[0], _mqBox(bottom, '50% 0%', 2)]);
+  }
+  // Schuhe: Sohle auf dem Boden
+  if (groups.shoes[0]) boxes.push([groups.shoes[0], _mqBox([24, 137, 76, 157], '50% 100%', 7)]);
+  // Weitere Accessoires rechts neben den Beinen
+  groups.side.slice(0, 3).forEach(function(entry, i) {
+    boxes.push([entry, _mqBox([80, 90 + i * 20, 99, 108 + i * 20], '50% 50%', 8)]);
+  });
+
+  var html = boxes.map(function(pair) {
+    var e = pair[0], b = pair[1];
+    var content = e.photo
+      ? '<img src="' + _escAttr(e.photo) + '" alt="" draggable="false" style="object-position:' + b.align + ';">'
+      // Ohne Foto: Emoji wächst mit seinem Bereich (cqh = % der Figur-Höhe)
+      : '<span class="mq-emoji" style="font-size:' + Math.max(6, Math.min(b.height, b.width * 1.6) * 0.55).toFixed(1) + 'cqh;">' + (e.item.emoji || '👕') + '</span>';
+    var tap = (!opts.mini && e.w)
+      ? ' onclick="event.stopPropagation();_openItemDetail(\'' + _escAttr(String(e.w.id)) + '\')"' : '';
+    return '<div class="mq-piece' + (tap ? ' mq-tap' : '') + '" data-name="' + _escAttr(e.item.name || '') + '"' + tap
+      + ' style="left:' + b.left + '%;top:' + b.top + '%;width:' + b.width + '%;height:' + b.height + '%;z-index:' + b.z + ';">'
+      + content + '</div>';
+  }).join('');
+
+  var svg = '<svg class="mq-body" viewBox="0 0 100 160" preserveAspectRatio="none" aria-hidden="true">'
+    + '<ellipse class="mq-shadow" cx="50" cy="154" rx="27" ry="3.5"/>'
+    + '<circle cx="50" cy="12.5" r="8"/>'
+    + '<path d="' + body.torso + '"/>'
+    + '<path d="' + body.legs + '"/>'
+    + '<ellipse cx="' + (body === _MQ_BODY.Feminin ? 41 : 40) + '" cy="148.5" rx="6.5" ry="2.6"/>'
+    + '<ellipse cx="' + (body === _MQ_BODY.Feminin ? 59 : 60) + '" cy="148.5" rx="6.5" ry="2.6"/>'
     + '</svg>';
-  return '<div class="mq">' + svg + html + '</div>';
+  return '<div class="mq' + (opts.mini ? ' mq-mini' : '') + '">' + svg + html + '</div>';
 }
 
 // Verständliche Meldung, wenn sich gar kein vollständiges Outfit bauen lässt
@@ -3031,6 +3095,8 @@ function _doRenameCollection(oldName, newName) {
 // ── Outfit-Board: Teile von Kopf bis Fuß, freigestellt übereinander ──────────
 var _BOARD_MAX = 4;
 function _makeOutfitBoard(outfit) {
+  // Ansicht "Figur": auch in Kacheln die kleine Figur zeigen
+  if (_outfitViewMode() === 'figur') return _makeMannequin(outfit, { mini: true });
   var all = [].concat(outfit.items || []).sort(function(a, b) { return _clothingOrder(a) - _clothingOrder(b); });
   var shown = all.slice(0, _BOARD_MAX);
   var html = shown.map(function(item) {

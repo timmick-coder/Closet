@@ -604,11 +604,23 @@
     .ov-wrap.mode-list .ov-figure { display: none; }
     .mq { position: relative; width: 100%; max-width: 260px; aspect-ratio: 5 / 8; margin: 0 auto 10px;
       border-radius: 18px; background: radial-gradient(ellipse at 50% 30%, #23466f 0%, #14304f 55%, #0e2240 100%); overflow: hidden; }
-    .mq-body { position: absolute; inset: 4% 8%; width: 84%; height: 92%; }
-    .mq-body * { fill: rgba(255,255,255,0.07); stroke: rgba(255,255,255,0.13); stroke-width: 0.6; }
+    .mq { container-type: size; } /* für mitwachsende Emojis (cqh) */
+    /* Silhouette füllt die ganze Fläche (viewBox 100×160 = Seitenverhältnis 5:8) → Körperpunkte stimmen */
+    .mq-body { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .mq-body * { fill: rgba(255,255,255,0.075); stroke: rgba(255,255,255,0.14); stroke-width: 0.5; }
+    .mq-body .mq-shadow { fill: rgba(0,0,0,0.28); stroke: none; }
     .mq-piece { position: absolute; display: flex; align-items: center; justify-content: center; }
-    .mq-piece img { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.4)); pointer-events: none; -webkit-user-drag: none; }
+    .mq-piece img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.4)); pointer-events: none; -webkit-user-drag: none; }
     .mq-emoji { font-size: 34px; line-height: 1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.35)); }
+    .mq-piece.mq-tap { cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform 0.15s; }
+    .mq-piece.mq-tap:active { transform: scale(0.97); }
+    /* Gedrückt halten: Name kurz anzeigen */
+    .mq-piece.mq-tap:active::after { content: attr(data-name); position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      background: rgba(13,27,46,0.88); color: #fff; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 10px; white-space: nowrap; pointer-events: none; z-index: 10; }
+    /* Kleine Figur in Outfit-Kacheln */
+    .col-grid-preview .mq-mini { height: 100%; width: auto; max-width: none; margin: 0 auto; background: none; border-radius: 0; }
+    .col-grid-preview .mq-mini .mq-emoji { font-size: 16px; }
+    .col-grid-preview:has(.mq-mini) { padding: 6px 0 0; }
     .outfit-card-reason { font-size: 12.5px; line-height: 1.45; color: var(--text2); background: rgba(77,141,255,0.08); border-radius: 12px; padding: 8px 10px; margin: 2px 0 10px; }
     .match-badge { background: #DCFCE7; color: #15803D; font-size: 12px; font-weight: 800; padding: 5px 12px; border-radius: 20px; white-space: nowrap; }
     .outfit-items-row { display: flex; gap: 16px; margin-bottom: 14px; }
