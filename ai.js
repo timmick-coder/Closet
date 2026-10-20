@@ -464,25 +464,160 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
     }
   };
 
-  const data = await _callGeminiAPI(body);
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  let raw;
-  try { raw = JSON.parse(text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()); }
-  catch { throw new Error('KI hat keine verwertbaren Outfits geliefert. Bitte erneut versuchen.'); }
-  if (!Array.isArray(raw)) raw = [raw];
+  // KI fragen → nur echte Schrank-Pieces übernehmen (Unbekanntes verwerfen)
+  const ask = async function(feedback) {
+    const b = JSON.parse(JSON.stringify(body));
+    if (feedback) b.contents[0].parts[0].text += feedback;
+    const data = await _callGeminiAPI(b);
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    let raw;
+    try { raw = JSON.parse(text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()); }
+    catch { throw new Error('KI hat keine verwertbaren Outfits geliefert. Bitte erneut versuchen.'); }
+    if (!Array.isArray(raw)) raw = [raw];
+    return raw.map(function(o) {
+      const seen = {};
+      const pieces = (o.itemIds || []).map(function(id) { return String(id).trim(); })
+        .filter(function(id) { return byId[id] && !seen[id] && (seen[id] = true); })
+        .map(function(id) { return byId[id]; });
+      return { name: o.name || 'Outfit', style: o.style || '', reason: o.reason || '', match: o.match || 90, weather: o.weather || '', pieces: pieces };
+    }).filter(function(o) { return o.pieces.length > 0; });
+  };
 
-  // Nur echte Schrank-Teile übernehmen, Unbekanntes verwerfen
-  const outfits = raw.map(function(o) {
-    const seen = {};
-    const items = (o.itemIds || []).map(function(id) { return String(id).trim(); })
-      .filter(function(id) { return byId[id] && !seen[id] && (seen[id] = true); })
-      .map(function(id) { return { id: byId[id].id, emoji: byId[id].emoji || '👕', name: byId[id].name }; });
-    return { name: o.name || 'Outfit', style: o.style || '', reason: o.reason || '', match: o.match || 90, weather: o.weather || '', items: items };
-  }).filter(function(o) { return o.items.length > 0; });
+  // Qualitätskontrolle: reparieren, was geht; Unsinniges aussortieren
+  const qcCtx = { season: season, wardrobe: wardrobe };
+  let result = _qualityCheckOutfits(await ask(''), qcCtx);
+  // Zu wenig brauchbare Outfits? Einmal gezielt mit den gefundenen Fehlern nachfragen
+  if (result.valid.length < 2 && result.problems.length) {
+    const feedback = '\n\nACHTUNG – deine letzten Vorschläge hatten diese Fehler, vermeide sie unbedingt:\n- '
+      + result.problems.slice(0, 6).join('\n- ');
+    try {
+      const second = _qualityCheckOutfits(await ask(feedback), qcCtx, result.valid);
+      result = { valid: result.valid.concat(second.valid), problems: second.problems };
+    } catch (e) { /* erster Durchgang bleibt gültig */ }
+  }
 
-  if (outfits.length === 0) throw new Error('KI konnte kein Outfit aus deinem Schrank zusammenstellen. Bitte erneut versuchen.');
+  const outfits = result.valid.slice(0, 3).map(function(o) {
+    return {
+      name: o.name, style: o.style, reason: o.reason, match: o.match, weather: o.weather,
+      items: o.pieces.map(function(w) { return { id: w.id, emoji: w.emoji || '👕', name: w.name }; })
+    };
+  });
+  if (outfits.length === 0) throw new Error(_missingForOutfitsMessage(wardrobe));
   _rememberSuggestions(outfits);
   return outfits;
+}
+
+// ── Qualitätskontrolle für KI-Outfits ────────────────────────────────────────
+// Rolle eines Pieces im Outfit: top | outer | bottom | onepiece | shoes | acc | other
+var _ROLE_BY_CAT = {
+  tshirts: 'top', hemden: 'top', pullover: 'top', tops: 'top', blusen: 'top', hoodies: 'top', sport: 'top',
+  jacken: 'outer', anzuege: 'outer',
+  hosen: 'bottom', shorts: 'bottom', roecke: 'bottom',
+  kleider: 'onepiece',
+  schuhe: 'shoes', sneaker: 'shoes', stiefel: 'shoes',
+  accessoires: 'acc', taschen: 'acc', schmuck: 'acc', kopf: 'acc'
+};
+function _pieceRole(w) {
+  var r = _ROLE_BY_CAT[_itemCategory(w)];
+  if (r) return r;
+  var t = ((w.name || '') + ' ' + (w.type || '')).toLowerCase();
+  if (/schuh|sneaker|stiefel|boot|sandal|loafer|pumps|slipper|timberland/.test(t)) return 'shoes';
+  if (/kleid(?!ung)|dress|overall|jumpsuit/.test(t)) return 'onepiece';
+  if (/jacke|mantel|blazer|parka|sakko|coat|anorak/.test(t)) return 'outer';
+  if (/hose|jeans|chino|jogger|legging|short|\brock\b|röcke|skirt/.test(t)) return 'bottom';
+  if (/mütze|cap\b|hut\b|beanie|schal|gürtel|tasche|rucksack|brille|uhr\b|kette|ring\b|armband|handschuh|accessoire/.test(t)) return 'acc';
+  if (/shirt|hemd|bluse|pullover|pulli|hoodie|sweat|strick|top\b|polo|cardigan|weste/.test(t)) return 'top';
+  return 'other';
+}
+// Formalität aus dem Stil-Feld: 1 = sportlich … 4 = Business/elegant
+function _formality(w) {
+  var s = (w.style || '').toLowerCase();
+  if (/sport/.test(s)) return 1;
+  if (/business|formal|elegant|anzug/.test(s)) return 4;
+  if (/smart/.test(s)) return 3;
+  if (/casual|street|lässig/.test(s)) return 2;
+  return 0; // unbekannt → nicht bewerten
+}
+var _NEUTRAL_COLOR_RE = /schwarz|weiß|weiss|grau|beige|braun|navy|denim|creme|oliv|camel/i;
+
+// Prüft und repariert Outfits. existing: schon akzeptierte (für Duplikat-Check)
+function _qualityCheckOutfits(list, ctx, existing) {
+  var valid = [], problems = [];
+  var seenKeys = {};
+  (existing || []).forEach(function(o) { seenKeys[o.pieces.map(function(w) { return w.id; }).sort().join('|')] = true; });
+  var shoesInWardrobe = ctx.wardrobe.filter(function(w) { return _pieceRole(w) === 'shoes'; });
+
+  list.forEach(function(o, idx) {
+    var label = '„' + o.name + '“';
+    var byRole = { top: [], outer: [], bottom: [], onepiece: [], shoes: [], acc: [], other: [] };
+    o.pieces.forEach(function(w) { byRole[_pieceRole(w)].push(w); });
+
+    // 1) Zu viel von einer Sorte → Überzählige entfernen
+    var limits = { top: 2, outer: 1, bottom: 1, onepiece: 1, shoes: 1, acc: 2 };
+    Object.keys(limits).forEach(function(r) {
+      if (byRole[r].length > limits[r]) {
+        problems.push(label + ': zu viele ' + { top: 'Oberteile', outer: 'Jacken', bottom: 'Hosen/Röcke', onepiece: 'Kleider', shoes: 'Schuhe', acc: 'Accessoires' }[r]);
+        byRole[r] = byRole[r].slice(0, limits[r]);
+      }
+    });
+    if (byRole.onepiece.length && byRole.bottom.length) {
+      problems.push(label + ': Kleid und Hose/Rock zusammen');
+      byRole.bottom = [];
+    }
+
+    // 2) Pflicht: Oberteil + Unterteil (oder ein Kleid)
+    var hasTop = byRole.top.length || byRole.onepiece.length;
+    var hasBottom = byRole.bottom.length || byRole.onepiece.length;
+    if (!hasTop || !hasBottom) {
+      problems.push(label + ': unvollständig – ' + (!hasTop ? 'Oberteil' : 'Hose/Rock') + ' fehlt');
+      return;
+    }
+
+    // 3) Schuhe fehlen → passende aus dem Schrank ergänzen (neutral, zur Jahreszeit)
+    if (!byRole.shoes.length && shoesInWardrobe.length) {
+      var shoeOk = function(w) { return !(ctx.season === 'Winter' && w.season === 'Sommer') && !(ctx.season === 'Sommer' && w.season === 'Winter'); };
+      var pick = shoesInWardrobe.filter(shoeOk).sort(function(a, b) {
+        return (_NEUTRAL_COLOR_RE.test(b.color || '') ? 1 : 0) - (_NEUTRAL_COLOR_RE.test(a.color || '') ? 1 : 0);
+      })[0];
+      if (pick) byRole.shoes = [pick];
+    }
+
+    var clothes = byRole.top.concat(byRole.outer, byRole.bottom, byRole.onepiece);
+    var lower = byRole.bottom.concat(byRole.onepiece, byRole.shoes);
+
+    // 4) Wärme: Winter-Oberteile/Jacken nicht mit Sommer-Unterteilen/-Schuhen (z. B. Wollpulli + Shorts)
+    var winterUpper = byRole.top.concat(byRole.outer).some(function(w) { return w.season === 'Winter'; });
+    var summerLower = lower.some(function(w) { return w.season === 'Sommer'; });
+    if (winterUpper && summerLower) { problems.push(label + ': Winter- und Sommer-Pieces gemischt'); return; }
+    // Jahreszeit: im Winter keine Sommer-Unterteile/-Schuhe, im Sommer keine Winter-Oberteile/-Jacken
+    if (ctx.season === 'Winter' && summerLower) { problems.push(label + ': Sommer-Pieces im Winter'); return; }
+    if (ctx.season === 'Sommer' && winterUpper) { problems.push(label + ': Winter-Pieces im Sommer'); return; }
+
+    // 5) Formalität: nichts Sportliches zusammen mit Business/Elegant (z. B. Sakko + Jogginghose)
+    var levels = clothes.map(_formality).filter(function(l) { return l > 0; });
+    if (levels.length && Math.max.apply(null, levels) - Math.min.apply(null, levels) >= 3) {
+      problems.push(label + ': sportliche und schicke Pieces gemischt'); return;
+    }
+
+    // Reihenfolge Kopf bis Fuß: Accessoires, Jacke, Oberteile, Kleid, Unterteil, Schuhe
+    var pieces = byRole.acc.concat(byRole.outer, byRole.top, byRole.onepiece, byRole.bottom, byRole.shoes, byRole.other);
+    var key = pieces.map(function(w) { return w.id; }).sort().join('|');
+    if (seenKeys[key]) { problems.push(label + ': doppelt'); return; }
+    seenKeys[key] = true;
+    valid.push(Object.assign({}, o, { pieces: pieces }));
+  });
+  return { valid: valid, problems: problems };
+}
+
+// Verständliche Meldung, wenn sich gar kein vollständiges Outfit bauen lässt
+function _missingForOutfitsMessage(wardrobe) {
+  var roles = wardrobe.map(_pieceRole);
+  var has = function(r) { return roles.indexOf(r) >= 0; };
+  var missing = [];
+  if (!has('top') && !has('onepiece')) missing.push('Oberteile');
+  if (!has('bottom') && !has('onepiece')) missing.push('Hosen oder Röcke');
+  if (missing.length) return 'Für komplette Outfits fehlen dir noch ' + missing.join(' und ') + ' im Schrank.';
+  return 'Die KI hat diesmal kein stimmiges Outfit gefunden. Bitte erneut versuchen.';
 }
 
 // Letzte Vorschläge merken, damit die KI sich nicht ständig wiederholt
