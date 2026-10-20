@@ -636,28 +636,15 @@ function _outfitVisualHtml(outfit, listHtml) {
     + '<div class="ov-list">' + listHtml + '</div>'
     + '</div>';
 }
-// Figur: Koordinaten in "Figur-Einheiten" (viewBox 0 0 100 160).
-// Feste Körperpunkte: Hals y≈22, Schultern y≈27, Taille y≈78, Knöchel y≈146, Boden y≈155.
-// Pieces werden daran ausgerichtet: Oberteile hängen am Kragen (oben), Hosen sitzen
-// am Bund (oben, Taille), Schuhe stehen auf dem Boden (unten).
+// Figur als Mode-Skizze (Croquis) auf Papier. Koordinaten in "Figur-Einheiten"
+// (viewBox 0 0 100 160, lang gestreckte ~9-Kopf-Proportion):
+// Kopf y≈8, Kragen y≈19, Schultern y≈22, Taille/Bund y≈60, Knie y≈106, Knöchel y≈145, Boden y≈152.
+// Die Zeichnung liegt UNTER den Pieces – sichtbar bleiben nur Kopf, Hals, Hände,
+// Unterschenkel/Knöchel. Dadurch wirken die Pieces angezogen statt aufgeklebt.
 var _MQ_BODY = {
-  // Silhouetten je Stilrichtung – bewusst OHNE Arme und schmal, damit die Kleidung
-  // den Körper überdeckt und die Figur nur als zarter Hinweis dahinter liegt
-  Maskulin: {
-    torso: 'M44 21 C44 24 42 25 38 26 C33 27 31 29 31 34 L33 76 C33 78 34.5 79 36.5 79 L63.5 79 C65.5 79 67 78 67 76 L69 34 C69 29 67 27 62 26 C58 25 56 24 56 21 Z',
-    legs: 'M37.5 79 L38 144 C38 147 44.5 147 44.5 144 L48.5 92 L51.5 92 L55.5 144 C55.5 147 62 147 62 144 L62.5 79 Z',
-    shoulders: [24, 76]
-  },
-  Feminin: {
-    torso: 'M45 21 C45 24 43 25 40 26 C36 27 34 29 34 34 C35 50 39 56 39.5 63 C39.5 70 36 76 35.5 82 L64.5 82 C64 76 60.5 70 60.5 63 C61 56 65 50 66 34 C66 29 64 27 60 26 C57 25 55 24 55 21 Z',
-    legs: 'M36.5 82 L38.5 144 C38.5 147 45 147 45 144 L48.5 96 L51.5 96 L55 144 C55 147 61.5 147 61.5 144 L63.5 82 Z',
-    shoulders: [28, 72]
-  },
-  Neutral: {
-    torso: 'M44.5 21 C44.5 24 42.5 25 39 26 C34.5 27 32.5 29 32.5 34 L34 77 C34 79 35.5 80 37.5 80 L62.5 80 C64.5 80 66 79 66 77 L67.5 34 C67.5 29 65.5 27 61 26 C57.5 25 55.5 24 55.5 21 Z',
-    legs: 'M37 80 L38 144 C38 147 44.5 147 44.5 144 L48.5 94 L51.5 94 L55.5 144 C55.5 147 62 147 62 144 L63 80 Z',
-    shoulders: [26, 74]
-  }
+  Maskulin: { sw: 10, ww: 7.2, hw: 7.8 },
+  Feminin:  { sw: 8,  ww: 5.2, hw: 8.6 },
+  Neutral:  { sw: 9,  ww: 6.2, hw: 8.0 }
 };
 var _HEADWEAR_RE = /mütze|cap\b|hut\b|beanie|kappe|stirnband/i;
 var _SHORTS_RE = /short|bermuda|hotpants/i;
@@ -665,17 +652,43 @@ var _LONGCOAT_RE = /mantel|parka|trench|coat|daunen/i;
 var _SKIRT_RE = /\brock\b|röcke|skirt/i;
 var _MINI_RE = /\bmini/i, _MAXI_RE = /\bmaxi|bodenlang/i;
 
-// Box [x0, y0, x1, y1] in Figur-Einheiten → CSS (Prozent) + Ausrichtung des Bildes
+// Croquis-Linien (Kohle-Stil) für eine Körperform
+function _croquisSvg(b) {
+  var L = function(x) { return (50 - x).toFixed(1); }, R = function(x) { return (50 + x).toFixed(1); };
+  var sw = b.sw, ww = b.ww, hw = b.hw;
+  var side = function(f) { // eine Körperhälfte; f = L oder R
+    return 'M' + f(2.3) + ' 14 C' + f(2.4) + ' 17 ' + f(2.6) + ' 19 ' + f(4) + ' 20.5'                 // Hals
+      + ' C' + f(sw - 3) + ' 21.5 ' + f(sw) + ' 22 ' + f(sw) + ' 26'                                     // Schulter
+      + ' C' + f(sw - 0.5) + ' 38 ' + f(ww) + ' 48 ' + f(ww) + ' 56'                                     // Flanke → Taille
+      + ' C' + f(ww) + ' 60 ' + f(hw) + ' 62 ' + f(hw) + ' 68'                                           // Hüfte
+      + ' C' + f(hw - 0.5) + ' 86 ' + f(5.6) + ' 98 ' + f(5.4) + ' 106'                                  // Oberschenkel → Knie
+      + ' C' + f(5.3) + ' 120 ' + f(4.6) + ' 136 ' + f(4.2) + ' 145'                                     // Wade → Knöchel
+      + ' M' + f(1.2) + ' 74 C' + f(1.6) + ' 88 ' + f(2.4) + ' 98 ' + f(2.6) + ' 106'                   // Innenbein
+      + ' C' + f(2.6) + ' 120 ' + f(2.4) + ' 136 ' + f(2.5) + ' 145'
+      + ' M' + f(sw - 0.2) + ' 27 C' + f(sw + 2.6) + ' 36 ' + f(sw + 3.2) + ' 46 ' + f(sw + 2.8) + ' 58'  // Arm außen
+      + ' M' + f(sw - 2.6) + ' 32 C' + f(sw - 1) + ' 40 ' + f(sw + 0.2) + ' 48 ' + f(sw + 0.4) + ' 58';  // Arm innen
+  };
+  var hand = function(f) { return '<ellipse cx="' + f(sw + 1.7) + '" cy="61" rx="1.6" ry="2.6"/>'; };
+  var foot = function(f) { return '<path d="M' + f(4.2) + ' 145 C' + f(4.6) + ' 148 ' + f(5.6) + ' 150.5 ' + f(7) + ' 151.5 L' + f(2.2) + ' 151.5 L' + f(2.5) + ' 145"/>'; };
+  return '<svg class="mq-body" viewBox="0 0 100 160" preserveAspectRatio="none" aria-hidden="true">'
+    + '<ellipse class="mq-shadow" cx="50" cy="152.5" rx="17" ry="2.2"/>'
+    + '<ellipse class="mq-head" cx="50" cy="8.3" rx="4.4" ry="5.6"/>'
+    + '<path d="' + side(L) + '"/><path d="' + side(R) + '"/>'
+    + hand(L) + hand(R) + foot(L) + foot(R)
+    + '</svg>';
+}
+
+// Box [x0, y0, x1, y1] in Figur-Einheiten → Prozent + Ausrichtung des Bildes
 function _mqBox(b, align, z) {
   return { left: b[0], top: b[1] / 1.6, width: b[2] - b[0], height: (b[3] - b[1]) / 1.6, align: align, z: z };
 }
 
-// opts.mini: kleine Variante für Kacheln (nicht antippbar)
+// opts.mini: kleine Variante für Kacheln (ohne Beschriftung, nicht antippbar)
 function _makeMannequin(outfit, opts) {
   opts = opts || {};
   var wardrobe = loadWardrobe();
   var body = _MQ_BODY[_styleDirection()] || _MQ_BODY.Neutral;
-  var sh = body.shoulders;
+  var sw = body.sw;
   var groups = { head: [], outer: [], top: [], onepiece: [], bottom: [], shoes: [], side: [] };
   (outfit.items || []).forEach(function(item) {
     var w = wardrobe.find(function(x) { return item.id && String(x.id) === String(item.id); })
@@ -686,55 +699,52 @@ function _makeMannequin(outfit, opts) {
     var entry = { item: item, w: w, photo: _findWardrobePhoto(item), text: ((item.name || '') + ' ' + (info.type || '')) };
     if (role === 'acc' && _HEADWEAR_RE.test(entry.text) && !groups.head.length) groups.head.push(entry);
     else if (groups[role]) groups[role].push(entry);
-    else groups.side.push(entry); // weitere Accessoires/Sonstiges seitlich
+    else groups.side.push(entry);
   });
 
+  // Proportionen an der schlanken Mode-Figur: Oberteile ~ Schulterbreite (+ Ärmel),
+  // Hosen ~ Beinlänge, Schuhe klein und realistisch
   var boxes = [];
-  if (groups.head[0]) boxes.push([groups.head[0], _mqBox([38, 0, 62, 17], '50% 100%', 6)]);
-  // Kleid: Länge nach Name (Mini / Midi / Maxi)
+  if (groups.head[0]) boxes.push([groups.head[0], _mqBox([42, 0, 58, 11], '50% 100%', 6)]);
   if (groups.onepiece[0]) {
     var t = groups.onepiece[0].text;
-    var len = _MINI_RE.test(t) ? 104 : _MAXI_RE.test(t) ? 148 : 124;
-    boxes.push([groups.onepiece[0], _mqBox([sh[0] - 1, 22, sh[1] + 1, len], '50% 0%', 3)]);
+    var len = _MINI_RE.test(t) ? 92 : _MAXI_RE.test(t) ? 146 : 114;
+    boxes.push([groups.onepiece[0], _mqBox([14, 18.5, 86, len], '50% 0%', 3)]);
   }
-  // Oberkörper: Jacke + Oberteile; bei mehreren leicht versetzt auffächern
   var outer = groups.outer[0];
   var longCoat = outer && _LONGCOAT_RE.test(outer.text);
   var torso = [outer, groups.top[0], groups.top[1]].filter(Boolean);
   if (torso.length === 1) {
     var single = outer
-      ? [sh[0] - 8, 21, sh[1] + 8, longCoat ? 122 : 88]
-      : [sh[0] - 4, 22, sh[1] + 4, 86];
+      ? [50 - sw - 13, 18, 50 + sw + 13, longCoat ? 112 : 74]
+      : [50 - sw - 11, 18.5, 50 + sw + 11, 70];
     boxes.push([torso[0], _mqBox(single, '50% 0%', 4)]);
   } else if (torso.length === 2) {
-    boxes.push([torso[0], _mqBox([8, 21, 64, longCoat ? 118 : 88], '50% 0%', 5)]);
-    boxes.push([torso[1], _mqBox([36, 23, 92, 84], '50% 0%', 4)]);
+    boxes.push([torso[0], _mqBox([50 - sw - 17, 18, 50 + sw + 3, longCoat ? 110 : 74], '50% 0%', 5)]);
+    boxes.push([torso[1], _mqBox([50 - sw - 3, 19.5, 50 + sw + 17, 70], '50% 0%', 4)]);
   } else if (torso.length === 3) {
-    boxes.push([torso[0], _mqBox([3, 21, 57, longCoat ? 116 : 86], '50% 0%', 5)]);
-    boxes.push([torso[1], _mqBox([25, 23, 79, 84], '50% 0%', 4)]);
-    boxes.push([torso[2], _mqBox([47, 25, 97, 82], '50% 0%', 3)]);
+    boxes.push([torso[0], _mqBox([50 - sw - 20, 18, 50 + sw - 2, longCoat ? 108 : 72], '50% 0%', 5)]);
+    boxes.push([torso[1], _mqBox([50 - sw - 9, 19.5, 50 + sw + 9, 70], '50% 0%', 4)]);
+    boxes.push([torso[2], _mqBox([50 - sw + 2, 21, 50 + sw + 20, 68], '50% 0%', 3)]);
   }
-  // Unterteil: Bund an der Taille; Länge nach Art (Shorts / Rock Mini-Midi-Maxi / lange Hose)
   if (groups.bottom[0]) {
     var bt = groups.bottom[0].text, bottom;
-    if (_SHORTS_RE.test(bt)) bottom = [29, 77, 71, 110];
-    else if (_SKIRT_RE.test(bt)) bottom = [27, 77, 73, _MINI_RE.test(bt) ? 100 : _MAXI_RE.test(bt) ? 146 : 118];
-    else bottom = [29, 77, 71, 150];
+    // Breite großzügig, damit die LÄNGE (Bund → Saum) das Bild skaliert
+    if (_SHORTS_RE.test(bt)) bottom = [22, 58, 78, 92];
+    else if (_SKIRT_RE.test(bt)) bottom = [20, 58, 80, _MINI_RE.test(bt) ? 86 : _MAXI_RE.test(bt) ? 144 : 104];
+    else bottom = [18, 58, 82, 147];
     boxes.push([groups.bottom[0], _mqBox(bottom, '50% 0%', 2)]);
   }
-  // Schuhe: Sohle auf dem Boden
-  if (groups.shoes[0]) boxes.push([groups.shoes[0], _mqBox([24, 137, 76, 157], '50% 100%', 7)]);
-  // Weitere Accessoires rechts neben den Beinen
+  if (groups.shoes[0]) boxes.push([groups.shoes[0], _mqBox([36, 140, 64, 153.5], '50% 100%', 7)]);
   groups.side.slice(0, 3).forEach(function(entry, i) {
-    boxes.push([entry, _mqBox([80, 90 + i * 20, 99, 108 + i * 20], '50% 50%', 8)]);
+    boxes.push([entry, _mqBox([72, 70 + i * 18, 88, 85 + i * 18], '50% 50%', 8)]);
   });
 
   var html = boxes.map(function(pair) {
     var e = pair[0], b = pair[1];
     var content = e.photo
       ? '<img src="' + _escAttr(e.photo) + '" alt="" draggable="false" style="object-position:' + b.align + ';">'
-      // Ohne Foto: Emoji wächst mit seinem Bereich (cqh = % der Figur-Höhe)
-      : '<span class="mq-emoji" style="font-size:' + Math.max(6, Math.min(b.height, b.width * 1.6) * 0.55).toFixed(1) + 'cqh;">' + (e.item.emoji || '👕') + '</span>';
+      : '<span class="mq-emoji" style="font-size:' + Math.max(5, Math.min(b.height, b.width * 1.6) * 0.5).toFixed(1) + 'cqh;">' + (e.item.emoji || '👕') + '</span>';
     var tap = (!opts.mini && e.w)
       ? ' onclick="event.stopPropagation();_openItemDetail(\'' + _escAttr(String(e.w.id)) + '\')"' : '';
     return '<div class="mq-piece' + (tap ? ' mq-tap' : '') + '" data-name="' + _escAttr(e.item.name || '') + '"' + tap
@@ -742,15 +752,26 @@ function _makeMannequin(outfit, opts) {
       + content + '</div>';
   }).join('');
 
-  var svg = '<svg class="mq-body" viewBox="0 0 100 160" preserveAspectRatio="none" aria-hidden="true">'
-    + '<ellipse class="mq-shadow" cx="50" cy="154" rx="27" ry="3.5"/>'
-    + '<circle class="mq-head" cx="50" cy="12.5" r="7.5"/>'
-    + '<path d="' + body.torso + '"/>'
-    + '<path d="' + body.legs + '"/>'
-    + '<ellipse cx="41.5" cy="147" rx="4.5" ry="2"/>'
-    + '<ellipse cx="58.5" cy="147" rx="4.5" ry="2"/>'
-    + '</svg>';
-  return '<div class="mq' + (opts.mini ? ' mq-mini' : '') + '">' + svg + html + '</div>';
+  var stage = '<div class="mq-stage">' + _croquisSvg(body) + html + '</div>';
+  if (opts.mini) return '<div class="mq mq-sketch mq-mini">' + stage + '</div>';
+
+  // Beschriftungen wie in einer Modeskizze: Name rechts, feine Linie zum Piece
+  var labels = boxes.map(function(pair) {
+    var b = pair[1];
+    return { name: pair[0].item.name || '', y: b.top + b.height * (pair[0] === groups.shoes[0] ? 0.6 : 0.35), x: b.left + b.width * 0.82 };
+  }).sort(function(a, b) { return a.y - b.y; });
+  for (var i = 1; i < labels.length; i++) if (labels[i].y - labels[i - 1].y < 9) labels[i].y = labels[i - 1].y + 9;
+  // Bühne nimmt 62 % der Breite ein → x in Gesamt-Prozent umrechnen
+  var lines = labels.map(function(l) {
+    var x1 = Math.min(l.x, 96) * 0.62, y1 = l.y;
+    return '<path d="M' + x1.toFixed(1) + ' ' + y1.toFixed(1) + ' L66 ' + l.y.toFixed(1) + '"/><circle cx="' + x1.toFixed(1) + '" cy="' + y1.toFixed(1) + '" r="0.7"/>';
+  }).join('');
+  var labelHtml = labels.map(function(l) {
+    return '<div class="mq-label" style="top:' + l.y.toFixed(1) + '%;">' + l.name + '</div>';
+  }).join('');
+  return '<div class="mq mq-sketch mq-annotated">' + stage
+    + '<svg class="mq-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">' + lines + '</svg>'
+    + labelHtml + '</div>';
 }
 
 // Verständliche Meldung, wenn sich gar kein vollständiges Outfit bauen lässt
