@@ -7290,7 +7290,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Panels checked in order: first match wins (topmost panel takes priority)
   var SWIPE_PANELS = [
-    { id: 'fp-ki-panel',          close: function() { _closeFriendKI(); } },
+    { id: 'sh-chat-panel',        close: function() { _shCloseChat(); } },
+    { id: 'fp-ki-panel',         close: function() { _closeFriendKI(); } },
     { id: 'item-detail-panel',    close: function() { _closeItemDetail(); } },
     { id: 'ki-results-panel',       close: function() { _closeKiResults(); } },
     { id: 'ki-create-outfit-panel', close: function() { _closeCreateOutfitPanel(); } },
@@ -7301,7 +7302,9 @@ document.addEventListener('DOMContentLoaded', function() {
     { id: 'friend-search-panel',  close: function() { _closeFriendSearch(); } },
     { id: 'friend-profile-panel', close: function() { _closeFriendProfile(); } },
     { id: 'settings-panel',       close: function() { _closeSettings(); } },
-    { id: 'streak-detail-panel',  close: function() { _closeStreakPanel(); } }
+    { id: 'streak-detail-panel',  close: function() { _closeStreakPanel(); } },
+    // Leihen & Tauschen → zurück zum Feed (Screen, daher zuletzt prüfen)
+    { id: 'teilen',               close: function() { _shCloseSheet(); navigate('freunde', document.getElementById('nav-freunde')); } }
   ];
 
   var _panel    = null;
@@ -7384,21 +7387,23 @@ document.addEventListener('DOMContentLoaded', function() {
     var dx  = t.clientX - _startX;
     var threshold = Math.max(100, _screenW * 0.35);
 
-    // Re-enable CSS transition for the snap animation
-    _panel.style.transition = '';
+    // Snap-Animation (auch für Panels ohne eigene CSS-Transition)
+    var panelEl = _panel;
+    panelEl.style.transition = 'transform 0.28s cubic-bezier(0.4,0,0.2,1)';
 
     if (_committed && dx > threshold) {
       // ✅ Complete the swipe — slide panel off to the right
-      _panel.style.transform = 'translateX(100%)';
+      panelEl.style.transform = 'translateX(100%)';
       var closeFn = _closeFn;
-      var panelEl = _panel;
       setTimeout(function() {
         closeFn();                   // removes .active (CSS: translateX(100%))
+        panelEl.style.transition = '';
         panelEl.style.transform = ''; // clear inline style
       }, 300);
     } else {
       // ❌ Not far enough — snap back to centre
-      _panel.style.transform = '';
+      panelEl.style.transform = '';
+      setTimeout(function() { panelEl.style.transition = ''; }, 300);
     }
 
     _reset(false);
@@ -7916,6 +7921,10 @@ var _SH_PIECES = [
   { id: 'fp12', owner: 'noah',  emoji: '👢', name: 'Chelsea Boots',       color: 'Braun',    hex: '#6b4a2f', size: '44',    style: 'Casual',     lend: true,  swap: false, note: 'Frisch imprägniert.' },
   { id: 'fp13', owner: 'noah',  emoji: '🧢', name: 'Bucket Hat',          color: 'Oliv',     hex: '#6b6b3a', size: '–',     style: 'Streetwear', lend: false, swap: true,  note: '' }
 ];
+// Max. Leihdauer einiger Beispiel-Pieces (Tage, sonst 2 Wochen)
+[['fp1', 7], ['fp4', 3], ['fp7', 30], ['fp8', 3], ['fp10', 7]].forEach(function(x) {
+  _SH_PIECES.find(function(p) { return p.id === x[0]; }).max = x[1];
+});
 var _shTab = 'entdecken', _shFilter = 'alle', _shChatId = null, _shDraft = null;
 
 function _shLoad() {
@@ -8123,9 +8132,15 @@ function _shRenderOffer() {
     + '<div class="sh-offer-count">' + nL + ' verleihbar · ' + nS + ' tauschbar</div>'
     + mine.map(function(w) {
       var id = _escAttr(String(w.id));
+      var max = w.lendMax || _SH_MAX_DEFAULT;
       return '<div class="sh-offer-row">' + _shThumb(w) + '<div class="sh-offer-name">' + _shEsc(w.name || 'Piece') + '<span>' + _shEsc(w.color || '') + '</span></div>'
         + '<button class="sh-toggle' + (w.lend ? ' on' : '') + '" onclick="_shSetItemFlag(\'' + id + '\',\'lend\',' + !w.lend + ');_shRender()">Leihen</button>'
-        + '<button class="sh-toggle swap' + (w.swap ? ' on' : '') + '" onclick="_shSetItemFlag(\'' + id + '\',\'swap\',' + !w.swap + ');_shRender()">Tauschen</button></div>';
+        + '<button class="sh-toggle swap' + (w.swap ? ' on' : '') + '" onclick="_shSetItemFlag(\'' + id + '\',\'swap\',' + !w.swap + ');_shRender()">Tauschen</button>'
+        // Maximale Leihdauer, nur wenn verleihbar
+        + (w.lend ? '<div class="sh-offer-max"><span>Max. Leihdauer</span>' + _SH_DURATIONS.map(function(d) {
+          return '<button class="sh-mini-chip' + (d[0] === max ? ' on' : '') + '" onclick="_shSetItemFlag(\'' + id + '\',\'lendMax\',' + d[0] + ');_shRender()">' + d[1] + '</button>';
+        }).join('') + '</div>' : '')
+        + '</div>';
     }).join('');
 }
 // Eigenes Piece als verleihbar / tauschbar markieren
@@ -8133,7 +8148,7 @@ function _shSetItemFlag(itemId, flag, on) {
   var items = loadWardrobe();
   var it = items.find(function(w) { return String(w.id) === String(itemId); });
   if (!it) return;
-  it[flag] = !!on;
+  it[flag] = typeof on === 'number' ? on : !!on;
   saveWardrobe(items);
 }
 
@@ -8149,7 +8164,8 @@ function _shOpenPiece(id) {
   var busy = _shLoad().requests.find(function(r) { return r.pieceId === id && _SH_OPEN.indexOf(r.status) >= 0; });
   var html = '<div class="sh-piece-head">' + _shThumb(p, 'sh-thumb-xl') + '<div><div class="modal-title" style="margin-bottom:6px">' + _shEsc(p.name) + '</div>'
     + '<div class="sh-meta">' + _shAvatar(p.owner, 'sh-avatar-xs') + 'von&nbsp;<b>' + _shEsc(f.name) + '</b></div>'
-    + '<div class="sh-piece-facts">' + _shEsc(p.color) + ' · Gr. ' + _shEsc(p.size) + ' · ' + _shEsc(p.style) + '</div></div></div>'
+    + '<div class="sh-piece-facts">' + _shEsc(p.color) + ' · Gr. ' + _shEsc(p.size) + ' · ' + _shEsc(p.style) + '</div>'
+    + (p.lend ? '<div class="sh-piece-facts">📅 Leihen bis max. ' + _shMaxLabel(p.max || _SH_MAX_DEFAULT) + '</div>' : '') + '</div></div>'
     + (p.note ? '<div class="sh-piece-note">„' + _shEsc(p.note) + '“</div>' : '')
     + '<div class="sh-piece-why">✨ ' + _shEsc(m.reason) + '</div>'
     + (m.fits.length ? '<div class="sh-fits">' + m.fits.map(function(w) { return '<div class="sh-fit">' + _shThumb(w) + '<span>' + _shEsc(w.name) + '</span></div>'; }).join('') + '</div>' : '');
@@ -8161,30 +8177,54 @@ function _shOpenPiece(id) {
   _shOpenSheet(html);
 }
 
-// ── Leih-Anfrage mit Zeitraum ──
-function _shStartLend(id) {
-  var p = _shPiece(id), t = _shToday();
-  _shDraft = { pieceId: id };
-  var html = '<div class="modal-title">Leihen anfragen</div>'
-    + '<div class="sh-mini">' + _shThumb(p) + '<div><b>' + _shEsc(p.name) + '</b><span>von ' + _shEsc(_SH_FRIENDS[p.owner].name) + '</span></div></div>'
-    + '<div class="sh-label">Leihzeit</div><div class="sh-chip-row wrap" id="sh-presets">'
-    + [['we', 'Wochenende'], ['1w', '1 Woche'], ['2w', '2 Wochen'], ['own', 'Eigener Zeitraum']].map(function(c) {
-      return '<button class="sh-chip" data-p="' + c[0] + '" onclick="_shPreset(\'' + c[0] + '\')">' + c[1] + '</button>';
-    }).join('') + '</div>'
+// ── Leihdauer ──
+// Verleiher legen pro Piece eine maximale Leihdauer fest (item.lendMax in Tagen)
+var _SH_DURATIONS = [[3, 'Wochenende'], [7, '1 Woche'], [14, '2 Wochen'], [30, '1 Monat']];
+var _SH_MAX_DEFAULT = 14;
+function _shMaxLabel(days) {
+  var x = _SH_DURATIONS.find(function(d) { return d[0] === days; });
+  return x ? x[1] : days + ' Tage';
+}
+// Auswahl der Leihzeit (Schnellwahl + eigener Zeitraum); _shDraft.max begrenzt sie,
+// _shDraft.reqFrom/reqTo = ursprünglich angefragter Zeitraum (beim Annehmen)
+function _shPeriodHtml() {
+  var d = _shDraft, t = _shToday();
+  var chips = (d.reqFrom ? [['req', 'Wie angefragt', 0]] : [])
+    .concat([['we', 'Wochenende', 3], ['1w', '1 Woche', 7], ['2w', '2 Wochen', 14], ['1m', '1 Monat', 30]])
+    .filter(function(c) { return c[2] <= d.max; })
+    .concat([['own', 'Eigener Zeitraum', 0]]);
+  return '<div class="sh-label">Leihzeit <em>max. ' + _shMaxLabel(d.max) + '</em></div><div class="sh-chip-row wrap" id="sh-presets">'
+    + chips.map(function(c) { return '<button class="sh-chip" data-p="' + c[0] + '" onclick="_shPreset(\'' + c[0] + '\')">' + c[1] + '</button>'; }).join('') + '</div>'
     + '<div class="sh-dates" id="sh-dates"><label>Von<input type="date" id="sh-from" min="' + t + '" onchange="_shDateChange()"></label>'
     + '<label>Bis<input type="date" id="sh-to" min="' + t + '" onchange="_shDateChange()"></label></div>'
-    + '<div class="sh-period" id="sh-period"></div>'
+    + '<div class="sh-period" id="sh-period"></div>';
+}
+
+// ── Leih-Anfrage mit Zeitraum ──
+function _shStartLend(id) {
+  var p = _shPiece(id);
+  _shDraft = { pieceId: id, max: p.max || _SH_MAX_DEFAULT };
+  var html = '<div class="modal-title">Leihen anfragen</div>'
+    + '<div class="sh-mini">' + _shThumb(p) + '<div><b>' + _shEsc(p.name) + '</b><span>von ' + _shEsc(_SH_FRIENDS[p.owner].name) + '</span></div></div>'
+    + _shPeriodHtml()
     + '<div class="sh-label">Nachricht</div><textarea class="sh-textarea" id="sh-msg">Hey ' + _shEsc(_SH_FRIENDS[p.owner].name) + ', darf ich mir dein Piece „' + _shEsc(p.name) + '“ leihen? 😊</textarea>'
     + '<button class="sh-btn" onclick="_shSendLend()">Anfrage senden</button>';
   _shOpenSheet(html);
   _shPreset('we');
 }
 function _shPreset(k) {
-  var t = _shToday(), d = _shDraft;
+  var t = _shToday(), d = _shDraft, start = d.reqFrom || _shAddDays(t, 1);
   d.preset = k;
-  if (k === 'we') { var dow = new Date(t + 'T12:00:00').getDay(); d.from = dow === 6 ? t : dow === 0 ? t : _shAddDays(t, 5 - dow); d.to = _shAddDays(d.from, dow === 6 ? 1 : dow === 0 ? 0 : 2); }
-  if (k === '1w') { d.from = _shAddDays(t, 1); d.to = _shAddDays(d.from, 6); }
-  if (k === '2w') { d.from = _shAddDays(t, 1); d.to = _shAddDays(d.from, 13); }
+  if (k === 'req') { d.from = d.reqFrom; d.to = d.reqTo; }
+  if (k === 'we') {
+    if (d.reqFrom) { d.from = d.reqFrom; d.to = _shAddDays(d.from, 2); }
+    else { var dow = new Date(t + 'T12:00:00').getDay(); d.from = dow === 6 || dow === 0 ? t : _shAddDays(t, 5 - dow); d.to = _shAddDays(d.from, dow === 6 ? 1 : dow === 0 ? 0 : 2); }
+  }
+  if (k === '1w') { d.from = start; d.to = _shAddDays(start, 6); }
+  if (k === '2w') { d.from = start; d.to = _shAddDays(start, 13); }
+  if (k === '1m') { d.from = start; d.to = _shAddDays(start, 29); }
+  if (!d.from) { d.from = start; d.to = _shAddDays(start, 2); }
+  if (_shDays(d.from, d.to) > d.max) d.to = _shAddDays(d.from, d.max - 1);
   document.querySelectorAll('#sh-presets .sh-chip').forEach(function(c) { c.classList.toggle('on', c.getAttribute('data-p') === k); });
   _shSyncDates();
 }
@@ -8201,7 +8241,7 @@ function _shDateChange() {
   d.from = document.getElementById('sh-from').value || d.from;
   d.to = document.getElementById('sh-to').value || d.to;
   if (d.to < d.from) d.to = d.from;
-  if (_shDays(d.from, d.to) > 30) { d.to = _shAddDays(d.from, 29); _showToast('Maximal 30 Tage am Stück'); }
+  if (_shDays(d.from, d.to) > d.max) { d.to = _shAddDays(d.from, d.max - 1); _showToast('Maximal ' + _shMaxLabel(d.max) + ' am Stück'); }
   _shSyncDates();
 }
 function _shSendLend() {
@@ -8351,9 +8391,32 @@ function _shSendMsg() {
   var answers = ['Passt! 👍', 'Super, bis dann 😊', 'Alles klar!', 'Klingt gut 🙌'];
   _shFakeReply(id, answers[Math.floor(Math.random() * answers.length)]);
 }
+// Annehmen: Verleiher bestätigt oder ändert die Leihzeit
 function _shAccept(id) {
-  _shUpdateReq(id, function(r) { r.status = 'angenommen'; _shSys(r, '✅ Du hast angenommen'); });
-  _shFakeReply(id, 'Danke dir!! 🥰 Ich hol es morgen ab.');
+  var r = _shLoad().requests.find(function(x) { return x.id === id; });
+  if (!r) return;
+  if (r.type === 'swap') {
+    _shUpdateReq(id, function(x) { x.status = 'angenommen'; _shSys(x, '✅ Du hast angenommen'); });
+    _shFakeReply(id, 'Yay, danke! 🥰');
+    return;
+  }
+  var it = _shMyItem(r.myItemId) || {};
+  _shDraft = { reqId: id, reqFrom: r.from, reqTo: r.to, max: Math.max(it.lendMax || _SH_MAX_DEFAULT, _shDays(r.from, r.to)) };
+  _shOpenSheet('<div class="modal-title">Anfrage annehmen</div>'
+    + '<div class="sh-mini">' + _shThumb(it) + '<div><b>' + _shEsc(it.name || 'Piece') + '</b><span>' + _SH_FRIENDS[r.friend].name + ' wünscht sich: ' + _shPeriod(r) + '</span></div></div>'
+    + _shPeriodHtml()
+    + '<button class="sh-btn" onclick="_shConfirmAccept()">Annehmen</button>');
+  _shPreset('req');
+}
+function _shConfirmAccept() {
+  var d = _shDraft, id = d.reqId;
+  var changed = d.from !== d.reqFrom || d.to !== d.reqTo;
+  _shCloseSheet();
+  _shUpdateReq(id, function(r) {
+    r.from = d.from; r.to = d.to; r.status = 'angenommen';
+    _shSys(r, '✅ Du hast angenommen' + (changed ? ' · Leihzeit geändert: ' + _shPeriod(r) : ''));
+  });
+  _shFakeReply(id, changed ? 'Okay, passt für mich! 🥰 Danke dir!' : 'Danke dir!! 🥰 Ich hol es morgen ab.');
 }
 function _shDecline(id) { _shUpdateReq(id, function(r) { r.status = 'abgelehnt'; _shSys(r, 'Du hast die Anfrage abgelehnt'); }); }
 function _shWithdraw(id) { _shUpdateReq(id, function(r) { r.status = 'zurueckgezogen'; _shSys(r, 'Anfrage zurückgezogen'); }); }
@@ -8376,10 +8439,21 @@ function _shFillItemDetail(item) {
   var l = document.getElementById('idp-sh-lend'), s = document.getElementById('idp-sh-swap');
   if (l) l.checked = !!item.lend;
   if (s) s.checked = !!item.swap;
+  var m = document.getElementById('idp-sh-max');
+  if (m) m.value = String(item.lendMax || _SH_MAX_DEFAULT);
+  var row = document.getElementById('idp-sh-max-row');
+  if (row) row.style.display = item.lend ? '' : 'none';
+}
+function _shItemDetailMax(val) {
+  if (!_currentItemId) return;
+  _shSetItemFlag(_currentItemId, 'lendMax', parseInt(val, 10));
+  _showToast('📅 Max. Leihdauer: ' + _shMaxLabel(parseInt(val, 10)));
 }
 function _shItemDetailToggle(flag, on) {
   if (!_currentItemId) return;
   _shSetItemFlag(_currentItemId, flag, on);
+  var row = document.getElementById('idp-sh-max-row');
+  if (row && flag === 'lend') row.style.display = on ? '' : 'none';
   _showToast(on ? (flag === 'lend' ? '📅 Für Freunde verleihbar' : '🔄 Für Freunde tauschbar') : 'Nicht mehr ' + (flag === 'lend' ? 'verleihbar' : 'tauschbar'));
 }
 
