@@ -2025,6 +2025,7 @@ function _populateItemDetail(item) {
     picker.parentNode.replaceChild(pickerClone, picker);
     pickerClone.addEventListener('change', _saveItemField);
   }
+  _shFillItemDetail(item);
   // Scroll to top
   var scroll = document.getElementById('idp-scroll');
   if (scroll) scroll.scrollTop = 0;
@@ -7885,3 +7886,500 @@ function _renderKofferPackliste() {
 function _kofferBackToSelect() {
   _kofferShowStep('select');
 }
+
+// ── Leihen & Tauschen (Klick-Prototyp) ───────────────────────────────────────
+// Nachhaltigkeit: Pieces von Freunden leihen oder tauschen statt neu kaufen.
+// PROTOTYP: Freunde, ihre Pieces und Antworten sind Beispiele (kein Server).
+// Eigene Pieces werden über item.lend / item.swap als verleihbar/tauschbar markiert.
+// Anfragen + Chats liegen lokal in localStorage['stylesync_share_demo'].
+var _SH_KEY = 'stylesync_share_demo';
+// Grobe Schätzung pro geteiltem statt neu gekauftem Piece
+var _SH_CO2_KG = 8, _SH_WATER_L = 2000;
+var _SH_FRIENDS = {
+  lena:  { name: 'Lena',  avatar: '👩‍🦰', bg: '#FFE0B2' },
+  jonas: { name: 'Jonas', avatar: '🧔', bg: '#C8E6C9' },
+  mia:   { name: 'Mia',   avatar: '👩', bg: '#E1BEE7' },
+  noah:  { name: 'Noah',  avatar: '👨‍🦱', bg: '#BBDEFB' }
+};
+var _SH_PIECES = [
+  { id: 'fp1',  owner: 'lena',  emoji: '🧥', name: 'Oversize Trenchcoat', color: 'Beige',    hex: '#d8c3a0', size: 'M',     style: 'Elegant',    lend: true,  swap: false, note: 'Perfekt für Herbst, kaum getragen.' },
+  { id: 'fp2',  owner: 'lena',  emoji: '👚', name: 'Seidenbluse',         color: 'Weiß',     hex: '#f3f1ec', size: 'S',     style: 'Business',   lend: true,  swap: true,  note: 'Bitte nur Handwäsche 🙏' },
+  { id: 'fp3',  owner: 'lena',  emoji: '👗', name: 'Midi-Rock Satin',     color: 'Schwarz',  hex: '#1d1d1f', size: 'S',     style: 'Elegant',    lend: true,  swap: false, note: '' },
+  { id: 'fp4',  owner: 'jonas', emoji: '🧥', name: 'Lederjacke',          color: 'Schwarz',  hex: '#222222', size: 'L',     style: 'Streetwear', lend: true,  swap: false, note: 'Echtleder, Vintage.' },
+  { id: 'fp5',  owner: 'jonas', emoji: '👖', name: "Levi's 501 Jeans",    color: 'Denim',    hex: '#4a6fa5', size: '32/32', style: 'Casual',     lend: false, swap: true,  note: 'Passt mir nicht mehr – gerne tauschen.' },
+  { id: 'fp6',  owner: 'jonas', emoji: '👟', name: 'New Balance 550 Sneaker', color: 'Weiß', hex: '#f2f2f2', size: '43',    style: 'Streetwear', lend: true,  swap: false, note: '' },
+  { id: 'fp7',  owner: 'mia',   emoji: '🧶', name: 'Grobstrick-Pullover', color: 'Creme',    hex: '#efe6d2', size: 'M',     style: 'Casual',     lend: true,  swap: true,  note: 'Mega kuschelig.' },
+  { id: 'fp8',  owner: 'mia',   emoji: '👗', name: 'Abendkleid',          color: 'Smaragd',  hex: '#1f7a5a', size: 'S',     style: 'Elegant',    lend: true,  swap: false, note: 'Für Hochzeiten & Feiern 💚' },
+  { id: 'fp9',  owner: 'mia',   emoji: '👜', name: 'Leder-Tasche',        color: 'Camel',    hex: '#b5824f', size: '–',     style: 'Casual',     lend: true,  swap: true,  note: '' },
+  { id: 'fp10', owner: 'noah',  emoji: '🧥', name: 'Sakko',               color: 'Navy',     hex: '#22314f', size: 'L',     style: 'Business',   lend: true,  swap: false, note: 'Für Bewerbungsgespräche ideal.' },
+  { id: 'fp11', owner: 'noah',  emoji: '👔', name: 'Oxford-Hemd',         color: 'Hellblau', hex: '#a9c6e8', size: 'M',     style: 'Business',   lend: true,  swap: true,  note: '' },
+  { id: 'fp12', owner: 'noah',  emoji: '👢', name: 'Chelsea Boots',       color: 'Braun',    hex: '#6b4a2f', size: '44',    style: 'Casual',     lend: true,  swap: false, note: 'Frisch imprägniert.' },
+  { id: 'fp13', owner: 'noah',  emoji: '🧢', name: 'Bucket Hat',          color: 'Oliv',     hex: '#6b6b3a', size: '–',     style: 'Streetwear', lend: false, swap: true,  note: '' }
+];
+var _shTab = 'entdecken', _shFilter = 'alle', _shChatId = null, _shDraft = null;
+
+function _shLoad() {
+  var d = null;
+  try { d = JSON.parse(localStorage.getItem(_SH_KEY) || 'null'); } catch (e) {}
+  if (!d || !d.requests) d = _shSeed();
+  return d;
+}
+function _shSave(d) { try { localStorage.setItem(_SH_KEY, JSON.stringify(d)); } catch (e) {} _shUpdateBadge(d); }
+// Beispiel: eine Freundin fragt ein eigenes Piece an + eine bereits abgeschlossene Leihe (für die Bilanz)
+function _shSeed() {
+  var mine = loadWardrobe().filter(function(w) { return !_excludedByDirection(w); });
+  var reqs = [], now = Date.now();
+  if (mine.length) {
+    var it = mine.find(function(w) { return /jacke|mantel|pullover|hoodie|strick/i.test(w.name || ''); }) || mine[0];
+    var from = _shAddDays(_shToday(), 3);
+    reqs.push({ id: 'rq_seed', type: 'lend', dir: 'in', friend: 'lena', myItemId: it.id, from: from, to: _shAddDays(from, 4),
+      status: 'angefragt', unread: true, updated: now - 3600e3,
+      messages: [{ by: 'them', text: 'Hey! 😊 Darf ich mir dein Piece „' + it.name + '“ leihen? Ich passe gut drauf auf!', ts: now - 3600e3 }] });
+  }
+  reqs.push({ id: 'rq_seed2', type: 'lend', dir: 'out', friend: 'mia', pieceId: 'fp9', from: _shAddDays(_shToday(), -20), to: _shAddDays(_shToday(), -13),
+    status: 'zurueck', unread: false, updated: now - 12 * 864e5,
+    messages: [{ by: 'me', text: 'Darf ich mir deine Tasche für die Reise leihen?', ts: now - 21 * 864e5 },
+               { by: 'them', text: 'Na klar, viel Spaß! ✈️', ts: now - 21 * 864e5 + 600e3 },
+               { by: 'sys', text: '✅ Zurückgegeben – danke fürs Teilen!', ts: now - 12 * 864e5 }] });
+  var d = { requests: reqs };
+  try { localStorage.setItem(_SH_KEY, JSON.stringify(d)); } catch (e) {}
+  return d;
+}
+function _shResetDemo() {
+  try { localStorage.removeItem(_SH_KEY); } catch (e) {}
+  _shChatId = null;
+  _shRender();
+  _showToast('🔄 Demo zurückgesetzt');
+}
+
+// ── Hilfsfunktionen ──
+function _shEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function _shIso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function _shToday() { return _shIso(new Date()); }
+function _shAddDays(iso, n) { var d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return _shIso(d); }
+function _shDays(a, b) { return Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5) + 1; }
+function _shFmt(iso) { return new Date(iso + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' }); }
+function _shPeriod(r) { var n = _shDays(r.from, r.to); return _shFmt(r.from) + ' – ' + _shFmt(r.to) + ' · ' + n + (n === 1 ? ' Tag' : ' Tage'); }
+function _shPiece(id) { return _SH_PIECES.find(function(p) { return p.id === id; }); }
+function _shMyItem(id) { return loadWardrobe().find(function(w) { return String(w.id) === String(id); }); }
+function _shVisiblePieces() {
+  return _SH_PIECES.filter(function(p) { return !_excludedByDirection({ name: p.name, type: '' }); });
+}
+// Vorschaubild: eigenes Piece mit Foto, sonst Emoji auf Farbfläche
+function _shThumb(obj, cls) {
+  var photo = obj && obj.imageDataUrl && obj.imageDataUrl.length > 20 ? obj.imageDataUrl : '';
+  var bg = obj && (obj.hex || obj.colorHex) ? (obj.hex || obj.colorHex) : '#2a3a55';
+  return '<div class="sh-thumb ' + (cls || '') + (photo ? ' photo' : '') + '" style="--sh-c:' + _shEsc(bg) + '">'
+    + (photo ? '<img src="' + _escAttr(photo) + '" alt="">' : '<span>' + ((obj && obj.emoji) || '👕') + '</span>') + '</div>';
+}
+function _shAvatar(fid, cls) {
+  var f = _SH_FRIENDS[fid] || {};
+  return '<div class="sh-avatar ' + (cls || '') + '" style="background:' + f.bg + '">' + f.avatar + '</div>';
+}
+
+// ── "Passt zu dir": einfache Abschätzung (im echten Feature übernimmt das die KI) ──
+var _SH_PAIRS = { top: ['bottom', 'outer'], bottom: ['top', 'shoes', 'outer'], outer: ['top', 'bottom', 'onepiece'], shoes: ['bottom', 'onepiece'], onepiece: ['shoes', 'outer'], acc: ['top', 'onepiece', 'outer'] };
+var _SH_ROLE_LABEL = { top: 'Oberteile', bottom: 'Hosen/Röcke', outer: 'Jacken', shoes: 'Schuhe', onepiece: 'Kleider', acc: 'Accessoires' };
+function _shMatch(p, wardrobe) {
+  var role = _pieceRole({ name: p.name, type: '' });
+  var prefs = _loadStylePrefs();
+  var mine = wardrobe.filter(function(w) { return !_excludedByDirection(w); });
+  var partners = _SH_PAIRS[role] || [];
+  var pNeutral = _NEUTRAL_COLOR_RE.test(p.color);
+  var fits = mine.filter(function(w) {
+    if (partners.indexOf(_pieceRole(w)) < 0) return false;
+    return pNeutral || _NEUTRAL_COLOR_RE.test(w.color || '');
+  });
+  var sameRole = mine.filter(function(w) { return _pieceRole(w) === role; }).length;
+  var styleHit = (prefs.styles || []).some(function(s) { return s.toLowerCase() === p.style.toLowerCase(); });
+  var score = Math.min(fits.length, 4) * 2 + (sameRole === 0 ? 3 : 0) + (styleHit ? 2 : 0);
+  var reason;
+  if (fits.length) reason = 'Passt zu: ' + fits[0].name + (fits[1] ? ' & ' + fits[1].name : '');
+  else if (!sameRole && _SH_ROLE_LABEL[role]) reason = 'Füllt eine Lücke: du hast noch keine ' + _SH_ROLE_LABEL[role];
+  else reason = 'Passt zu deinem ' + p.style + '-Stil';
+  return { score: score, fits: fits.slice(0, 4), reason: reason };
+}
+
+// ── Bilanz + Badge ──
+function _shStats(d) {
+  var done = d.requests.filter(function(r) { return r.status === 'zurueck' || r.status === 'getauscht'; }).length;
+  return { done: done, co2: done * _SH_CO2_KG, water: done * _SH_WATER_L };
+}
+function _shUpdateBadge(d) {
+  d = d || _shLoad();
+  var n = d.requests.filter(function(r) { return r.unread; }).length;
+  var b = document.getElementById('sh-badge');
+  if (b) { b.textContent = n || ''; b.style.display = n ? '' : 'none'; }
+  var nav = document.getElementById('nav-freunde');
+  if (nav) nav.classList.toggle('sh-has-unread', n > 0);
+}
+
+// ── Hauptansicht ──
+function _shSwitchTab(tab) {
+  _shTab = tab;
+  document.querySelectorAll('#teilen .sh-tab').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-sh-tab') === tab); });
+  _shRender();
+  var box = document.getElementById('sh-content');
+  if (box) box.scrollTop = 0;
+}
+function _shRender() {
+  var box = document.getElementById('sh-content');
+  if (!box) return;
+  var d = _shLoad();
+  _shUpdateBadge(d);
+  if (_shTab === 'anfragen') box.innerHTML = _shRenderRequests(d);
+  else if (_shTab === 'angebot') box.innerHTML = _shRenderOffer();
+  else box.innerHTML = _shRenderDiscover(d);
+}
+function _shSetFilter(f) { _shFilter = f; _shRender(); }
+function _shRenderDiscover(d) {
+  var st = _shStats(d), wardrobe = loadWardrobe();
+  var pieces = _shVisiblePieces();
+  var html = '<div class="sh-hero">'
+    + '<div class="sh-hero-title">♻️ Teilen statt kaufen</div>'
+    + '<div class="sh-hero-text">Leih dir Pieces von Freunden oder tauscht untereinander – statt Fast Fashion neu zu kaufen.</div>'
+    + '<div class="sh-stats">'
+    + '<div><b>' + st.done + '</b><span>geteilt</span></div>'
+    + '<div><b>~' + st.co2 + ' kg</b><span>CO₂ gespart</span></div>'
+    + '<div><b>~' + st.water.toLocaleString('de-DE') + ' l</b><span>Wasser gespart</span></div>'
+    + '</div></div>'
+    + '<div class="feed-demo-banner sh-demo"><span class="feed-demo-icon">🚧</span><div><b>Klick-Prototyp.</b> Freunde und ihre Pieces sind Beispiele – Anfragen werden noch nicht wirklich verschickt.</div></div>';
+
+  // Beste Treffer zum eigenen Schrank
+  // Möglichst verschiedene Arten zeigen (nicht 4 Jacken)
+  var sorted = pieces.map(function(p) { return { p: p, m: _shMatch(p, wardrobe), role: _pieceRole({ name: p.name, type: '' }) }; })
+    .sort(function(a, b) { return b.m.score - a.m.score; });
+  var roles = {}, ranked = sorted.filter(function(x) { if (roles[x.role]) return false; roles[x.role] = 1; return true; }).slice(0, 4);
+  html += '<div class="sh-section-title">✨ Passt zu deinem Schrank</div><div class="sh-match-row">'
+    + ranked.map(function(x) {
+      return '<div class="sh-match-card" onclick="_shOpenPiece(\'' + x.p.id + '\')">' + _shThumb(x.p, 'sh-thumb-lg')
+        + '<div class="sh-match-name">' + _shEsc(x.p.name) + '</div>'
+        + '<div class="sh-meta">' + _shAvatar(x.p.owner, 'sh-avatar-xs') + _shEsc(_SH_FRIENDS[x.p.owner].name) + '</div>'
+        + '<div class="sh-match-reason">' + _shEsc(x.m.reason) + '</div></div>';
+    }).join('') + '</div>';
+
+  // Filter: Art + Freunde
+  var chips = [['alle', 'Alle'], ['lend', '📅 Leihen'], ['swap', '🔄 Tauschen']].concat(Object.keys(_SH_FRIENDS).map(function(k) { return [k, _SH_FRIENDS[k].avatar + ' ' + _SH_FRIENDS[k].name]; }));
+  html += '<div class="sh-section-title">Schränke deiner Freunde</div><div class="sh-chip-row">'
+    + chips.map(function(c) { return '<button class="sh-chip' + (_shFilter === c[0] ? ' on' : '') + '" onclick="_shSetFilter(\'' + c[0] + '\')">' + c[1] + '</button>'; }).join('') + '</div>';
+  var list = pieces.filter(function(p) {
+    if (_shFilter === 'alle') return true;
+    if (_shFilter === 'lend') return p.lend;
+    if (_shFilter === 'swap') return p.swap;
+    return p.owner === _shFilter;
+  });
+  html += '<div class="sh-grid">' + list.map(function(p) {
+    return '<div class="sh-card" onclick="_shOpenPiece(\'' + p.id + '\')">' + _shThumb(p, 'sh-thumb-card')
+      + '<div class="sh-card-tags">' + (p.lend ? '<span class="sh-tag lend">Leihen</span>' : '') + (p.swap ? '<span class="sh-tag swap">Tauschen</span>' : '') + '</div>'
+      + '<div class="sh-card-name">' + _shEsc(p.name) + '</div>'
+      + '<div class="sh-meta">' + _shAvatar(p.owner, 'sh-avatar-xs') + _shEsc(_SH_FRIENDS[p.owner].name) + ' · Gr. ' + _shEsc(p.size) + '</div></div>';
+  }).join('') + '</div>';
+  return html;
+}
+
+var _SH_STATUS = {
+  angefragt:      ['Angefragt', 'wait'],
+  angenommen:     ['Angenommen', 'ok'],
+  abgelehnt:      ['Abgelehnt', 'no'],
+  uebergeben:     ['Ausgeliehen', 'run'],
+  zurueck:        ['Zurückgegeben', 'done'],
+  getauscht:      ['Getauscht', 'done'],
+  zurueckgezogen: ['Zurückgezogen', 'no']
+};
+var _SH_OPEN = ['angefragt', 'angenommen', 'uebergeben'];
+function _shStatusPill(s) { var x = _SH_STATUS[s] || [s, 'wait']; return '<span class="sh-status ' + x[1] + '">' + x[0] + '</span>'; }
+// Worum geht es: Piece des Freundes (ausgehend) bzw. eigenes Piece (eingehend)
+function _shReqSubject(r) { return r.dir === 'in' ? (_shMyItem(r.myItemId) || { name: 'Piece', emoji: '👕' }) : (_shPiece(r.pieceId) || { name: 'Piece' }); }
+
+function _shRenderRequests(d) {
+  var reqs = d.requests.slice().sort(function(a, b) { return b.updated - a.updated; });
+  if (!reqs.length) return '<div class="sh-empty">💬<br>Noch keine Anfragen.<br><span>Frag bei „Entdecken“ ein Piece an.</span></div>'
+    + '<button class="sh-reset" onclick="_shResetDemo()">Demo zurücksetzen</button>';
+  var open = reqs.filter(function(r) { return _SH_OPEN.indexOf(r.status) >= 0; });
+  var done = reqs.filter(function(r) { return _SH_OPEN.indexOf(r.status) < 0; });
+  var row = function(r) {
+    var f = _SH_FRIENDS[r.friend], subj = _shReqSubject(r), last = r.messages[r.messages.length - 1] || {};
+    var what = r.dir === 'in'
+      ? f.name + ' möchte ' + (r.type === 'swap' ? 'tauschen' : 'leihen')
+      : (r.type === 'swap' ? 'Tausch mit ' : 'Leihen von ') + f.name;
+    return '<div class="sh-req' + (r.unread ? ' unread' : '') + '" onclick="_shOpenChat(\'' + r.id + '\')">'
+      + '<div class="sh-req-pic">' + _shThumb(subj) + _shAvatar(r.friend, 'sh-avatar-badge') + '</div>'
+      + '<div class="sh-req-main"><div class="sh-req-top"><b>' + _shEsc(subj.name) + '</b>' + _shStatusPill(r.status) + '</div>'
+      + '<div class="sh-req-what">' + (r.type === 'swap' ? '🔄 ' : '📅 ') + _shEsc(what) + '</div>'
+      + '<div class="sh-req-last">' + _shEsc(last.by === 'me' ? 'Du: ' + last.text : (last.text || '')) + '</div></div>'
+      + (r.unread ? '<span class="sh-dot"></span>' : '') + '</div>';
+  };
+  return (open.length ? '<div class="sh-section-title">Laufend</div>' + open.map(row).join('') : '')
+    + (done.length ? '<div class="sh-section-title">Abgeschlossen</div>' + done.map(row).join('') : '')
+    + '<button class="sh-reset" onclick="_shResetDemo()">Demo zurücksetzen</button>';
+}
+
+function _shRenderOffer() {
+  var mine = loadWardrobe();
+  if (!mine.length) return '<div class="sh-empty">👕<br>Dein Schrank ist noch leer.<br><span>Scanne Pieces, um sie mit Freunden zu teilen.</span></div>';
+  var nL = mine.filter(function(w) { return w.lend; }).length, nS = mine.filter(function(w) { return w.swap; }).length;
+  return '<div class="sh-offer-info">🔒 Nur deine <b>Freunde</b> sehen, was du hier freigibst. Bei jeder Anfrage entscheidest du selbst.</div>'
+    + '<div class="sh-offer-count">' + nL + ' verleihbar · ' + nS + ' tauschbar</div>'
+    + mine.map(function(w) {
+      var id = _escAttr(String(w.id));
+      return '<div class="sh-offer-row">' + _shThumb(w) + '<div class="sh-offer-name">' + _shEsc(w.name || 'Piece') + '<span>' + _shEsc(w.color || '') + '</span></div>'
+        + '<button class="sh-toggle' + (w.lend ? ' on' : '') + '" onclick="_shSetItemFlag(\'' + id + '\',\'lend\',' + !w.lend + ');_shRender()">Leihen</button>'
+        + '<button class="sh-toggle swap' + (w.swap ? ' on' : '') + '" onclick="_shSetItemFlag(\'' + id + '\',\'swap\',' + !w.swap + ');_shRender()">Tauschen</button></div>';
+    }).join('');
+}
+// Eigenes Piece als verleihbar / tauschbar markieren
+function _shSetItemFlag(itemId, flag, on) {
+  var items = loadWardrobe();
+  var it = items.find(function(w) { return String(w.id) === String(itemId); });
+  if (!it) return;
+  it[flag] = !!on;
+  saveWardrobe(items);
+}
+
+// ── Piece eines Freundes ──
+function _shOpenSheet(html) {
+  document.getElementById('sh-sheet-body').innerHTML = '<div class="modal-handle"></div>' + html;
+  document.getElementById('sh-sheet').classList.add('open');
+}
+function _shCloseSheet() { document.getElementById('sh-sheet').classList.remove('open'); }
+function _shOpenPiece(id) {
+  var p = _shPiece(id); if (!p) return;
+  var f = _SH_FRIENDS[p.owner], m = _shMatch(p, loadWardrobe());
+  var busy = _shLoad().requests.find(function(r) { return r.pieceId === id && _SH_OPEN.indexOf(r.status) >= 0; });
+  var html = '<div class="sh-piece-head">' + _shThumb(p, 'sh-thumb-xl') + '<div><div class="modal-title" style="margin-bottom:6px">' + _shEsc(p.name) + '</div>'
+    + '<div class="sh-meta">' + _shAvatar(p.owner, 'sh-avatar-xs') + 'von&nbsp;<b>' + _shEsc(f.name) + '</b></div>'
+    + '<div class="sh-piece-facts">' + _shEsc(p.color) + ' · Gr. ' + _shEsc(p.size) + ' · ' + _shEsc(p.style) + '</div></div></div>'
+    + (p.note ? '<div class="sh-piece-note">„' + _shEsc(p.note) + '“</div>' : '')
+    + '<div class="sh-piece-why">✨ ' + _shEsc(m.reason) + '</div>'
+    + (m.fits.length ? '<div class="sh-fits">' + m.fits.map(function(w) { return '<div class="sh-fit">' + _shThumb(w) + '<span>' + _shEsc(w.name) + '</span></div>'; }).join('') + '</div>' : '');
+  if (busy) html += '<button class="sh-btn ghost" onclick="_shCloseSheet();_shOpenChat(\'' + busy.id + '\')">💬 Zur laufenden Anfrage</button>';
+  else {
+    if (p.lend) html += '<button class="sh-btn" onclick="_shStartLend(\'' + p.id + '\')">📅 Leihen anfragen</button>';
+    if (p.swap) html += '<button class="sh-btn swap" onclick="_shStartSwap(\'' + p.id + '\')">🔄 Tausch anbieten</button>';
+  }
+  _shOpenSheet(html);
+}
+
+// ── Leih-Anfrage mit Zeitraum ──
+function _shStartLend(id) {
+  var p = _shPiece(id), t = _shToday();
+  _shDraft = { pieceId: id };
+  var html = '<div class="modal-title">Leihen anfragen</div>'
+    + '<div class="sh-mini">' + _shThumb(p) + '<div><b>' + _shEsc(p.name) + '</b><span>von ' + _shEsc(_SH_FRIENDS[p.owner].name) + '</span></div></div>'
+    + '<div class="sh-label">Leihzeit</div><div class="sh-chip-row wrap" id="sh-presets">'
+    + [['we', 'Wochenende'], ['1w', '1 Woche'], ['2w', '2 Wochen'], ['own', 'Eigener Zeitraum']].map(function(c) {
+      return '<button class="sh-chip" data-p="' + c[0] + '" onclick="_shPreset(\'' + c[0] + '\')">' + c[1] + '</button>';
+    }).join('') + '</div>'
+    + '<div class="sh-dates" id="sh-dates"><label>Von<input type="date" id="sh-from" min="' + t + '" onchange="_shDateChange()"></label>'
+    + '<label>Bis<input type="date" id="sh-to" min="' + t + '" onchange="_shDateChange()"></label></div>'
+    + '<div class="sh-period" id="sh-period"></div>'
+    + '<div class="sh-label">Nachricht</div><textarea class="sh-textarea" id="sh-msg">Hey ' + _shEsc(_SH_FRIENDS[p.owner].name) + ', darf ich mir dein Piece „' + _shEsc(p.name) + '“ leihen? 😊</textarea>'
+    + '<button class="sh-btn" onclick="_shSendLend()">Anfrage senden</button>';
+  _shOpenSheet(html);
+  _shPreset('we');
+}
+function _shPreset(k) {
+  var t = _shToday(), d = _shDraft;
+  d.preset = k;
+  if (k === 'we') { var dow = new Date(t + 'T12:00:00').getDay(); d.from = dow === 6 ? t : dow === 0 ? t : _shAddDays(t, 5 - dow); d.to = _shAddDays(d.from, dow === 6 ? 1 : dow === 0 ? 0 : 2); }
+  if (k === '1w') { d.from = _shAddDays(t, 1); d.to = _shAddDays(d.from, 6); }
+  if (k === '2w') { d.from = _shAddDays(t, 1); d.to = _shAddDays(d.from, 13); }
+  document.querySelectorAll('#sh-presets .sh-chip').forEach(function(c) { c.classList.toggle('on', c.getAttribute('data-p') === k); });
+  _shSyncDates();
+}
+function _shSyncDates() {
+  var d = _shDraft;
+  document.getElementById('sh-from').value = d.from;
+  document.getElementById('sh-to').value = d.to;
+  document.getElementById('sh-to').min = d.from;
+  document.getElementById('sh-dates').classList.toggle('show', d.preset === 'own');
+  document.getElementById('sh-period').textContent = '🗓️ ' + _shPeriod(d);
+}
+function _shDateChange() {
+  var d = _shDraft;
+  d.from = document.getElementById('sh-from').value || d.from;
+  d.to = document.getElementById('sh-to').value || d.to;
+  if (d.to < d.from) d.to = d.from;
+  if (_shDays(d.from, d.to) > 30) { d.to = _shAddDays(d.from, 29); _showToast('Maximal 30 Tage am Stück'); }
+  _shSyncDates();
+}
+function _shSendLend() {
+  var d = _shDraft, p = _shPiece(d.pieceId);
+  var text = (document.getElementById('sh-msg').value || '').trim();
+  var r = _shNewRequest({ type: 'lend', dir: 'out', friend: p.owner, pieceId: p.id, from: d.from, to: d.to }, text);
+  _shCloseSheet();
+  _shOpenChat(r.id);
+  _shFakeReply(r.id, 'Klar, gerne! 🙌 Wann magst du es abholen?', 'angenommen');
+}
+
+// ── Tausch anbieten: eigenes Piece auswählen ──
+function _shStartSwap(id) {
+  var p = _shPiece(id);
+  var mine = loadWardrobe().slice().sort(function(a, b) { return (b.swap ? 1 : 0) - (a.swap ? 1 : 0); });
+  _shDraft = { pieceId: id, offer: null };
+  var html = '<div class="modal-title">Tausch anbieten</div>'
+    + '<div class="sh-mini">' + _shThumb(p) + '<div><b>' + _shEsc(p.name) + '</b><span>von ' + _shEsc(_SH_FRIENDS[p.owner].name) + '</span></div></div>'
+    + '<div class="sh-label">Was bietest du dafür?</div>'
+    + (mine.length ? '<div class="sh-pick-grid">' + mine.map(function(w) {
+      return '<div class="sh-pick" data-id="' + _escAttr(String(w.id)) + '" onclick="_shPickOffer(this)">' + _shThumb(w) + '<span>' + _shEsc(w.name || 'Piece') + '</span>'
+        + (w.swap ? '<i>tauschbar</i>' : '') + '</div>';
+    }).join('') + '</div>' : '<div class="sh-empty small">Dein Schrank ist noch leer.</div>')
+    + '<div class="sh-label">Nachricht</div><textarea class="sh-textarea" id="sh-msg">Hey ' + _shEsc(_SH_FRIENDS[p.owner].name) + ', hättest du Lust auf einen Tausch? 🔄</textarea>'
+    + '<button class="sh-btn swap" id="sh-swap-send" disabled onclick="_shSendSwap()">Tausch anbieten</button>';
+  _shOpenSheet(html);
+}
+function _shPickOffer(el) {
+  document.querySelectorAll('.sh-pick').forEach(function(x) { x.classList.toggle('on', x === el); });
+  _shDraft.offer = el.getAttribute('data-id');
+  document.getElementById('sh-swap-send').disabled = false;
+}
+function _shSendSwap() {
+  var d = _shDraft, p = _shPiece(d.pieceId);
+  if (!d.offer) return;
+  var text = (document.getElementById('sh-msg').value || '').trim();
+  var r = _shNewRequest({ type: 'swap', dir: 'out', friend: p.owner, pieceId: p.id, offerItemId: d.offer }, text);
+  _shCloseSheet();
+  _shOpenChat(r.id);
+  _shFakeReply(r.id, 'Oh, das gefällt mir! Deal 🤝', 'angenommen');
+}
+
+function _shNewRequest(base, text) {
+  var d = _shLoad(), now = Date.now();
+  var r = Object.assign({ id: 'rq_' + now, status: 'angefragt', unread: false, updated: now, messages: [] }, base);
+  if (text) r.messages.push({ by: 'me', text: text, ts: now });
+  d.requests.push(r);
+  _shSave(d);
+  return r;
+}
+function _shUpdateReq(id, fn) {
+  var d = _shLoad(), r = d.requests.find(function(x) { return x.id === id; });
+  if (!r) return null;
+  fn(r);
+  r.updated = Date.now();
+  _shSave(d);
+  if (_shChatId === id) _shRenderChat(); else _shRender();
+  return r;
+}
+function _shSys(r, text) { r.messages.push({ by: 'sys', text: text, ts: Date.now() }); }
+// Prototyp: der Freund antwortet nach kurzer Zeit automatisch
+function _shFakeReply(id, text, status) {
+  setTimeout(function() {
+    var typing = document.getElementById('sh-typing');
+    if (typing && _shChatId === id) { typing.classList.add('show'); var l = document.getElementById('sh-msgs'); if (l) l.scrollTop = l.scrollHeight; }
+  }, 900);
+  setTimeout(function() {
+    _shUpdateReq(id, function(r) {
+      if (r.status === 'zurueckgezogen' || r.status === 'abgelehnt') return;
+      if (status && r.status === 'angefragt') { r.status = status; _shSys(r, '✅ ' + _SH_FRIENDS[r.friend].name + ' hat ' + (r.type === 'swap' ? 'den Tausch' : 'die Anfrage') + ' angenommen'); }
+      r.messages.push({ by: 'them', text: text, ts: Date.now() });
+      if (_shChatId !== id) r.unread = true;
+    });
+  }, 2600);
+}
+
+// ── Chat pro Anfrage ──
+function _shOpenChat(id) {
+  _shChatId = id;
+  var d = _shLoad(), r = d.requests.find(function(x) { return x.id === id; });
+  if (r && r.unread) { r.unread = false; _shSave(d); }
+  document.getElementById('sh-chat-panel').classList.add('active');
+  _shRenderChat();
+}
+function _shCloseChat() {
+  _shChatId = null;
+  document.getElementById('sh-chat-panel').classList.remove('active');
+  _shRender();
+}
+function _shSteps(r) {
+  var steps = r.type === 'swap' ? ['angefragt', 'angenommen', 'getauscht'] : ['angefragt', 'angenommen', 'uebergeben', 'zurueck'];
+  var labels = { angefragt: 'Angefragt', angenommen: 'Angenommen', uebergeben: 'Übergeben', zurueck: 'Zurück', getauscht: 'Getauscht' };
+  var cur = steps.indexOf(r.status);
+  if (cur < 0) return '';
+  return '<div class="sh-steps">' + steps.map(function(s, i) {
+    return '<div class="sh-step' + (i <= cur ? ' on' : '') + '"><i></i><span>' + labels[s] + '</span></div>';
+  }).join('') + '</div>';
+}
+function _shChatActions(r) {
+  var b = function(label, fn, cls) { return '<button class="sh-act ' + (cls || '') + '" onclick="' + fn + '(\'' + r.id + '\')">' + label + '</button>'; };
+  if (r.status === 'angefragt') {
+    return r.dir === 'in'
+      ? b('Annehmen', '_shAccept') + b('Ablehnen', '_shDecline', 'ghost')
+      : b('Anfrage zurückziehen', '_shWithdraw', 'ghost');
+  }
+  if (r.status === 'angenommen') return r.type === 'swap' ? b('🔄 Tausch abgeschlossen', '_shSwapDone') : b('🤝 Als übergeben markieren', '_shHandover');
+  if (r.status === 'uebergeben') return b('✅ Zurückgegeben', '_shReturned') + (r.dir === 'out' ? b('Verlängern', '_shExtend', 'ghost') : '');
+  if (r.status === 'zurueck' || r.status === 'getauscht') {
+    return '<div class="sh-saved">🌱 Danke fürs Teilen! Ca. ' + _SH_CO2_KG + ' kg CO₂ und ' + _SH_WATER_L.toLocaleString('de-DE') + ' l Wasser gespart.</div>';
+  }
+  return '';
+}
+function _shDueText(to) {
+  var n = _shDays(_shToday(), to) - 1;
+  return n > 1 ? 'in ' + n + ' Tagen' : n === 1 ? 'morgen' : n === 0 ? 'heute' : 'überfällig (' + -n + ' Tage)';
+}
+function _shRenderChat() {
+  var panel = document.getElementById('sh-chat-panel');
+  var r = _shLoad().requests.find(function(x) { return x.id === _shChatId; });
+  if (!panel || !r) return;
+  var f = _SH_FRIENDS[r.friend], subj = _shReqSubject(r);
+  var offer = r.type === 'swap' && r.dir === 'out' ? _shMyItem(r.offerItemId) : null;
+  var deal = r.type === 'swap'
+    ? '<div class="sh-deal">' + _shThumb(offer || { emoji: '❔' }) + '<span class="sh-swap-arrow">⇄</span>' + _shThumb(subj)
+      + '<div><b>Tausch</b><span>' + _shEsc((offer ? offer.name : 'Dein Piece') + ' gegen ' + subj.name) + '</span></div></div>'
+    : '<div class="sh-deal">' + _shThumb(subj) + '<div><b>' + _shEsc(subj.name) + '</b><span>🗓️ ' + _shPeriod(r) + '</span>'
+      + (r.status === 'uebergeben' ? '<span class="sh-due">Rückgabe ' + _shDueText(r.to) + '</span>' : '') + '</div></div>';
+  var msgs = r.messages.map(function(m) {
+    if (m.by === 'sys') return '<div class="sh-msg sys">' + _shEsc(m.text) + '</div>';
+    return '<div class="sh-msg ' + m.by + '">' + _shEsc(m.text) + '<time>' + new Date(m.ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + '</time></div>';
+  }).join('');
+  var closed = ['abgelehnt', 'zurueckgezogen'].indexOf(r.status) >= 0;
+  panel.innerHTML = '<div class="idp-header sh-chat-head"><button class="idp-back" onclick="_shCloseChat()">←</button>'
+    + _shAvatar(r.friend) + '<div class="sh-chat-who"><b>' + f.name + '</b><span>' + (r.type === 'swap' ? 'Tausch' : 'Leihen') + ' · ' + _shEsc(subj.name) + '</span></div>' + _shStatusPill(r.status) + '</div>'
+    + '<div class="sh-chat-card">' + deal + _shSteps(r) + '<div class="sh-acts">' + _shChatActions(r) + '</div></div>'
+    + '<div class="sh-msgs" id="sh-msgs">' + msgs + '<div class="sh-msg them sh-typing" id="sh-typing"><i></i><i></i><i></i></div></div>'
+    + (closed ? '<div class="sh-closed">Diese Anfrage ist beendet.</div>'
+      : '<div class="sh-input"><input id="sh-input" placeholder="Nachricht…" enterkeyhint="send" onkeydown="if(event.key===\'Enter\')_shSendMsg()"><button onclick="_shSendMsg()">➤</button></div>');
+  var list = document.getElementById('sh-msgs');
+  list.scrollTop = list.scrollHeight;
+}
+function _shSendMsg() {
+  var inp = document.getElementById('sh-input'), text = (inp.value || '').trim();
+  if (!text) return;
+  var id = _shChatId;
+  _shUpdateReq(id, function(r) { r.messages.push({ by: 'me', text: text, ts: Date.now() }); });
+  var answers = ['Passt! 👍', 'Super, bis dann 😊', 'Alles klar!', 'Klingt gut 🙌'];
+  _shFakeReply(id, answers[Math.floor(Math.random() * answers.length)]);
+}
+function _shAccept(id) {
+  _shUpdateReq(id, function(r) { r.status = 'angenommen'; _shSys(r, '✅ Du hast angenommen'); });
+  _shFakeReply(id, 'Danke dir!! 🥰 Ich hol es morgen ab.');
+}
+function _shDecline(id) { _shUpdateReq(id, function(r) { r.status = 'abgelehnt'; _shSys(r, 'Du hast die Anfrage abgelehnt'); }); }
+function _shWithdraw(id) { _shUpdateReq(id, function(r) { r.status = 'zurueckgezogen'; _shSys(r, 'Anfrage zurückgezogen'); }); }
+function _shHandover(id) { _shUpdateReq(id, function(r) { r.status = 'uebergeben'; _shSys(r, '🤝 Übergeben – Rückgabe bis ' + _shFmt(r.to)); }); }
+function _shReturned(id) { _shUpdateReq(id, function(r) { r.status = 'zurueck'; _shSys(r, '✅ Zurückgegeben – danke fürs Teilen!'); }); }
+function _shSwapDone(id) { _shUpdateReq(id, function(r) { r.status = 'getauscht'; _shSys(r, '🔄 Tausch abgeschlossen'); }); }
+function _shExtend(id) {
+  _shUpdateReq(id, function(r) { _shSys(r, '⏳ Verlängerung um 1 Woche angefragt'); });
+  setTimeout(function() {
+    _shUpdateReq(id, function(r) {
+      r.to = _shAddDays(r.to, 7);
+      _shSys(r, '✅ Verlängert bis ' + _shFmt(r.to));
+      r.messages.push({ by: 'them', text: 'Kein Problem, behalt es noch 😊', ts: Date.now() });
+    });
+  }, 2200);
+}
+
+// Artikel-Detail: Schalter "Mit Freunden teilen"
+function _shFillItemDetail(item) {
+  var l = document.getElementById('idp-sh-lend'), s = document.getElementById('idp-sh-swap');
+  if (l) l.checked = !!item.lend;
+  if (s) s.checked = !!item.swap;
+}
+function _shItemDetailToggle(flag, on) {
+  if (!_currentItemId) return;
+  _shSetItemFlag(_currentItemId, flag, on);
+  _showToast(on ? (flag === 'lend' ? '📅 Für Freunde verleihbar' : '🔄 Für Freunde tauschbar') : 'Nicht mehr ' + (flag === 'lend' ? 'verleihbar' : 'tauschbar'));
+}
+
+_shUpdateBadge();
