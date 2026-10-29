@@ -8014,7 +8014,8 @@ function _shUpdateBadge(d) {
   if (nav) nav.classList.toggle('sh-has-unread', n > 0);
 }
 
-// ── Hauptansicht ──
+// ── Hauptansicht (wird vom Feed aus geöffnet) ──
+function _shOpenFromFeed() { navigate('teilen', document.getElementById('nav-freunde')); }
 function _shSwitchTab(tab) {
   _shTab = tab;
   document.querySelectorAll('#teilen .sh-tab').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-sh-tab') === tab); });

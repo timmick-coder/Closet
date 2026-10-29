@@ -405,6 +405,8 @@
 
     /* ── Teilen: Leihen & Tauschen (Klick-Prototyp) ── */
     #nav-freunde.sh-has-unread::after { content: ''; position: absolute; top: 6px; left: 50%; margin-left: 8px; width: 9px; height: 9px; border-radius: 50%; background: #34d399; border: 2px solid #0d1b2e; }
+    .sh-feed-actions { display: flex; align-items: center; gap: 8px; }
+    .sh-open-btn { height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid rgba(52,211,153,0.5); background: rgba(16,185,129,0.18); color: #6ee7b7; font-size: 12.5px; font-weight: 800; cursor: pointer; white-space: nowrap; }
     .sh-feed-btn { background: var(--card); border: 1.5px solid var(--purple-border); color: var(--text2); font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 14px; cursor: pointer; }
     .sh-tabs { display: flex; gap: 8px; padding: 0 20px 12px; flex-shrink: 0; }
     .sh-tab { flex: 1; padding: 9px 4px; border-radius: 20px; font-size: 13px; font-weight: 700; cursor: pointer; border: 1.5px solid var(--purple-border); background: var(--card); color: var(--text2); white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
@@ -2023,7 +2025,7 @@
     <div id="teilen" class="screen">
       <div class="freunde-header">
         <div class="big-title">Teilen</div>
-        <button class="sh-feed-btn" onclick="navigate('freunde', document.getElementById('nav-freunde'))">Feed →</button>
+        <button class="sh-feed-btn" onclick="navigate('freunde', document.getElementById('nav-freunde'))">← Feed</button>
       </div>
       <div class="sh-tabs">
         <button class="sh-tab active" data-sh-tab="entdecken" onclick="_shSwitchTab('entdecken')">Entdecken</button>
@@ -2039,7 +2041,10 @@
     <div id="freunde" class="screen">
       <div class="freunde-header">
         <div class="big-title">Feed</div>
-        <button class="search-friend-btn" onclick="_openFriendSearch()">🔍</button>
+        <div class="sh-feed-actions">
+          <button class="sh-open-btn" onclick="_shOpenFromFeed()">♻️ Leihen &amp; Tauschen</button>
+          <button class="search-friend-btn" onclick="_openFriendSearch()">🔍</button>
+        </div>
       </div>
       <div class="tab-row">
         <button class="tab-pill active" onclick="switchTab('entdecken', this)">Entdecken</button>
@@ -2058,6 +2063,7 @@
           <div class="feed-soon-icon">🚧</div>
           <div class="feed-soon-title">Feed – bald verfügbar</div>
           <div class="feed-soon-text">Hier siehst du bald die Outfits deiner Freunde, kannst ihnen folgen, liken und kommentieren.<br><br>Diese Funktion ist <b>noch nicht freigeschaltet</b>.</div>
+          <button class="sh-btn" onclick="_shOpenFromFeed()">♻️ Leihen &amp; Tauschen</button>
           <button class="feed-soon-btn" onclick="document.getElementById('feed-soon-overlay').classList.add('hidden')">Vorschau ansehen</button>
           <div class="feed-soon-note">Die Vorschau zeigt nur Beispiel-Personen.</div>
         </div>
@@ -3007,10 +3013,11 @@
       </div>
       <span class="nav-label">KI Styling</span>
     </div>
-    <!-- id bleibt nav-freunde (Feed ist über "Teilen" erreichbar) -->
-    <button class="nav-item" id="nav-freunde" onclick="navigate('teilen',this)">
-      <svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
-      <span class="nav-label">Teilen</span>
+    <!-- Feed; "Leihen & Tauschen" (Screen teilen) ist vom Feed aus erreichbar -->
+    <button class="nav-item" id="nav-freunde" onclick="navigate('freunde',this)">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="nav-label">Feed</span>
+      <span class="nav-soon-badge">Bald</span>
     </button>
     <button class="nav-item" id="nav-profil" onclick="navigate('profil',this)">
       <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
