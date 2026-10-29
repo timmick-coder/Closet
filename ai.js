@@ -7921,10 +7921,6 @@ var _SH_PIECES = [
   { id: 'fp12', owner: 'noah',  emoji: '👢', name: 'Chelsea Boots',       color: 'Braun',    hex: '#6b4a2f', size: '44',    style: 'Casual',     lend: true,  swap: false, note: 'Frisch imprägniert.' },
   { id: 'fp13', owner: 'noah',  emoji: '🧢', name: 'Bucket Hat',          color: 'Oliv',     hex: '#6b6b3a', size: '–',     style: 'Streetwear', lend: false, swap: true,  note: '' }
 ];
-// Max. Leihdauer einiger Beispiel-Pieces (Tage, sonst 2 Wochen)
-[['fp1', 7], ['fp4', 3], ['fp7', 30], ['fp8', 3], ['fp10', 7]].forEach(function(x) {
-  _SH_PIECES.find(function(p) { return p.id === x[0]; }).max = x[1];
-});
 var _shTab = 'entdecken', _shFilter = 'alle', _shChatId = null, _shDraft = null;
 
 function _shLoad() {
@@ -7941,9 +7937,10 @@ function _shSeed() {
   if (mine.length) {
     var it = mine.find(function(w) { return /jacke|mantel|pullover|hoodie|strick/i.test(w.name || ''); }) || mine[0];
     var from = _shAddDays(_shToday(), 3);
-    reqs.push({ id: 'rq_seed', type: 'lend', dir: 'in', friend: 'lena', myItemId: it.id, from: from, to: _shAddDays(from, 4),
+    reqs.push({ id: 'rq_seed', type: 'lend', dir: 'in', friend: 'lena', myItemId: it.id, agreed: false,
       status: 'angefragt', unread: true, updated: now - 3600e3,
-      messages: [{ by: 'them', text: 'Hey! 😊 Darf ich mir dein Piece „' + it.name + '“ leihen? Ich passe gut drauf auf!', ts: now - 3600e3 }] });
+      messages: [{ by: 'them', text: 'Hey! 😊 Darf ich mir dein Piece „' + it.name + '“ leihen? Ich passe gut drauf auf!', ts: now - 3600e3 },
+                 { by: 'them', kind: 'prop', from: from, to: _shAddDays(from, 4), state: 'offen', ts: now - 3600e3 }] });
   }
   reqs.push({ id: 'rq_seed2', type: 'lend', dir: 'out', friend: 'mia', pieceId: 'fp9', from: _shAddDays(_shToday(), -20), to: _shAddDays(_shToday(), -13),
     status: 'zurueck', unread: false, updated: now - 12 * 864e5,
@@ -8132,15 +8129,9 @@ function _shRenderOffer() {
     + '<div class="sh-offer-count">' + nL + ' verleihbar · ' + nS + ' tauschbar</div>'
     + mine.map(function(w) {
       var id = _escAttr(String(w.id));
-      var max = w.lendMax || _SH_MAX_DEFAULT;
       return '<div class="sh-offer-row">' + _shThumb(w) + '<div class="sh-offer-name">' + _shEsc(w.name || 'Piece') + '<span>' + _shEsc(w.color || '') + '</span></div>'
         + '<button class="sh-toggle' + (w.lend ? ' on' : '') + '" onclick="_shSetItemFlag(\'' + id + '\',\'lend\',' + !w.lend + ');_shRender()">Leihen</button>'
-        + '<button class="sh-toggle swap' + (w.swap ? ' on' : '') + '" onclick="_shSetItemFlag(\'' + id + '\',\'swap\',' + !w.swap + ');_shRender()">Tauschen</button>'
-        // Maximale Leihdauer, nur wenn verleihbar
-        + (w.lend ? '<div class="sh-offer-max"><span>Max. Leihdauer</span>' + _SH_DURATIONS.map(function(d) {
-          return '<button class="sh-mini-chip' + (d[0] === max ? ' on' : '') + '" onclick="_shSetItemFlag(\'' + id + '\',\'lendMax\',' + d[0] + ');_shRender()">' + d[1] + '</button>';
-        }).join('') + '</div>' : '')
-        + '</div>';
+        + '<button class="sh-toggle swap' + (w.swap ? ' on' : '') + '" onclick="_shSetItemFlag(\'' + id + '\',\'swap\',' + !w.swap + ');_shRender()">Tauschen</button></div>';
     }).join('');
 }
 // Eigenes Piece als verleihbar / tauschbar markieren
@@ -8148,7 +8139,7 @@ function _shSetItemFlag(itemId, flag, on) {
   var items = loadWardrobe();
   var it = items.find(function(w) { return String(w.id) === String(itemId); });
   if (!it) return;
-  it[flag] = typeof on === 'number' ? on : !!on;
+  it[flag] = !!on;
   saveWardrobe(items);
 }
 
@@ -8164,8 +8155,7 @@ function _shOpenPiece(id) {
   var busy = _shLoad().requests.find(function(r) { return r.pieceId === id && _SH_OPEN.indexOf(r.status) >= 0; });
   var html = '<div class="sh-piece-head">' + _shThumb(p, 'sh-thumb-xl') + '<div><div class="modal-title" style="margin-bottom:6px">' + _shEsc(p.name) + '</div>'
     + '<div class="sh-meta">' + _shAvatar(p.owner, 'sh-avatar-xs') + 'von&nbsp;<b>' + _shEsc(f.name) + '</b></div>'
-    + '<div class="sh-piece-facts">' + _shEsc(p.color) + ' · Gr. ' + _shEsc(p.size) + ' · ' + _shEsc(p.style) + '</div>'
-    + (p.lend ? '<div class="sh-piece-facts">📅 Leihen bis max. ' + _shMaxLabel(p.max || _SH_MAX_DEFAULT) + '</div>' : '') + '</div></div>'
+    + '<div class="sh-piece-facts">' + _shEsc(p.color) + ' · Gr. ' + _shEsc(p.size) + ' · ' + _shEsc(p.style) + '</div></div></div>'
     + (p.note ? '<div class="sh-piece-note">„' + _shEsc(p.note) + '“</div>' : '')
     + '<div class="sh-piece-why">✨ ' + _shEsc(m.reason) + '</div>'
     + (m.fits.length ? '<div class="sh-fits">' + m.fits.map(function(w) { return '<div class="sh-fit">' + _shThumb(w) + '<span>' + _shEsc(w.name) + '</span></div>'; }).join('') + '</div>' : '');
@@ -8177,54 +8167,34 @@ function _shOpenPiece(id) {
   _shOpenSheet(html);
 }
 
-// ── Leihdauer ──
-// Verleiher legen pro Piece eine maximale Leihdauer fest (item.lendMax in Tagen)
-var _SH_DURATIONS = [[3, 'Wochenende'], [7, '1 Woche'], [14, '2 Wochen'], [30, '1 Monat']];
-var _SH_MAX_DEFAULT = 14;
-function _shMaxLabel(days) {
-  var x = _SH_DURATIONS.find(function(d) { return d[0] === days; });
-  return x ? x[1] : days + ' Tage';
+// ── Leihzeit wird im Chat ausgehandelt ──
+// Vorschläge sind Chat-Nachrichten { kind: 'prop', from, to, state: 'offen'|'ok'|'ersetzt', ext }.
+// Erst wenn ein Vorschlag angenommen ist, gilt r.from/r.to (r.agreed = true).
+function _shAgreed(r) { return r.agreed !== false && !!r.from; } // ältere Demo-Daten ohne Flag = vereinbart
+function _shOpenProp(r) {
+  for (var i = r.messages.length - 1; i >= 0; i--) if (r.messages[i].kind === 'prop' && r.messages[i].state === 'offen') return r.messages[i];
+  return null;
 }
-// Auswahl der Leihzeit (Schnellwahl + eigener Zeitraum); _shDraft.max begrenzt sie,
-// _shDraft.reqFrom/reqTo = ursprünglich angefragter Zeitraum (beim Annehmen)
+// Auswahl des Zeitraums (Schnellwahl + eigener Zeitraum). Bei Verlängerung (ext) bleibt der Start fest.
 function _shPeriodHtml() {
   var d = _shDraft, t = _shToday();
-  var chips = (d.reqFrom ? [['req', 'Wie angefragt', 0]] : [])
-    .concat([['we', 'Wochenende', 3], ['1w', '1 Woche', 7], ['2w', '2 Wochen', 14], ['1m', '1 Monat', 30]])
-    .filter(function(c) { return c[2] <= d.max; })
-    .concat([['own', 'Eigener Zeitraum', 0]]);
-  return '<div class="sh-label">Leihzeit <em>max. ' + _shMaxLabel(d.max) + '</em></div><div class="sh-chip-row wrap" id="sh-presets">'
+  var chips = d.ext
+    ? [['p3', '+3 Tage'], ['p7', '+1 Woche'], ['p14', '+2 Wochen'], ['own', 'Eigenes Enddatum']]
+    : [['we', 'Wochenende'], ['1w', '1 Woche'], ['2w', '2 Wochen'], ['1m', '1 Monat'], ['own', 'Eigener Zeitraum']];
+  return '<div class="sh-chip-row wrap" id="sh-presets">'
     + chips.map(function(c) { return '<button class="sh-chip" data-p="' + c[0] + '" onclick="_shPreset(\'' + c[0] + '\')">' + c[1] + '</button>'; }).join('') + '</div>'
-    + '<div class="sh-dates" id="sh-dates"><label>Von<input type="date" id="sh-from" min="' + t + '" onchange="_shDateChange()"></label>'
+    + '<div class="sh-dates" id="sh-dates"><label' + (d.ext ? ' style="display:none"' : '') + '>Von<input type="date" id="sh-from" min="' + t + '" onchange="_shDateChange()"></label>'
     + '<label>Bis<input type="date" id="sh-to" min="' + t + '" onchange="_shDateChange()"></label></div>'
     + '<div class="sh-period" id="sh-period"></div>';
 }
-
-// ── Leih-Anfrage mit Zeitraum ──
-function _shStartLend(id) {
-  var p = _shPiece(id);
-  _shDraft = { pieceId: id, max: p.max || _SH_MAX_DEFAULT };
-  var html = '<div class="modal-title">Leihen anfragen</div>'
-    + '<div class="sh-mini">' + _shThumb(p) + '<div><b>' + _shEsc(p.name) + '</b><span>von ' + _shEsc(_SH_FRIENDS[p.owner].name) + '</span></div></div>'
-    + _shPeriodHtml()
-    + '<div class="sh-label">Nachricht</div><textarea class="sh-textarea" id="sh-msg">Hey ' + _shEsc(_SH_FRIENDS[p.owner].name) + ', darf ich mir dein Piece „' + _shEsc(p.name) + '“ leihen? 😊</textarea>'
-    + '<button class="sh-btn" onclick="_shSendLend()">Anfrage senden</button>';
-  _shOpenSheet(html);
-  _shPreset('we');
-}
 function _shPreset(k) {
-  var t = _shToday(), d = _shDraft, start = d.reqFrom || _shAddDays(t, 1);
+  var t = _shToday(), d = _shDraft, start = d.start || _shAddDays(t, 1);
   d.preset = k;
-  if (k === 'req') { d.from = d.reqFrom; d.to = d.reqTo; }
-  if (k === 'we') {
-    if (d.reqFrom) { d.from = d.reqFrom; d.to = _shAddDays(d.from, 2); }
-    else { var dow = new Date(t + 'T12:00:00').getDay(); d.from = dow === 6 || dow === 0 ? t : _shAddDays(t, 5 - dow); d.to = _shAddDays(d.from, dow === 6 ? 1 : dow === 0 ? 0 : 2); }
-  }
+  if (k === 'we') { var dow = new Date(t + 'T12:00:00').getDay(); d.from = dow === 6 || dow === 0 ? t : _shAddDays(t, 5 - dow); d.to = _shAddDays(d.from, dow === 6 ? 1 : dow === 0 ? 0 : 2); }
   if (k === '1w') { d.from = start; d.to = _shAddDays(start, 6); }
   if (k === '2w') { d.from = start; d.to = _shAddDays(start, 13); }
   if (k === '1m') { d.from = start; d.to = _shAddDays(start, 29); }
-  if (!d.from) { d.from = start; d.to = _shAddDays(start, 2); }
-  if (_shDays(d.from, d.to) > d.max) d.to = _shAddDays(d.from, d.max - 1);
+  if (/^p\d+$/.test(k)) { d.from = d.start; d.to = _shAddDays(d.baseTo, parseInt(k.slice(1), 10)); }
   document.querySelectorAll('#sh-presets .sh-chip').forEach(function(c) { c.classList.toggle('on', c.getAttribute('data-p') === k); });
   _shSyncDates();
 }
@@ -8232,25 +8202,91 @@ function _shSyncDates() {
   var d = _shDraft;
   document.getElementById('sh-from').value = d.from;
   document.getElementById('sh-to').value = d.to;
-  document.getElementById('sh-to').min = d.from;
+  document.getElementById('sh-to').min = d.ext ? _shAddDays(d.baseTo, 1) : d.from;
   document.getElementById('sh-dates').classList.toggle('show', d.preset === 'own');
   document.getElementById('sh-period').textContent = '🗓️ ' + _shPeriod(d);
 }
 function _shDateChange() {
   var d = _shDraft;
-  d.from = document.getElementById('sh-from').value || d.from;
+  if (!d.ext) d.from = document.getElementById('sh-from').value || d.from;
   d.to = document.getElementById('sh-to').value || d.to;
   if (d.to < d.from) d.to = d.from;
-  if (_shDays(d.from, d.to) > d.max) { d.to = _shAddDays(d.from, d.max - 1); _showToast('Maximal ' + _shMaxLabel(d.max) + ' am Stück'); }
+  if (_shDays(d.from, d.to) > 60) { d.to = _shAddDays(d.from, 59); _showToast('Maximal 60 Tage am Stück'); }
   _shSyncDates();
+}
+
+// Zeitraum im Chat vorschlagen (auch als Gegenvorschlag oder Verlängerung)
+function _shPropose(id) {
+  var r = _shLoad().requests.find(function(x) { return x.id === id; });
+  if (!r) return;
+  var ext = r.status === 'uebergeben', open = _shOpenProp(r);
+  _shDraft = { reqId: id, ext: ext };
+  if (ext) { _shDraft.start = r.from; _shDraft.baseTo = r.to; }
+  else if (open) _shDraft.start = open.from; // Gegenvorschlag: gleicher Start
+  var counter = open && open.by === 'them';
+  _shOpenSheet('<div class="modal-title">' + (ext ? 'Verlängerung vorschlagen' : counter ? 'Gegenvorschlag' : 'Zeitraum vorschlagen') + '</div>'
+    + (counter ? '<div class="sh-piece-facts" style="margin:-8px 0 12px">' + _SH_FRIENDS[r.friend].name + ' schlägt vor: ' + _shPeriod(open) + '</div>' : '')
+    + _shPeriodHtml()
+    + '<button class="sh-btn" onclick="_shSendProp()">Vorschlag senden</button>');
+  _shPreset(ext ? 'p7' : open ? '1w' : 'we');
+}
+function _shSendProp() {
+  var d = _shDraft, id = d.reqId;
+  _shCloseSheet();
+  _shUpdateReq(id, function(r) {
+    r.messages.forEach(function(m) { if (m.kind === 'prop' && m.state === 'offen') m.state = 'ersetzt'; });
+    r.messages.push({ by: 'me', kind: 'prop', from: d.from, to: d.to, ext: d.ext, state: 'offen', ts: Date.now() });
+  });
+  _shFakePropAnswer(id);
+}
+// Prototyp: Freund nimmt an – bei langen Wünschen kommt erst ein Gegenvorschlag (1 Woche)
+function _shFakePropAnswer(id) {
+  setTimeout(function() { var ty = document.getElementById('sh-typing'); if (ty && _shChatId === id) ty.classList.add('show'); }, 900);
+  setTimeout(function() {
+    _shUpdateReq(id, function(r) {
+      var p = _shOpenProp(r);
+      if (!p || p.by !== 'me') return;
+      var countered = r.messages.some(function(m) { return m.kind === 'prop' && m.by === 'them'; });
+      if (!p.ext && !countered && _shDays(p.from, p.to) > 7) {
+        p.state = 'ersetzt';
+        r.messages.push({ by: 'them', text: 'Hmm, so lange brauche ich es selbst wieder 🙈 Wie wäre eine Woche?', ts: Date.now() });
+        r.messages.push({ by: 'them', kind: 'prop', from: p.from, to: _shAddDays(p.from, 6), state: 'offen', ts: Date.now() });
+      } else {
+        _shApplyProp(r, p);
+        r.messages.push({ by: 'them', text: p.ext ? 'Kein Problem, behalt es noch 😊' : 'Passt für mich! 👍', ts: Date.now() });
+      }
+      if (_shChatId !== id) r.unread = true;
+    });
+  }, 2600);
+}
+function _shApplyProp(r, p) {
+  p.state = 'ok';
+  r.from = p.from; r.to = p.to; r.agreed = true;
+  _shSys(r, p.ext ? '✅ Verlängert bis ' + _shFmt(p.to) : '🗓️ Zeitraum vereinbart: ' + _shPeriod(p));
+}
+// Vorschlag des Freundes annehmen
+function _shPropAccept(id) {
+  _shUpdateReq(id, function(r) { var p = _shOpenProp(r); if (p) _shApplyProp(r, p); });
+}
+
+// ── Leih-Anfrage (Zeitraum wird danach im Chat ausgehandelt) ──
+function _shStartLend(id) {
+  var p = _shPiece(id);
+  _shDraft = { pieceId: id };
+  var html = '<div class="modal-title">Leihen anfragen</div>'
+    + '<div class="sh-mini">' + _shThumb(p) + '<div><b>' + _shEsc(p.name) + '</b><span>von ' + _shEsc(_SH_FRIENDS[p.owner].name) + '</span></div></div>'
+    + '<div class="sh-label">Nachricht</div><textarea class="sh-textarea" id="sh-msg">Hey ' + _shEsc(_SH_FRIENDS[p.owner].name) + ', darf ich mir dein Piece „' + _shEsc(p.name) + '“ leihen? 😊</textarea>'
+    + '<div class="sh-hint">🗓️ Wie lange, besprecht ihr danach im Chat.</div>'
+    + '<button class="sh-btn" onclick="_shSendLend()">Anfrage senden</button>';
+  _shOpenSheet(html);
 }
 function _shSendLend() {
   var d = _shDraft, p = _shPiece(d.pieceId);
   var text = (document.getElementById('sh-msg').value || '').trim();
-  var r = _shNewRequest({ type: 'lend', dir: 'out', friend: p.owner, pieceId: p.id, from: d.from, to: d.to }, text);
+  var r = _shNewRequest({ type: 'lend', dir: 'out', friend: p.owner, pieceId: p.id, agreed: false }, text);
   _shCloseSheet();
   _shOpenChat(r.id);
-  _shFakeReply(r.id, 'Klar, gerne! 🙌 Wann magst du es abholen?', 'angenommen');
+  _shFakeReply(r.id, 'Klar, gerne! 🙌 Wie lange brauchst du es?', 'angenommen');
 }
 
 // ── Tausch anbieten: eigenes Piece auswählen ──
@@ -8347,8 +8383,13 @@ function _shChatActions(r) {
       ? b('Annehmen', '_shAccept') + b('Ablehnen', '_shDecline', 'ghost')
       : b('Anfrage zurückziehen', '_shWithdraw', 'ghost');
   }
-  if (r.status === 'angenommen') return r.type === 'swap' ? b('🔄 Tausch abgeschlossen', '_shSwapDone') : b('🤝 Als übergeben markieren', '_shHandover');
-  if (r.status === 'uebergeben') return b('✅ Zurückgegeben', '_shReturned') + (r.dir === 'out' ? b('Verlängern', '_shExtend', 'ghost') : '');
+  if (r.status === 'angenommen') {
+    if (r.type === 'swap') return b('🔄 Tausch abgeschlossen', '_shSwapDone');
+    // Übergabe erst, wenn ihr euch auf einen Zeitraum geeinigt habt
+    return _shAgreed(r) ? b('🤝 Übergeben', '_shHandover') + b('🗓️ Ändern', '_shPropose', 'ghost')
+      : b('🗓️ Zeitraum vorschlagen', '_shPropose');
+  }
+  if (r.status === 'uebergeben') return b('✅ Zurückgegeben', '_shReturned') + b('Verlängern', '_shPropose', 'ghost');
   if (r.status === 'zurueck' || r.status === 'getauscht') {
     return '<div class="sh-saved">🌱 Danke fürs Teilen! Ca. ' + _SH_CO2_KG + ' kg CO₂ und ' + _SH_WATER_L.toLocaleString('de-DE') + ' l Wasser gespart.</div>';
   }
@@ -8367,10 +8408,19 @@ function _shRenderChat() {
   var deal = r.type === 'swap'
     ? '<div class="sh-deal">' + _shThumb(offer || { emoji: '❔' }) + '<span class="sh-swap-arrow">⇄</span>' + _shThumb(subj)
       + '<div><b>Tausch</b><span>' + _shEsc((offer ? offer.name : 'Dein Piece') + ' gegen ' + subj.name) + '</span></div></div>'
-    : '<div class="sh-deal">' + _shThumb(subj) + '<div><b>' + _shEsc(subj.name) + '</b><span>🗓️ ' + _shPeriod(r) + '</span>'
+    : '<div class="sh-deal">' + _shThumb(subj) + '<div><b>' + _shEsc(subj.name) + '</b><span>🗓️ '
+      + (_shAgreed(r) ? _shPeriod(r) : _shOpenProp(r) ? 'Vorschlag offen' : 'Zeitraum noch offen – im Chat vorschlagen') + '</span>'
       + (r.status === 'uebergeben' ? '<span class="sh-due">Rückgabe ' + _shDueText(r.to) + '</span>' : '') + '</div></div>';
   var msgs = r.messages.map(function(m) {
     if (m.by === 'sys') return '<div class="sh-msg sys">' + _shEsc(m.text) + '</div>';
+    if (m.kind === 'prop') {
+      var st = m.state === 'ok' ? '<div class="sh-prop-state ok">✓ Vereinbart</div>'
+        : m.state === 'ersetzt' ? '<div class="sh-prop-state">Nicht übernommen</div>'
+        : m.by === 'them' ? '<div class="sh-prop-btns"><button onclick="_shPropAccept(\'' + r.id + '\')">✅ Passt</button><button class="ghost" onclick="_shPropose(\'' + r.id + '\')">Gegenvorschlag</button></div>'
+        : '<div class="sh-prop-state">Wartet auf Antwort…</div>';
+      return '<div class="sh-msg ' + m.by + ' sh-prop' + (m.state === 'ersetzt' ? ' old' : '') + '"><div class="sh-prop-title">🗓️ ' + (m.ext ? 'Verlängerung bis ' + _shFmt(m.to) : 'Vorschlag Leihzeit') + '</div>'
+        + '<div class="sh-prop-period">' + _shPeriod(m) + '</div>' + st + '</div>';
+    }
     return '<div class="sh-msg ' + m.by + '">' + _shEsc(m.text) + '<time>' + new Date(m.ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + '</time></div>';
   }).join('');
   var closed = ['abgelehnt', 'zurueckgezogen'].indexOf(r.status) >= 0;
@@ -8391,69 +8441,25 @@ function _shSendMsg() {
   var answers = ['Passt! 👍', 'Super, bis dann 😊', 'Alles klar!', 'Klingt gut 🙌'];
   _shFakeReply(id, answers[Math.floor(Math.random() * answers.length)]);
 }
-// Annehmen: Verleiher bestätigt oder ändert die Leihzeit
 function _shAccept(id) {
-  var r = _shLoad().requests.find(function(x) { return x.id === id; });
-  if (!r) return;
-  if (r.type === 'swap') {
-    _shUpdateReq(id, function(x) { x.status = 'angenommen'; _shSys(x, '✅ Du hast angenommen'); });
-    _shFakeReply(id, 'Yay, danke! 🥰');
-    return;
-  }
-  var it = _shMyItem(r.myItemId) || {};
-  _shDraft = { reqId: id, reqFrom: r.from, reqTo: r.to, max: Math.max(it.lendMax || _SH_MAX_DEFAULT, _shDays(r.from, r.to)) };
-  _shOpenSheet('<div class="modal-title">Anfrage annehmen</div>'
-    + '<div class="sh-mini">' + _shThumb(it) + '<div><b>' + _shEsc(it.name || 'Piece') + '</b><span>' + _SH_FRIENDS[r.friend].name + ' wünscht sich: ' + _shPeriod(r) + '</span></div></div>'
-    + _shPeriodHtml()
-    + '<button class="sh-btn" onclick="_shConfirmAccept()">Annehmen</button>');
-  _shPreset('req');
-}
-function _shConfirmAccept() {
-  var d = _shDraft, id = d.reqId;
-  var changed = d.from !== d.reqFrom || d.to !== d.reqTo;
-  _shCloseSheet();
-  _shUpdateReq(id, function(r) {
-    r.from = d.from; r.to = d.to; r.status = 'angenommen';
-    _shSys(r, '✅ Du hast angenommen' + (changed ? ' · Leihzeit geändert: ' + _shPeriod(r) : ''));
-  });
-  _shFakeReply(id, changed ? 'Okay, passt für mich! 🥰 Danke dir!' : 'Danke dir!! 🥰 Ich hol es morgen ab.');
+  _shUpdateReq(id, function(r) { r.status = 'angenommen'; _shSys(r, '✅ Du hast angenommen'); });
+  _shFakeReply(id, 'Danke dir!! 🥰');
 }
 function _shDecline(id) { _shUpdateReq(id, function(r) { r.status = 'abgelehnt'; _shSys(r, 'Du hast die Anfrage abgelehnt'); }); }
 function _shWithdraw(id) { _shUpdateReq(id, function(r) { r.status = 'zurueckgezogen'; _shSys(r, 'Anfrage zurückgezogen'); }); }
 function _shHandover(id) { _shUpdateReq(id, function(r) { r.status = 'uebergeben'; _shSys(r, '🤝 Übergeben – Rückgabe bis ' + _shFmt(r.to)); }); }
 function _shReturned(id) { _shUpdateReq(id, function(r) { r.status = 'zurueck'; _shSys(r, '✅ Zurückgegeben – danke fürs Teilen!'); }); }
 function _shSwapDone(id) { _shUpdateReq(id, function(r) { r.status = 'getauscht'; _shSys(r, '🔄 Tausch abgeschlossen'); }); }
-function _shExtend(id) {
-  _shUpdateReq(id, function(r) { _shSys(r, '⏳ Verlängerung um 1 Woche angefragt'); });
-  setTimeout(function() {
-    _shUpdateReq(id, function(r) {
-      r.to = _shAddDays(r.to, 7);
-      _shSys(r, '✅ Verlängert bis ' + _shFmt(r.to));
-      r.messages.push({ by: 'them', text: 'Kein Problem, behalt es noch 😊', ts: Date.now() });
-    });
-  }, 2200);
-}
 
 // Artikel-Detail: Schalter "Mit Freunden teilen"
 function _shFillItemDetail(item) {
   var l = document.getElementById('idp-sh-lend'), s = document.getElementById('idp-sh-swap');
   if (l) l.checked = !!item.lend;
   if (s) s.checked = !!item.swap;
-  var m = document.getElementById('idp-sh-max');
-  if (m) m.value = String(item.lendMax || _SH_MAX_DEFAULT);
-  var row = document.getElementById('idp-sh-max-row');
-  if (row) row.style.display = item.lend ? '' : 'none';
-}
-function _shItemDetailMax(val) {
-  if (!_currentItemId) return;
-  _shSetItemFlag(_currentItemId, 'lendMax', parseInt(val, 10));
-  _showToast('📅 Max. Leihdauer: ' + _shMaxLabel(parseInt(val, 10)));
 }
 function _shItemDetailToggle(flag, on) {
   if (!_currentItemId) return;
   _shSetItemFlag(_currentItemId, flag, on);
-  var row = document.getElementById('idp-sh-max-row');
-  if (row && flag === 'lend') row.style.display = on ? '' : 'none';
   _showToast(on ? (flag === 'lend' ? '📅 Für Freunde verleihbar' : '🔄 Für Freunde tauschbar') : 'Nicht mehr ' + (flag === 'lend' ? 'verleihbar' : 'tauschbar'));
 }
 

@@ -405,13 +405,18 @@
 
     /* ── Teilen: Leihen & Tauschen (Klick-Prototyp) ── */
     #nav-freunde.sh-has-unread::after { content: ''; position: absolute; top: 6px; left: 50%; margin-left: -20px; width: 9px; height: 9px; border-radius: 50%; background: #34d399; border: 2px solid #0d1b2e; }
-    .sh-label em { font-style: normal; text-transform: none; letter-spacing: 0; font-weight: 700; color: #6ee7b7; margin-left: 6px; }
-    .sh-offer-row { flex-wrap: wrap; }
-    .sh-offer-max { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 0 2px 56px; }
-    .sh-offer-max span { font-size: 11px; font-weight: 700; color: var(--text2); margin-right: 2px; }
-    .sh-mini-chip { padding: 4px 9px; border-radius: 10px; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; border: 1px solid var(--purple-border); color: var(--text2); }
-    .sh-mini-chip.on { background: rgba(16,185,129,0.2); border-color: #34d399; color: #6ee7b7; }
-    .sh-idp-select { flex: 0 0 auto; width: auto; text-align: right; }
+    .sh-hint { font-size: 12.5px; color: var(--text2); margin: 10px 2px 0; }
+    /* Zeitraum-Vorschlag im Chat */
+    .sh-prop { min-width: 210px; border: 1px solid rgba(52,211,153,0.45); }
+    .sh-prop.old { opacity: 0.45; }
+    .sh-prop.old .sh-prop-period { text-decoration: line-through; }
+    .sh-prop-title { font-size: 11.5px; font-weight: 800; color: #6ee7b7; margin-bottom: 3px; }
+    .sh-prop-period { font-size: 14px; font-weight: 700; }
+    .sh-prop-state { font-size: 11.5px; color: var(--text2); margin: 5px 0 3px; }
+    .sh-prop-state.ok { color: #6ee7b7; font-weight: 800; }
+    .sh-prop-btns { display: flex; gap: 6px; margin: 8px 0 4px; }
+    .sh-prop-btns button { flex: 1; padding: 8px 6px; border: none; border-radius: 11px; background: #10b981; color: #fff; font-size: 12.5px; font-weight: 800; cursor: pointer; }
+    .sh-prop-btns button.ghost { background: transparent; border: 1.5px solid var(--purple-border); color: var(--text); }
     .sh-feed-actions { display: flex; align-items: center; gap: 8px; }
     .sh-open-btn { height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid rgba(52,211,153,0.5); background: rgba(16,185,129,0.18); color: #6ee7b7; font-size: 12.5px; font-weight: 800; cursor: pointer; white-space: nowrap; }
     .sh-feed-btn { background: var(--card); border: 1.5px solid var(--purple-border); color: var(--text2); font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 14px; cursor: pointer; }
@@ -1760,11 +1765,6 @@
         <div class="idp-field-group" style="margin:0 16px 12px">
           <div class="sh-idp-head">♻️ Mit Freunden teilen</div>
           <label class="idp-field-row sh-idp-row"><span>📅 Verleihbar</span><input type="checkbox" class="sh-switch" id="idp-sh-lend" onchange="_shItemDetailToggle('lend', this.checked)"></label>
-          <div class="idp-field-row sh-idp-row" id="idp-sh-max-row"><span>⏳ Max. Leihdauer</span>
-            <select class="idp-field-select sh-idp-select" id="idp-sh-max" onchange="_shItemDetailMax(this.value)">
-              <option value="3">Wochenende</option><option value="7">1 Woche</option><option value="14">2 Wochen</option><option value="30">1 Monat</option>
-            </select>
-          </div>
           <label class="idp-field-row sh-idp-row"><span>🔄 Tauschbar</span><input type="checkbox" class="sh-switch" id="idp-sh-swap" onchange="_shItemDetailToggle('swap', this.checked)"></label>
         </div>
         <div style="padding:0 16px 28px">
