@@ -310,6 +310,13 @@ async function _callGeminiAPI(body, onStatus) {
       catch (e) { r = { ok: false, status: 0, msg: e.message }; } // Netzwerkfehler
       if (r.ok) { _geminiPreferred = GEMINI_MODELS.indexOf(model); return r.data; }
       lastMsg = r.msg;
+      // Modell kennt die Denkzeit-Einstellung nicht → ohne sie nochmal
+      if (r.status === 400 && /thinking/i.test(r.msg || '') && body.generationConfig && body.generationConfig.thinkingConfig) {
+        body = JSON.parse(JSON.stringify(body));
+        delete body.generationConfig.thinkingConfig;
+        attempt--;
+        continue;
+      }
       // Anfrage selbst fehlerhaft (400/401/403) → anderes Modell hilft nicht
       if (r.status === 400 || r.status === 401 || r.status === 403) throw new Error(r.msg);
       // Überlastet / Serverfehler / Netz → kurz warten und gleiches Modell nochmal
@@ -332,7 +339,9 @@ async function analyzeClothingWithGemini(base64, mimeType, onStatus) {
   const catList = cats.map(function(c) { return c.id + ' = ' + c.label; }).join(', ');
   const prompt = 'Du bist ein Mode-Experte. Analysiere das Kleidungsstück auf diesem Bild und antworte NUR mit einem validen JSON-Objekt (kein Markdown, keine Erklärung, kein Text außerhalb des JSON):\n{\n  "name": "Name des Kleidungsstücks auf Deutsch",\n  "brand": "Marke falls erkennbar, sonst leerer String",\n  "type": "Kleidungsart auf Deutsch (z.B. Top, Hose, Kleid, Schuh, Accessoire, Jacke)",\n  "category": "ID der passendsten Schrank-Kategorie aus dieser Liste: ' + catList + ' – oder leerer String, wenn keine passt",\n  "color": "Hauptfarbe auf Deutsch",\n  "colorHex": "Hex-Farbcode der Hauptfarbe",\n  "season": "Saison auf Deutsch (Sommer | Winter | Frühling | Ganzjährig)",\n  "seasonClass": "s-sommer | s-winter | s-fruhjahr | s-ganzjahrig",\n  "style": "Stil auf Deutsch (z.B. Casual, Business, Sportlich, Elegant)",\n  "emoji": "Ein einzelnes passendes Emoji"\n}';
   const body = {
-    contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }]
+    contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+    // Erkennen braucht kaum Nachdenken – spart viel Wartezeit pro Scan
+    generationConfig: { thinkingConfig: { thinkingBudget: 256 } }
   };
   const data = await _callGeminiAPI(body, onStatus);
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -401,12 +410,18 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
   // Stilrichtung "Maskulin": Röcke/Kleider/Blusen gar nicht erst anbieten
   const wardrobe = loadWardrobe().filter(function(w) { return !_excludedByDirection(w); });
   if (wardrobe.length === 0) throw new Error('Füge zuerst Kleidung zu deinem Schrank hinzu!');
+  // Reihenfolge jedes Mal mischen – sonst bevorzugt die KI die Pieces weiter oben in der Liste
+  const shuffled = wardrobe.slice();
+  for (let i = shuffled.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = t; }
+  // Tragen-Protokoll: kürzlich Getragenes meiden, lange Ungetragenes bevorzugen
+  const wearHints = _wearHintsFor(wardrobe);
   const byId = {};
-  const wardrobeText = wardrobe.map(function(w, i) {
+  const wardrobeText = shuffled.map(function(w, i) {
     const id = 'T' + (i + 1);
     byId[id] = w;
     const cat = _itemCategory(w) !== 'none' ? _catLabel(_itemCategory(w)) : '';
-    return id + ': ' + (w.emoji || '') + ' ' + w.name + ' (' + [cat, w.type, w.color, w.season, w.style].filter(Boolean).join(', ') + ')';
+    return id + ': ' + (w.emoji || '') + ' ' + w.name + ' (' + [cat, w.type, w.color, w.season, w.style].filter(Boolean).join(', ') + ')'
+      + (wearHints[w.id] ? ' [' + wearHints[w.id] + ']' : '');
   }).join('\n');
 
   // Kontext: Datum/Jahreszeit + Wetter (nur wenn Standort schon erlaubt – keine neue Abfrage)
@@ -428,7 +443,8 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
     + '3. ANLASS & WETTER: Alle Pieces eines Outfits haben eine ähnliche Formalität (kein Anzugsakko zu Jogginghose, außer bewusst Streetwear). '
     + 'Richte dich nach Jahreszeit und Wetter: keine dicken Wintersachen bei Wärme, keine Shorts/Sandalen bei Kälte.\n'
     + '4. ABWECHSLUNG: Die Outfits müssen sich deutlich unterscheiden (andere Hauptteile, andere Wirkung, z. B. lässig / schicker / sportlich). '
-    + 'Verwende, wo der Schrank es erlaubt, zwischen zwei Outfits höchstens ein gemeinsames Piece.'
+    + 'Verwende, wo der Schrank es erlaubt, zwischen zwei Outfits höchstens ein gemeinsames Piece. '
+    + 'Nutze den ganzen Schrank: bevorzuge Pieces mit [lange nicht getragen], und nimm Pieces mit [gestern/heute getragen] nicht als Hauptteil (Oberteil, Hose, Jacke).'
     + (recent.length ? ' Wiederhole keine dieser kürzlich vorgeschlagenen Kombinationen:\n' + recent.map(function(r) { return '- ' + r.join(' + '); }).join('\n') : '')
     + '\n5. Gib je Outfit eine kurze, konkrete Begründung auf Deutsch (1 Satz, warum Farben/Teile zusammenpassen und zum Anlass/Wetter passen) und eine ehrliche Passgenauigkeit 0–100.\n\n'
     + 'HEUTE: ' + now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + ' (' + season + ')'
@@ -445,6 +461,8 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
     contents: [{ parts: parts }],
     generationConfig: {
       temperature: 1.0, // etwas mehr Abwechslung zwischen den Anfragen
+      // Denkzeit begrenzen: ohne Grenze ~5000 Denk-Tokens (~25 s), mit 1024 ~8 s bei gleicher Qualität
+      thinkingConfig: { thinkingBudget: 1024 },
       responseMimeType: 'application/json',
       responseSchema: {
         type: 'ARRAY',
@@ -1025,7 +1043,7 @@ var _scanJobs = [];
 var _scanQueue = Promise.resolve();
 var _currentScanJobId = null;
 
-function _startScanJob(base64, mimeType, origDataUrl) {
+function _startScanJob(base64, mimeType, origDataUrl, silent) {
   var job = {
     id: 'scan_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     status: 'waiting', step: 'Wartet…',
@@ -1035,7 +1053,7 @@ function _startScanJob(base64, mimeType, origDataUrl) {
   };
   _scanJobs.push(job);
   _renderScanJobsPill();
-  _showToast('📸 Wird im Hintergrund analysiert');
+  if (!silent) _showToast('📸 Wird im Hintergrund analysiert');
   _scanQueue = _scanQueue.then(function() { return _runScanJob(job, base64, mimeType); });
 }
 
@@ -1386,6 +1404,44 @@ function _discardDuplicateScan() {
   if (banner) banner.style.display = 'none';
   _showToast('🗑️ Vorhandenes Piece gelöscht');
 }
+// Mehrere Fotos aus der Galerie: ohne Zuschneiden direkt in die Warteschlange,
+// die App arbeitet sie nacheinander im Hintergrund ab. Ein einzelnes Foto → wie bisher.
+function processScanFiles(fileList) {
+  var files = Array.prototype.slice.call(fileList || []); // sofort kopieren, das Input wird gleich geleert
+  if (files.length <= 1) { processScanFile(files[0]); return; }
+  _showToast('📸 ' + files.length + ' Fotos werden nacheinander analysiert');
+  files.reduce(function(chain, file) {
+    return chain.then(function() { return _queueScanFile(file); });
+  }, Promise.resolve());
+}
+// Foto einlesen, auf handliche Größe bringen (max. 1800 px) und als Hintergrund-Scan einreihen
+function _queueScanFile(file) {
+  return new Promise(function(resolve) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var src = e.target.result;
+      var img = new Image();
+      img.onload = async function() {
+        try {
+          var keepAlpha = await _hasTransparency(src);
+          var sc = Math.min(1, 1800 / Math.max(img.naturalWidth, img.naturalHeight));
+          var c = document.createElement('canvas');
+          c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          var mime = keepAlpha ? 'image/png' : 'image/jpeg';
+          var dataUrl = keepAlpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.92);
+          _startScanJob(dataUrl.split(',')[1], mime, dataUrl, true);
+        } catch (err) { console.warn('[multi-scan]', err); }
+        resolve();
+      };
+      img.onerror = function() { resolve(); };
+      img.src = src;
+    };
+    reader.onerror = function() { resolve(); };
+    reader.readAsDataURL(file);
+  });
+}
+
 async function processScanFile(file) {
   if (!file) return;
   var reader = new FileReader();
@@ -1423,7 +1479,15 @@ async function confirmScanItem() {
     _scanResult = null;
     _scanDuplicateId = null;
     if (_currentScanJobId) _removeScanJob(_currentScanJobId);
-    _showToast('✅ Kleidungsstück gespeichert!');
+    // Mehrere Fotos: gleich das nächste fertige Piece zum Prüfen öffnen
+    var next = _scanJobs.find(function(j) { return j.status === 'ready'; });
+    if (next) {
+      _showToast('✅ Gespeichert – weiter mit dem nächsten Piece');
+      setTimeout(_onScanJobsPillTap, 350);
+      return;
+    }
+    var busy = _scanJobs.filter(function(j) { return j.status === 'waiting' || j.status === 'processing'; }).length;
+    _showToast(busy ? '✅ Gespeichert – ' + busy + ' weitere in Arbeit' : '✅ Kleidungsstück gespeichert!');
     navigate('schrank', document.getElementById('nav-schrank'));
   } catch (err) {
     console.error('[confirmScanItem] Fehler:', err);
@@ -2026,6 +2090,7 @@ function _populateItemDetail(item) {
     pickerClone.addEventListener('change', _saveItemField);
   }
   _shFillItemDetail(item);
+  _fillItemWorn(item.id);
   // Scroll to top
   var scroll = document.getElementById('idp-scroll');
   if (scroll) scroll.scrollTop = 0;
@@ -3384,6 +3449,7 @@ function _openOutfitDetail(id, collectionName) {
     content.innerHTML = '<div style="padding:4px 0 0;">'
       + inspoBanner
       + '<div class="outfit-items-vertical" style="border-top:none;padding-top:0;">' + itemsHtml + '</div>'
+      + (outfit.isInspo ? '' : '<button class="detail-worn-btn" id="detail-worn-btn" onclick="_toggleOutfitWorn(\'' + _escAttr(id) + '\')"></button>')
       + '<div class="detail-action-row">'
       + '<button class="detail-fav-btn" data-heart-id="' + _escAttr(id) + '" onclick="_toggleFav(\'' + id + '\', this)">' + (fav ? '🩷' : '🤍') + '</button>'
       + '<button class="detail-save-btn" onclick="_openSaveModal(\'' + id + '\')">💾 Speichern</button>'
@@ -3391,6 +3457,7 @@ function _openOutfitDetail(id, collectionName) {
       + '<button class="detail-post-btn" onclick="_openNewPostModal(\'' + _escAttr(id) + '\')">📤 Posten</button>'
       + myVersionBtn
       + '</div>';
+    _renderWornButton(id);
   }
 
   var panel = document.getElementById('ki-outfit-panel');
@@ -7301,6 +7368,7 @@ document.addEventListener('DOMContentLoaded', function() {
     { id: 'post-detail-panel',    close: function() { _closePostDetail(); } },
     { id: 'friend-search-panel',  close: function() { _closeFriendSearch(); } },
     { id: 'friend-profile-panel', close: function() { _closeFriendProfile(); } },
+    { id: 'stats-panel',          close: function() { _closeWearStats(); } },
     { id: 'settings-panel',       close: function() { _closeSettings(); } },
     { id: 'streak-detail-panel',  close: function() { _closeStreakPanel(); } },
     // Leihen & Tauschen → zurück zum Feed (Screen, daher zuletzt prüfen)
@@ -8464,3 +8532,162 @@ function _shItemDetailToggle(flag, on) {
 }
 
 _shUpdateBadge();
+
+// ── Getragen: Tragen-Protokoll + Schrank-Statistik ───────────────────────────
+// localStorage['stylesync_worn'] = [{ date: 'YYYY-MM-DD', outfitId, name, itemIds: [...] }]
+// Ein Eintrag pro getragenem Outfit (oder einzelnem Piece) und Tag.
+var _WORN_KEY = 'stylesync_worn';
+function _loadWorn() {
+  try { return JSON.parse(localStorage.getItem(_WORN_KEY) || '[]'); } catch (e) { return []; }
+}
+function _saveWorn(list) { try { localStorage.setItem(_WORN_KEY, JSON.stringify(list)); } catch (e) {} }
+function _todayIso() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function _daysSince(iso) { return Math.round((new Date(_todayIso() + 'T12:00:00') - new Date(iso + 'T12:00:00')) / 864e5); }
+
+// Outfit-Piece → Schrank-ID (ältere Outfits haben teils nur den Namen)
+function _wardrobeIdOf(item, wardrobe) {
+  var w = (item.id && wardrobe.find(function(x) { return String(x.id) === String(item.id); }))
+    || wardrobe.find(function(x) { return (x.name || '').toLowerCase() === (item.name || '').toLowerCase(); });
+  return w ? String(w.id) : null;
+}
+
+// Pro Piece: wie oft und wann zuletzt getragen → { id: { count, last } }
+function _wearStats() {
+  var stats = {};
+  _loadWorn().forEach(function(e) {
+    (e.itemIds || []).forEach(function(id) {
+      var s = stats[id] || (stats[id] = { count: 0, last: '' });
+      s.count++;
+      if (e.date > s.last) s.last = e.date;
+    });
+  });
+  return stats;
+}
+function _wornLabel(s) {
+  if (!s || !s.count) return 'Noch nie getragen';
+  var d = _daysSince(s.last);
+  return s.count + '× getragen · zuletzt ' + (d === 0 ? 'heute' : d === 1 ? 'gestern' : 'vor ' + d + ' Tagen');
+}
+
+function _isOutfitWornToday(outfitId) {
+  var t = _todayIso();
+  return _loadWorn().some(function(e) { return e.date === t && e.outfitId === outfitId; });
+}
+// Outfit als heute getragen markieren bzw. wieder entfernen
+function _toggleOutfitWorn(outfitId) {
+  var outfit = _kiOutfitRegistry[outfitId] || _loadOutfits().find(function(o) { return o.id === outfitId; });
+  if (!outfit) return;
+  var t = _todayIso(), list = _loadWorn();
+  var idx = list.findIndex(function(e) { return e.date === t && e.outfitId === outfitId; });
+  if (idx >= 0) {
+    list.splice(idx, 1);
+    _showToast('Markierung entfernt');
+  } else {
+    var wardrobe = loadWardrobe();
+    var ids = (outfit.items || []).map(function(i) { return _wardrobeIdOf(i, wardrobe); }).filter(Boolean);
+    list.push({ date: t, outfitId: outfitId, name: outfit.name || 'Outfit', itemIds: ids });
+    _showToast('👕 Als heute getragen gespeichert');
+  }
+  _saveWorn(list);
+  _renderWornButton(outfitId);
+}
+function _renderWornButton(outfitId) {
+  var btn = document.getElementById('detail-worn-btn');
+  if (!btn) return;
+  var on = _isOutfitWornToday(outfitId);
+  btn.classList.toggle('on', on);
+  btn.textContent = on ? '✓ Heute getragen' : '👕 Heute getragen';
+}
+
+// Einzelnes Piece (Artikel-Detail) als heute getragen
+function _toggleItemWornToday() {
+  if (!_currentItemId) return;
+  var id = String(_currentItemId), t = _todayIso(), list = _loadWorn();
+  var idx = list.findIndex(function(e) { return e.date === t && !e.outfitId && e.itemIds.length === 1 && e.itemIds[0] === id; });
+  if (idx >= 0) list.splice(idx, 1);
+  else list.push({ date: t, outfitId: null, name: '', itemIds: [id] });
+  _saveWorn(list);
+  _fillItemWorn(id);
+}
+function _fillItemWorn(id) {
+  var s = _wearStats()[String(id)];
+  var label = document.getElementById('idp-worn-label');
+  if (label) label.textContent = _wornLabel(s);
+  var btn = document.getElementById('idp-worn-btn');
+  if (btn) {
+    var t = _todayIso();
+    var on = _loadWorn().some(function(e) { return e.date === t && e.itemIds.indexOf(String(id)) >= 0; });
+    btn.classList.toggle('on', on);
+    btn.textContent = on ? '✓ Heute' : '+ Heute';
+  }
+}
+
+// Für die KI: kürzlich getragene und wenig genutzte Pieces (nach Schrank-ID)
+function _wearHintsFor(wardrobe) {
+  var stats = _wearStats(), recentNames = {};
+  _loadRecentSuggestions().forEach(function(names) { names.forEach(function(n) { recentNames[n] = (recentNames[n] || 0) + 1; }); });
+  var hints = {};
+  wardrobe.forEach(function(w) {
+    var s = stats[String(w.id)];
+    if (s && _daysSince(s.last) <= 1) hints[w.id] = 'gestern/heute getragen';
+    else if ((!s || _daysSince(s.last) > 21) && !recentNames[w.name]) hints[w.id] = 'lange nicht getragen';
+  });
+  return hints;
+}
+
+// ── Schrank-Statistik ──
+function _openWearStats() {
+  var panel = document.getElementById('stats-panel');
+  if (!panel) return;
+  document.getElementById('stats-content').innerHTML = _renderWearStats();
+  panel.classList.add('active');
+}
+function _closeWearStats() {
+  var panel = document.getElementById('stats-panel');
+  if (panel) panel.classList.remove('active');
+}
+function _renderWearStats() {
+  var wardrobe = loadWardrobe(), stats = _wearStats(), log = _loadWorn();
+  if (!wardrobe.length) return '<div class="st-empty">Scanne zuerst ein paar Pieces – dann siehst du hier, was du wie oft trägst.</div>';
+  var days30 = {}, used30 = {};
+  log.forEach(function(e) {
+    if (_daysSince(e.date) < 30) { days30[e.date] = 1; (e.itemIds || []).forEach(function(id) { used30[id] = 1; }); }
+  });
+  var used = wardrobe.filter(function(w) { return used30[String(w.id)]; }).length;
+  var pct = Math.round(used / wardrobe.length * 100);
+  var thumb = function(w) {
+    var photo = w.imageDataUrl && w.imageDataUrl.length > 20 ? w.imageDataUrl : '';
+    return '<div class="st-thumb">' + (photo ? '<img src="' + _escAttr(photo) + '" alt="">' : (w.emoji || '👕')) + '</div>';
+  };
+  var row = function(w, sub) {
+    return '<div class="st-row" onclick="_closeWearStats();_openItemDetail(\'' + _escAttr(String(w.id)) + '\')">' + thumb(w)
+      + '<div class="st-row-text"><b>' + _escAttr(w.name || 'Piece') + '</b><span>' + sub + '</span></div><span class="st-arrow">›</span></div>';
+  };
+  // Lange nicht / nie getragen: zuerst nie, dann am längsten her
+  var sleeping = wardrobe.filter(function(w) { var s = stats[String(w.id)]; return !s || _daysSince(s.last) > 30; })
+    .sort(function(a, b) { var sa = stats[String(a.id)], sb = stats[String(b.id)]; return (sa ? sa.last : '') < (sb ? sb.last : '') ? -1 : 1; });
+  var top = wardrobe.filter(function(w) { return stats[String(w.id)]; })
+    .sort(function(a, b) { return stats[String(b.id)].count - stats[String(a.id)].count; }).slice(0, 5);
+  // Farben im Schrank (nach Farbname)
+  var colors = {};
+  wardrobe.forEach(function(w) {
+    var k = (w.color || 'Unbekannt').trim();
+    k = k.charAt(0).toUpperCase() + k.slice(1).toLowerCase();
+    if (!colors[k]) colors[k] = { n: 0, hex: w.colorHex || '#888' };
+    colors[k].n++;
+  });
+  var colorList = Object.keys(colors).sort(function(a, b) { return colors[b].n - colors[a].n; });
+  return '<div class="st-cards">'
+    + '<div class="st-card"><b>' + Object.keys(days30).length + '</b><span>Tage erfasst<br>(30 Tage)</span></div>'
+    + '<div class="st-card"><b>' + pct + ' %</b><span>deines Schranks<br>getragen (30 Tage)</span></div>'
+    + '<div class="st-card"><b>' + wardrobe.length + '</b><span>Pieces<br>im Schrank</span></div></div>'
+    + (log.length ? '' : '<div class="st-tip">💡 Tippe bei einem Outfit auf <b>„Heute getragen“</b> – dann füllt sich die Statistik und die KI schlägt nicht ständig dasselbe vor.</div>')
+    + '<div class="st-title">😴 Lange nicht getragen <small>' + sleeping.length + '</small></div>'
+    + (sleeping.length ? sleeping.slice(0, 12).map(function(w) { return row(w, _wornLabel(stats[String(w.id)])); }).join('')
+      + (sleeping.length > 12 ? '<div class="st-more">+ ' + (sleeping.length - 12) + ' weitere</div>' : '')
+      : '<div class="st-ok">Alles im Einsatz – stark! 🌱</div>')
+    + (top.length ? '<div class="st-title">⭐ Am häufigsten getragen</div>' + top.map(function(w) { return row(w, _wornLabel(stats[String(w.id)])); }).join('') : '')
+    + '<div class="st-title">🎨 Farben im Schrank</div><div class="st-colors">'
+    + '<div class="st-colorbar">' + colorList.map(function(k) { return '<i style="flex:' + colors[k].n + ';background:' + _escAttr(colors[k].hex) + '"></i>'; }).join('') + '</div>'
+    + colorList.slice(0, 8).map(function(k) { return '<span><i style="background:' + _escAttr(colors[k].hex) + '"></i>' + _escAttr(k) + ' ' + colors[k].n + '</span>'; }).join('') + '</div>';
+}

@@ -1257,6 +1257,38 @@
     .ki-menu-danger { color:#EF4444; }
     /* Outfit detail action buttons */
     .detail-action-row { display:flex; gap:12px; padding:0 0 8px; }
+    /* Heute getragen */
+    .detail-worn-btn { width:100%; height:48px; margin:4px 0 12px; border-radius:14px; border:1.5px solid rgba(52,211,153,0.5); background:rgba(16,185,129,0.15); color:#6ee7b7; font-size:15px; font-weight:800; cursor:pointer; }
+    .detail-worn-btn.on { background:#10b981; border-color:#10b981; color:#fff; }
+    .idp-worn-btn { flex-shrink:0; padding:6px 10px; border-radius:10px; border:1.5px solid rgba(52,211,153,0.5); background:transparent; color:#6ee7b7; font-size:12px; font-weight:800; cursor:pointer; }
+    .idp-worn-btn.on { background:#10b981; border-color:#10b981; color:#fff; }
+    /* Schrank-Statistik */
+    .profil-stats-entry { display:flex; align-items:center; gap:12px; margin:0 20px 6px; padding:14px 16px; background:var(--card); border-radius:18px; cursor:pointer; box-shadow:var(--shadow); }
+    .pse-icon { font-size:24px; }
+    .pse-text { flex:1; display:flex; flex-direction:column; }
+    .pse-text b { font-size:14.5px; color:var(--text); }
+    .pse-text small { font-size:12px; color:var(--text2); margin-top:2px; }
+    .pse-arrow { font-size:22px; color:var(--text2); }
+    .st-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:16px 16px 6px; }
+    .st-card { background:var(--card); border-radius:16px; padding:12px 8px; text-align:center; }
+    .st-card b { display:block; font-size:20px; color:#6ee7b7; }
+    .st-card span { font-size:10.5px; line-height:1.3; color:var(--text2); font-weight:600; }
+    .st-tip { margin:8px 16px 0; padding:10px 12px; border-radius:14px; background:rgba(16,185,129,0.12); border:1px solid rgba(52,211,153,0.3); font-size:12.5px; line-height:1.4; color:rgba(255,255,255,0.85); }
+    .st-title { font-size:15px; font-weight:800; color:var(--text); padding:18px 16px 8px; }
+    .st-title small { font-size:12px; color:var(--text2); font-weight:700; margin-left:4px; }
+    .st-row { display:flex; align-items:center; gap:12px; margin:0 16px 6px; padding:8px 10px; background:var(--card); border-radius:14px; cursor:pointer; }
+    .st-thumb { width:44px; height:44px; flex-shrink:0; border-radius:10px; background:rgba(255,255,255,0.92); display:flex; align-items:center; justify-content:center; font-size:22px; overflow:hidden; }
+    .st-thumb img { width:100%; height:100%; object-fit:contain; }
+    .st-row-text { flex:1; min-width:0; display:flex; flex-direction:column; }
+    .st-row-text b { font-size:13.5px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .st-row-text span { font-size:11.5px; color:var(--text2); margin-top:2px; }
+    .st-arrow { color:var(--text2); font-size:18px; }
+    .st-more, .st-ok { font-size:12.5px; color:var(--text2); padding:4px 16px; }
+    .st-colors { padding:0 16px 30px; display:flex; flex-wrap:wrap; gap:6px 12px; }
+    .st-colorbar { flex-basis:100%; display:flex; height:16px; border-radius:8px; overflow:hidden; margin-bottom:6px; border:1px solid var(--purple-border); }
+    .st-colors span { display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--text2); font-weight:600; }
+    .st-colors span i { width:11px; height:11px; border-radius:50%; border:1px solid rgba(255,255,255,0.3); }
+    .st-empty { padding:40px 24px; text-align:center; color:var(--text2); font-size:14px; line-height:1.5; }
     .detail-fav-btn { flex:1; height:48px; border-radius:14px; background:var(--bg); border:1.5px solid var(--purple-border); font-size:20px; cursor:pointer; }
     .detail-save-btn { flex:2; height:48px; border-radius:14px; background:var(--purple-light); color:var(--purple); border:1.5px solid var(--purple-border); font-size:14px; font-weight:800; cursor:pointer; }
     .detail-post-btn { width:100%; height:46px; border-radius:14px; background:var(--bg); border:1.5px solid var(--purple-border); color:var(--text); font-size:14px; font-weight:800; cursor:pointer; margin-top:8px; display:flex; align-items:center; justify-content:center; gap:8px; transition:transform 0.15s; }
@@ -1757,6 +1789,11 @@
             <input class="idp-field-input" id="idp-e-brand" type="text" placeholder="Optional" />
           </div>
           <div class="idp-field-row">
+            <span class="idp-field-label">Getragen</span>
+            <span class="idp-field-static" id="idp-worn-label" style="flex:1">—</span>
+            <button class="idp-worn-btn" id="idp-worn-btn" onclick="_toggleItemWornToday()">+ Heute</button>
+          </div>
+          <div class="idp-field-row">
             <span class="idp-field-label">Hinzugefügt</span>
             <span class="idp-field-static" id="idp-v-date">—</span>
           </div>
@@ -1799,7 +1836,7 @@
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           </div>
           <div class="scan-drop-title">Kleidungsstück hier ablegen</div>
-          <div class="scan-drop-sub">Ziehe ein Bild hierher oder tippe zum Auswählen</div>
+          <div class="scan-drop-sub">Tippe zum Auswählen – gerne auch mehrere Fotos auf einmal</div>
         </div>
 
         <div class="scan-action-row">
@@ -1809,7 +1846,7 @@
           </button>
           <button class="scan-action-btn scan-btn-secondary">
             <svg viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-            Bild hochladen
+            Bilder hochladen
           </button>
         </div>
 
@@ -2364,6 +2401,12 @@
           <div class="profil-stat"><div class="pnum" id="profil-follower-count">0</div><div class="plbl">Follower</div></div>
           <div class="profil-stat"><div class="pnum" id="profil-posts-count">0</div><div class="plbl">Posts</div></div>
         </div>
+        <!-- Schrank-Statistik (was wie oft getragen wird) -->
+        <div class="profil-stats-entry" onclick="_openWearStats()">
+          <span class="pse-icon">📊</span>
+          <span class="pse-text"><b>Mein Schrank in Zahlen</b><small>Was du oft, selten oder nie trägst</small></span>
+          <span class="pse-arrow">›</span>
+        </div>
         <div class="profil-posts-label"><span>Meine Posts</span><button class="new-post-btn" onclick="_openNewPostModal()">+ Neuer Beitrag</button></div>
         <div id="profil-posts-grid"></div>
       </div>
@@ -2374,6 +2417,14 @@
           <div class="post-detail-title-text" id="post-detail-title">Post</div>
         </div>
         <div class="post-detail-scroll" id="post-detail-content"></div>
+      </div>
+      <!-- Schrank-Statistik Panel (Inhalt aus _renderWearStats in ai.js) -->
+      <div class="settings-panel" id="stats-panel">
+        <div class="settings-header">
+          <button class="settings-back" onclick="_closeWearStats()">←</button>
+          <div class="settings-title">Mein Schrank in Zahlen</div>
+        </div>
+        <div class="settings-scroll" id="stats-content"></div>
       </div>
       <!-- Einstellungen Panel -->
       <div class="settings-panel" id="settings-panel">
@@ -2949,8 +3000,8 @@
   <!-- Versteckte Datei-Inputs -->
   <input type="file" id="scan-camera-input" accept="image/*" capture="environment" style="display:none"
          onchange="processScanFile(this.files[0]);this.value=''" />
-  <input type="file" id="scan-gallery-input" accept="image/*" style="display:none"
-         onchange="processScanFile(this.files[0]);this.value=''" />
+  <input type="file" id="scan-gallery-input" accept="image/*" multiple style="display:none"
+         onchange="processScanFiles(this.files);this.value=''" />
 
   <!-- ═══════════ FREUNDES-PROFIL PANEL ═══════════ -->
   <div class="friend-profile-panel" id="friend-profile-panel">
