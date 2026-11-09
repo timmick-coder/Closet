@@ -737,17 +737,18 @@
     .col-grid-card { min-width:0; background:#0e2240; border-radius:16px; overflow:hidden; cursor:pointer; transition:transform 0.15s; border:1px solid rgba(255,255,255,0.12); -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
     .col-grid-card:active { transform:scale(0.97); }
     /* Mal wieder anziehen? – Swipe-Stapel */
-    .deck { position:relative; width:min(100%, 280px); margin:4px auto 0; aspect-ratio:4/5.9; }
+    .deck { position:relative; width:min(100%, 340px); margin:4px auto 0; aspect-ratio:4/5.6; }
     .deck-card { position:absolute; inset:0; background:#0e2240; border-radius:20px; overflow:hidden; border:1px solid rgba(255,255,255,0.12);
       box-shadow:0 10px 30px rgba(0,0,30,0.45); -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:pan-y; display:flex; flex-direction:column; }
-    .deck-card .col-grid-preview { flex:1; aspect-ratio:auto; }
+    .deck-card .col-grid-preview { flex:1; aspect-ratio:auto; padding:14px 18px; }
+    .deck-card .ob-emoji { font-size:46px; }
     .deck-card.top { cursor:grab; z-index:2; }
     .deck-card.under { transform:scale(0.94) translateY(12px); opacity:0.55; z-index:1; pointer-events:none; }
     .deck-stamp { position:absolute; top:18px; padding:6px 12px; border-radius:10px; font-size:15px; font-weight:900; letter-spacing:0.02em; opacity:0; pointer-events:none; border:2.5px solid; }
     .deck-stamp.left { right:16px; color:#fca5a5; border-color:#f87171; background:rgba(127,29,29,0.55); transform:rotate(10deg); }
     .deck-stamp.right { left:16px; color:#6ee7b7; border-color:#34d399; background:rgba(6,78,59,0.6); transform:rotate(-10deg); }
-    .deck-actions { display:flex; align-items:center; justify-content:center; gap:26px; margin:14px 0 4px; }
-    .deck-btn { width:54px; height:54px; border-radius:50%; font-size:22px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); }
+    .deck-actions { display:flex; align-items:center; justify-content:center; gap:22px; margin:10px 0 2px; }
+    .deck-btn { width:40px; height:40px; border-radius:50%; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); }
     .deck-btn.skip { background:var(--card); border:1.5px solid rgba(248,113,113,0.6); color:#f87171; font-weight:800; }
     .deck-btn.wear { background:#10b981; border:none; }
     .deck-btn:active { transform:scale(0.92); }
