@@ -4208,17 +4208,89 @@ function _renderPreviewSuggestions(collectionFilter) {
     _previewDeck = { key: null, order: [], pos: 0 };
     return;
   }
-  // Reihenfolge bleibt stabil, solange sich die gespeicherten Outfits nicht ändern
-  var cacheKey = (collectionFilter || '__all__') + '|' + pool.map(function(o) { return o.id; }).sort().join(',');
+  // Reihenfolge bleibt stabil, solange sich die gespeicherten Outfits (und das Wetter) nicht ändern
+  var w = _deckWeather.data;
+  var cacheKey = (collectionFilter || '__all__') + '|' + (w ? w.date : '') + '|' + pool.map(function(o) { return o.id; }).sort().join(',');
   if (_previewDeck.key !== cacheKey) {
-    // In den letzten 14 Tagen Getragenes nach hinten, sonst zufällig
-    var recentWorn = {};
-    _loadWorn().forEach(function(e) { if (e.outfitId && _daysSince(e.date) < 14) recentWorn[e.outfitId] = true; });
-    var shuffled = pool.slice().sort(function() { return Math.random() - 0.5; });
-    var order = shuffled.filter(function(o) { return !recentWorn[o.id]; }).concat(shuffled.filter(function(o) { return recentWorn[o.id]; }));
-    _previewDeck = { key: cacheKey, order: order.map(function(o) { return o.id; }), pos: 0, filter: collectionFilter };
+    // Wetter da und noch nicht geblättert → passend zum Wetter sortieren, sonst zufällig;
+    // in den letzten 14 Tagen Getragenes immer nach hinten
+    var keepPos = _previewDeck.pos > 0 && _previewDeck.filter === collectionFilter && _previewDeck.key && _previewDeck.key.split('|')[2] === cacheKey.split('|')[2];
+    if (!keepPos) {
+      var recentWorn = {};
+      _loadWorn().forEach(function(e) { if (e.outfitId && _daysSince(e.date) < 14) recentWorn[e.outfitId] = true; });
+      var wardrobe = loadWardrobe();
+      var scored = pool.map(function(o) { return { o: o, s: (w ? _weatherFit(o, w, wardrobe) : 0) + Math.random() * 0.9 }; })
+        .sort(function(a, b) { return b.s - a.s; }).map(function(x) { return x.o; });
+      var order = scored.filter(function(o) { return !recentWorn[o.id]; }).concat(scored.filter(function(o) { return recentWorn[o.id]; }));
+      _previewDeck = { key: cacheKey, order: order.map(function(o) { return o.id; }), pos: 0, filter: collectionFilter };
+    } else {
+      _previewDeck.key = cacheKey; // schon am Blättern: Reihenfolge nicht mehr umwerfen
+    }
   }
   _drawPreviewDeck();
+  if (!_deckWeather.tried) _loadDeckWeather(false);
+}
+
+// ── Wetter für die Sortierung (einmal pro Tag, nur mit erlaubtem Standort) ──
+var _deckWeather = { data: null, tried: false, needsPermission: false };
+function _parseWeather(text) {
+  var m = /(-?\d+)\s*[–-]\s*(-?\d+)\s*°C,?\s*(.*)/.exec(text || '');
+  if (!m) return null;
+  return { date: _todayIso(), min: +m[1], max: +m[2], desc: m[3] || '', rain: /regen|schauer|gewitter|schnee/i.test(m[3] || ''), text: text };
+}
+async function _loadDeckWeather(ask) {
+  _deckWeather.tried = true;
+  try {
+    var cached = JSON.parse(localStorage.getItem('stylesync_weather_today') || 'null');
+    if (cached && cached.date === _todayIso()) { _deckWeather.data = cached; _renderPreviewSuggestions(_previewDeck.filter || null); return; }
+  } catch (e) {}
+  var text = '';
+  // Einmal per Knopf zugestimmt → danach täglich automatisch (iPhone-Home-App meldet die Erlaubnis oft nicht)
+  var optedIn = false;
+  try { optedIn = localStorage.getItem('stylesync_weather_ok') === '1'; } catch (e) {}
+  if (ask || optedIn) {
+    try {
+      text = await _todayWeatherText();
+      try { localStorage.setItem('stylesync_weather_ok', '1'); } catch (e) {}
+    } catch (e) { if (ask) _showToast('📍 Standort nicht verfügbar'); }
+  } else {
+    text = await _weatherIfAllowed();
+  }
+  if (!text) {
+    var state = '';
+    try { state = (await navigator.permissions.query({ name: 'geolocation' })).state; } catch (e) {}
+    _deckWeather.needsPermission = state !== 'denied'; // abgelehnt → nicht nerven
+    _drawPreviewDeck();
+    return;
+  }
+  var data = _parseWeather(text);
+  if (!data) return;
+  _deckWeather.data = data;
+  _deckWeather.needsPermission = false;
+  try { localStorage.setItem('stylesync_weather_today', JSON.stringify(data)); } catch (e) {}
+  _renderPreviewSuggestions(_previewDeck.filter || null);
+}
+
+// Wie gut passt ein Outfit zum Wetter? (höher = besser)
+// Wärme der Pieces: Winter-Sachen und Jacken/Mäntel wärmen, Sommer-Sachen/Shorts sind luftig.
+function _weatherFit(outfit, w, wardrobe) {
+  var t = (w.min + w.max * 2) / 3; // tagsüber zählt mehr
+  var warmth = 0, hasOuter = false, heavyCoat = false, light = 0;
+  (outfit.items || []).forEach(function(i) {
+    var id = _wardrobeIdOf(i, wardrobe);
+    var p = (id && wardrobe.find(function(x) { return String(x.id) === id; })) || { name: i.name || '' };
+    var role = _pieceRole(p), text = ((p.name || '') + ' ' + (p.type || '')).toLowerCase();
+    if (p.season === 'Winter') warmth += 2;
+    if (p.season === 'Sommer') { warmth -= 2; light++; }
+    if (/short|sandal|top\b|tanktop|leinen/.test(text)) { warmth -= 2; light++; }
+    if (/strick|wolle|pullover|hoodie|fleece|rollkragen/.test(text)) warmth += 1;
+    if (role === 'outer') { hasOuter = true; warmth += 2; if (/mantel|daunen|parka|puffer|winterjacke/.test(text)) { heavyCoat = true; warmth += 2; } }
+    if (w.rain && /stiefel|boots|regen/.test(text)) warmth += 0.5;
+  });
+  if (t <= 8) return warmth + (hasOuter ? 3 : -4) - light * 3;
+  if (t <= 15) return warmth * 0.6 + (hasOuter ? 2 : -1) - light * 2;
+  if (t <= 22) return -Math.abs(warmth - 1) - (heavyCoat ? 3 : 0) - light * 0.5;
+  return -warmth - (hasOuter ? 3 : 0) + light;
 }
 
 function _drawPreviewDeck() {
@@ -4242,7 +4314,10 @@ function _drawPreviewDeck() {
   };
   var cur = get(d.pos), next = get(d.pos + 1);
   if (!cur) { d.pos++; _drawPreviewDeck(); return; } // inzwischen gelöscht
-  container.innerHTML = '<div class="deck">' + (next ? card(next, 'under') : '') + card(cur, 'top') + '</div>'
+  var wd = _deckWeather.data;
+  var weatherLine = wd ? '<div class="deck-weather">' + (wd.rain ? '🌧️' : wd.max >= 20 ? '☀️' : wd.max <= 5 ? '🥶' : '⛅') + ' Heute ' + _escAttr(wd.text) + ' – passend sortiert</div>'
+    : _deckWeather.needsPermission ? '<button class="deck-weather ask" onclick="_loadDeckWeather(true)">📍 Nach Wetter sortieren – Standort erlauben</button>' : '';
+  container.innerHTML = weatherLine + '<div class="deck">' + (next ? card(next, 'under') : '') + card(cur, 'top') + '</div>'
     + '<div class="deck-actions">'
     + '<button class="deck-btn skip" onclick="_previewDeckSwipe(-1)" aria-label="Nächstes">✕</button>'
     + '<span class="deck-count">' + (d.pos + 1) + ' / ' + d.order.length + '</span>'
