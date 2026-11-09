@@ -8825,6 +8825,8 @@ function _wearHintsFor(wardrobe) {
 function _openWearStats() {
   var panel = document.getElementById('stats-panel');
   if (!panel) return;
+  _statsView = 'stats';
+  document.getElementById('stats-title').textContent = 'Mein Schrank in Zahlen';
   document.getElementById('stats-content').innerHTML = _renderWearStats();
   panel.classList.add('active');
 }
@@ -8864,7 +8866,7 @@ function _renderWearStats() {
   });
   var colorList = Object.keys(colors).sort(function(a, b) { return colors[b].n - colors[a].n; });
   return '<div class="st-cards">'
-    + '<div class="st-card"><b>' + Object.keys(days30).length + '</b><span>Tage erfasst<br>(30 Tage)</span></div>'
+    + '<div class="st-card st-card-link" onclick="_openWearHistory()"><b>' + Object.keys(days30).length + '</b><span>Tage erfasst<br>(30 Tage) ›</span></div>'
     + '<div class="st-card"><b>' + pct + ' %</b><span>deines Schranks<br>getragen (30 Tage)</span></div>'
     + '<div class="st-card"><b>' + wardrobe.length + '</b><span>Pieces<br>im Schrank</span></div></div>'
     + (log.length ? '' : '<div class="st-tip">💡 Tippe bei einem Outfit auf <b>„Heute getragen“</b> – dann füllt sich die Statistik und die KI schlägt nicht ständig dasselbe vor.</div>')
@@ -8876,4 +8878,116 @@ function _renderWearStats() {
     + '<div class="st-title">🎨 Farben im Schrank</div><div class="st-colors">'
     + '<div class="st-colorbar">' + colorList.map(function(k) { return '<i style="flex:' + colors[k].n + ';background:' + _escAttr(colors[k].hex) + '"></i>'; }).join('') + '</div>'
     + colorList.slice(0, 8).map(function(k) { return '<span><i style="background:' + _escAttr(colors[k].hex) + '"></i>' + _escAttr(k) + ' ' + colors[k].n + '</span>'; }).join('') + '</div>';
+}
+
+// ── Getragen-Verlauf: was an welchem Tag (letzte 30 Tage) ──
+var _statsView = 'stats';
+function _statsBack() {
+  if (_statsView === 'history') {
+    _statsView = 'stats';
+    document.getElementById('stats-title').textContent = 'Mein Schrank in Zahlen';
+    document.getElementById('stats-content').innerHTML = _renderWearStats();
+  } else _closeWearStats();
+}
+function _openWearHistory() {
+  _statsView = 'history';
+  document.getElementById('stats-title').textContent = 'Getragen – letzte 30 Tage';
+  _drawWearHistory();
+  var sc = document.getElementById('stats-content');
+  if (sc) sc.scrollTop = 0;
+}
+function _isoAddDays(iso, n) {
+  var d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n);
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+function _dayLabel(iso) {
+  var n = _daysSince(iso);
+  if (n === 0) return 'Heute';
+  if (n === 1) return 'Gestern';
+  return new Date(iso + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+// Mini-Bild eines Schrank-Pieces (Foto oder Emoji)
+function _wornThumb(id, wardrobe, cls) {
+  var w = wardrobe.find(function(x) { return String(x.id) === String(id); });
+  if (!w) return '';
+  var photo = w.imageDataUrl && w.imageDataUrl.length > 20 ? w.imageDataUrl : '';
+  return '<span class="' + (cls || 'wh-thumb') + '">' + (photo ? '<img src="' + _escAttr(photo) + '" alt="">' : (w.emoji || '👕')) + '</span>';
+}
+function _drawWearHistory() {
+  var box = document.getElementById('stats-content');
+  if (!box) return;
+  var wardrobe = loadWardrobe(), log = _loadWorn(), today = _todayIso();
+  var byDay = {};
+  log.forEach(function(e, idx) {
+    if (_daysSince(e.date) < 30 && _daysSince(e.date) >= 0) (byDay[e.date] = byDay[e.date] || []).push({ e: e, idx: idx });
+  });
+  // Kalender: 30 Tage bis heute, Spalten Mo–So
+  var start = _isoAddDays(today, -29);
+  var lead = (new Date(start + 'T12:00:00').getDay() + 6) % 7; // Montag = 0
+  var cells = '';
+  for (var i = 0; i < lead; i++) cells += '<div class="wh-cell empty"></div>';
+  for (var k = 0; k < 30; k++) {
+    var iso = _isoAddDays(start, k), entries = byDay[iso];
+    var first = entries && entries[0].e.itemIds[0];
+    cells += '<div class="wh-cell' + (entries ? ' worn' : '') + (iso === today ? ' today' : '') + '" onclick="_whTapDay(\'' + iso + '\')">'
+      + '<span class="wh-day">' + new Date(iso + 'T12:00:00').getDate() + '</span>'
+      + (first ? _wornThumb(first, wardrobe, 'wh-cell-thumb') : '') + '</div>';
+  }
+  var html = '<div class="wh-cal"><div class="wh-week">' + ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(function(d) { return '<span>' + d + '</span>'; }).join('') + '</div>'
+    + '<div class="wh-grid">' + cells + '</div>'
+    + '<div class="wh-cal-hint">Tippe auf einen Tag ohne Eintrag, um nachzutragen.</div></div>';
+  var days = Object.keys(byDay).sort().reverse();
+  if (!days.length) html += '<div class="st-empty">Noch nichts eingetragen.<br>Tippe bei einem Outfit auf „Heute getragen“ oder trage oben einen Tag nach.</div>';
+  html += days.map(function(iso) {
+    return '<div class="wh-daybox" id="wh-' + iso + '"><div class="wh-dayhead"><span>' + _dayLabel(iso) + '</span>'
+      + '<button onclick="_whPick(\'' + iso + '\')">+ Outfit</button></div>'
+      + byDay[iso].map(function(x) {
+        var e = x.e;
+        var name = e.name || (e.itemIds.length === 1 ? ((wardrobe.find(function(w) { return String(w.id) === e.itemIds[0]; }) || {}).name || 'Piece') : 'Outfit');
+        return '<div class="wh-entry"' + (e.outfitId && _loadOutfits().some(function(o) { return o.id === e.outfitId; }) ? ' onclick="_closeWearStats();navigateCenter();_openOutfitDetail(\'' + _escAttr(e.outfitId) + '\')"' : '') + '>'
+          + '<div class="wh-thumbs">' + e.itemIds.slice(0, 5).map(function(id) { return _wornThumb(id, wardrobe); }).join('') + '</div>'
+          + '<div class="wh-name">' + _escAttr(name) + '</div>'
+          + '<button class="wh-del" onclick="event.stopPropagation();_whDelete(' + x.idx + ')" aria-label="Eintrag löschen">✕</button></div>';
+      }).join('') + '</div>';
+  }).join('');
+  box.innerHTML = html + '<div id="wh-picker"></div>';
+}
+function _whTapDay(iso) {
+  var el = document.getElementById('wh-' + iso);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  else _whPick(iso);
+}
+function _whDelete(idx) {
+  var list = _loadWorn();
+  list.splice(idx, 1);
+  _saveWorn(list);
+  _drawWearHistory();
+  _showToast('Eintrag gelöscht');
+}
+// Nachtragen: gespeichertes Outfit für einen Tag auswählen
+function _whPick(iso) {
+  var picker = document.getElementById('wh-picker');
+  if (!picker) return;
+  var outfits = _loadOutfits().filter(function(o) { return !o.isInspo; }), wardrobe = loadWardrobe();
+  picker.innerHTML = '<div class="wh-pick-overlay" onclick="if(event.target===this)this.parentNode.innerHTML=\'\'"><div class="wh-pick-sheet">'
+    + '<div class="wh-pick-title">' + _dayLabel(iso) + ' – was hattest du an?</div>'
+    + (outfits.length ? outfits.map(function(o) {
+      var ids = (o.items || []).map(function(i) { return _wardrobeIdOf(i, wardrobe); }).filter(Boolean);
+      return '<div class="wh-entry" onclick="_whAdd(\'' + iso + '\',\'' + _escAttr(o.id) + '\')">'
+        + '<div class="wh-thumbs">' + ids.slice(0, 5).map(function(id) { return _wornThumb(id, wardrobe); }).join('') + '</div>'
+        + '<div class="wh-name">' + _escAttr(o.name || 'Outfit') + '</div></div>';
+    }).join('') : '<div class="st-empty">Noch keine Outfits gespeichert.</div>')
+    + '<button class="wh-pick-cancel" onclick="document.getElementById(\'wh-picker\').innerHTML=\'\'">Abbrechen</button></div></div>';
+}
+function _whAdd(iso, outfitId) {
+  var o = _loadOutfits().find(function(x) { return x.id === outfitId; });
+  if (!o) return;
+  var wardrobe = loadWardrobe(), list = _loadWorn();
+  if (!list.some(function(e) { return e.date === iso && e.outfitId === outfitId; })) {
+    list.push({ date: iso, outfitId: outfitId, name: o.name || 'Outfit',
+      itemIds: (o.items || []).map(function(i) { return _wardrobeIdOf(i, wardrobe); }).filter(Boolean) });
+    _saveWorn(list);
+  }
+  _drawWearHistory();
+  _showToast('✅ Eingetragen: ' + _dayLabel(iso));
 }
