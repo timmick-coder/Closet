@@ -4186,56 +4186,138 @@ function _confirmGenerate() {
   }
 }
 
-// ── Vorgeschlagene Outfits (kein API, aus gespeicherten) ──────────────────────
-var _previewSuggestionsCache = { key: null, picks: null };
+// ── Mal wieder anziehen? (Swipe-Stapel aus gespeicherten Outfits, kein API) ──
+// Immer ein Outfit sichtbar: nach links wischen = nächstes, nach rechts = anziehen
+// (als heute getragen speichern). Tippen öffnet das Outfit.
+var _previewDeck = { key: null, order: [], pos: 0 };
 
 function _renderPreviewSuggestions(collectionFilter) {
   var container = document.getElementById('ki-preview-suggestions');
   if (!container) return;
-  // Gespeicherte Outfits, die länger nicht getragen wurden (zuletzt Getragenes ausblenden)
-  var recentWorn = {};
-  _loadWorn().forEach(function(e) { if (e.outfitId && _daysSince(e.date) < 14) recentWorn[e.outfitId] = true; });
   var all = _loadOutfits().filter(function(o) { return !o.isInspo; });
-  var rested = all.filter(function(o) { return !recentWorn[o.id]; });
-  if (rested.length) all = rested;
-  var pool;
+  var pool = all;
   if (collectionFilter) {
     pool = all.filter(function(o) { return (o.kollektionen || []).indexOf(collectionFilter) >= 0; });
     if (pool.length === 0) pool = all; // Fallback: alle zeigen
-  } else {
-    pool = all;
   }
   if (pool.length === 0) {
     container.innerHTML = '<div style="text-align:center;padding:24px 20px 12px;">'
       + '<div style="font-size:32px;">🧺</div>'
       + '<div style="font-size:14px;font-weight:700;color:var(--text2);margin-top:8px;line-height:1.5;">Noch keine Outfits gespeichert.<br>Generiere Outfits und speichere sie!</div>'
       + '</div>';
-    _previewSuggestionsCache = { key: null, picks: null };
+    _previewDeck = { key: null, order: [], pos: 0 };
     return;
   }
-  // Auswahl bleibt stabil, solange sich der Pool (gespeicherte Outfits) nicht ändert –
-  // sonst würde jedes Öffnen/Verlassen eines Ordners die Vorschläge neu mischen.
-  var cacheKey = (collectionFilter || '__all__') + '|' + pool.map(function(o) { return o.id || _outfitId(o); }).sort().join(',');
-  var picks;
-  if (_previewSuggestionsCache.key === cacheKey) {
-    picks = _previewSuggestionsCache.picks;
-  } else {
+  // Reihenfolge bleibt stabil, solange sich die gespeicherten Outfits nicht ändern
+  var cacheKey = (collectionFilter || '__all__') + '|' + pool.map(function(o) { return o.id; }).sort().join(',');
+  if (_previewDeck.key !== cacheKey) {
+    // In den letzten 14 Tagen Getragenes nach hinten, sonst zufällig
+    var recentWorn = {};
+    _loadWorn().forEach(function(e) { if (e.outfitId && _daysSince(e.date) < 14) recentWorn[e.outfitId] = true; });
     var shuffled = pool.slice().sort(function() { return Math.random() - 0.5; });
-    picks = shuffled.slice(0, 3);
-    _previewSuggestionsCache = { key: cacheKey, picks: picks };
+    var order = shuffled.filter(function(o) { return !recentWorn[o.id]; }).concat(shuffled.filter(function(o) { return recentWorn[o.id]; }));
+    _previewDeck = { key: cacheKey, order: order.map(function(o) { return o.id; }), pos: 0, filter: collectionFilter };
   }
-  container.innerHTML = '<div class="ki-col-grid">' + picks.map(function(outfit) {
+  _drawPreviewDeck();
+}
+
+function _drawPreviewDeck() {
+  var container = document.getElementById('ki-preview-suggestions');
+  if (!container) return;
+  var d = _previewDeck, outfits = _loadOutfits();
+  var get = function(i) { return outfits.find(function(o) { return o.id === d.order[i]; }); };
+  if (d.pos >= d.order.length) {
+    container.innerHTML = '<div class="deck-done"><div style="font-size:34px;">🎉</div><b>Alle durchgeschaut</b>'
+      + '<span>Nichts dabei? Lass dir von der KI neue Outfits vorschlagen.</span>'
+      + '<button onclick="_previewDeckRestart()">Nochmal von vorn</button></div>';
+    return;
+  }
+  var card = function(outfit, cls) {
     var id = _regOutfit(outfit);
-    var fav = _isFav(id);
-    var cells = _makeOutfitBoard(outfit);
-    return '<div class="col-grid-card" data-saved-id="' + _escAttr(id) + '" style="cursor:pointer;">'
-      + '<div class="col-grid-preview">' + cells + '</div>'
-      + '<div class="col-grid-footer">'
-      + _outfitTitle(outfit)
-      + '<button class="col-grid-heart" data-heart-id="' + _escAttr(id) + '">' + (fav ? '🩷' : '🤍') + '</button>'
-      + '</div>'
+    return '<div class="deck-card ' + cls + '"' + (cls === 'top' ? ' id="deck-top" data-saved-id="' + _escAttr(id) + '"' : '') + '>'
+      + '<div class="col-grid-preview">' + _makeOutfitBoard(outfit) + '</div>'
+      + '<div class="col-grid-footer">' + _outfitTitle(outfit) + '</div>'
+      + (cls === 'top' ? '<div class="deck-stamp left">Nächstes</div><div class="deck-stamp right">Anziehen 👕</div>' : '')
       + '</div>';
-  }).join('') + '</div>';
+  };
+  var cur = get(d.pos), next = get(d.pos + 1);
+  if (!cur) { d.pos++; _drawPreviewDeck(); return; } // inzwischen gelöscht
+  container.innerHTML = '<div class="deck">' + (next ? card(next, 'under') : '') + card(cur, 'top') + '</div>'
+    + '<div class="deck-actions">'
+    + '<button class="deck-btn skip" onclick="_previewDeckSwipe(-1)" aria-label="Nächstes">✕</button>'
+    + '<span class="deck-count">' + (d.pos + 1) + ' / ' + d.order.length + '</span>'
+    + '<button class="deck-btn wear" onclick="_previewDeckSwipe(1)" aria-label="Anziehen">👕</button>'
+    + '</div>'
+    + '<div class="deck-hint">← weiter · anziehen →</div>';
+  _initDeckDrag(document.getElementById('deck-top'));
+}
+
+function _previewDeckRestart() {
+  _previewDeck.key = null;
+  _renderPreviewSuggestions(_previewDeck.filter || null);
+}
+
+// dir: -1 = nächstes (links raus), 1 = anziehen (rechts raus)
+function _previewDeckSwipe(dir) {
+  var el = document.getElementById('deck-top');
+  if (!el || el.classList.contains('leaving')) return;
+  var id = el.getAttribute('data-saved-id');
+  el.classList.add('leaving');
+  el.style.transition = 'transform 0.3s ease-out, opacity 0.3s';
+  el.style.transform = 'translateX(' + (dir * 130) + '%) rotate(' + (dir * 18) + 'deg)';
+  el.style.opacity = '0';
+  if (dir > 0) _wearOutfitToday(id);
+  setTimeout(function() { _previewDeck.pos++; _drawPreviewDeck(); }, 280);
+}
+
+// Outfit als heute getragen speichern (nur hinzufügen, nicht umschalten)
+function _wearOutfitToday(outfitId) {
+  var outfit = _kiOutfitRegistry[outfitId] || _loadOutfits().find(function(o) { return o.id === outfitId; });
+  if (!outfit) return;
+  if (!_isOutfitWornToday(outfitId)) {
+    var wardrobe = loadWardrobe(), list = _loadWorn();
+    list.push({ date: _todayIso(), outfitId: outfitId, name: outfit.name || 'Outfit',
+      itemIds: (outfit.items || []).map(function(i) { return _wardrobeIdOf(i, wardrobe); }).filter(Boolean) });
+    _saveWorn(list);
+  }
+  _showToast('👕 Viel Spaß mit „' + (outfit.name || 'Outfit') + '“ – als heute getragen gespeichert');
+}
+
+// Karte mit dem Finger ziehen (vertikal scrollt die Seite weiter normal)
+function _initDeckDrag(el) {
+  if (!el) return;
+  var sx = 0, sy = 0, dx = 0, dragging = false, decided = false, horizontal = false;
+  var stampL = el.querySelector('.deck-stamp.left'), stampR = el.querySelector('.deck-stamp.right');
+  el.addEventListener('pointerdown', function(e) {
+    sx = e.clientX; sy = e.clientY; dx = 0; dragging = true; decided = false; horizontal = false;
+    el.style.transition = 'none';
+  });
+  el.addEventListener('pointermove', function(e) {
+    if (!dragging) return;
+    var mx = e.clientX - sx, my = e.clientY - sy;
+    if (!decided && (Math.abs(mx) > 8 || Math.abs(my) > 8)) {
+      decided = true; horizontal = Math.abs(mx) > Math.abs(my);
+      if (horizontal) { try { el.setPointerCapture(e.pointerId); } catch (err) {} }
+    }
+    if (!horizontal) return;
+    dx = mx;
+    el.style.transform = 'translateX(' + dx + 'px) rotate(' + (dx / 18) + 'deg)';
+    var p = Math.min(1, Math.abs(dx) / 90);
+    stampL.style.opacity = dx < 0 ? p : 0;
+    stampR.style.opacity = dx > 0 ? p : 0;
+  });
+  var end = function() {
+    if (!dragging) return;
+    dragging = false;
+    if (horizontal && Math.abs(dx) > 90) { _previewDeckSwipe(dx > 0 ? 1 : -1); return; }
+    el.style.transition = 'transform 0.25s ease';
+    el.style.transform = '';
+    stampL.style.opacity = 0; stampR.style.opacity = 0;
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  // Nach einem Wisch kein "Tippen" auslösen (sonst öffnet sich das Outfit)
+  el.addEventListener('click', function(e) { if (horizontal && Math.abs(dx) > 8) { e.stopPropagation(); e.preventDefault(); } }, true);
 }
 
 // ── KI Vorschläge ─────────────────────────────────────────────────────────────

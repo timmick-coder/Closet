@@ -736,6 +736,27 @@
     .col-wrap-grid { min-width:0; }
     .col-grid-card { min-width:0; background:#0e2240; border-radius:16px; overflow:hidden; cursor:pointer; transition:transform 0.15s; border:1px solid rgba(255,255,255,0.12); -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
     .col-grid-card:active { transform:scale(0.97); }
+    /* Mal wieder anziehen? – Swipe-Stapel */
+    .deck { position:relative; width:min(100%, 280px); margin:4px auto 0; aspect-ratio:4/5.9; }
+    .deck-card { position:absolute; inset:0; background:#0e2240; border-radius:20px; overflow:hidden; border:1px solid rgba(255,255,255,0.12);
+      box-shadow:0 10px 30px rgba(0,0,30,0.45); -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:pan-y; display:flex; flex-direction:column; }
+    .deck-card .col-grid-preview { flex:1; aspect-ratio:auto; }
+    .deck-card.top { cursor:grab; z-index:2; }
+    .deck-card.under { transform:scale(0.94) translateY(12px); opacity:0.55; z-index:1; pointer-events:none; }
+    .deck-stamp { position:absolute; top:18px; padding:6px 12px; border-radius:10px; font-size:15px; font-weight:900; letter-spacing:0.02em; opacity:0; pointer-events:none; border:2.5px solid; }
+    .deck-stamp.left { right:16px; color:#fca5a5; border-color:#f87171; background:rgba(127,29,29,0.55); transform:rotate(10deg); }
+    .deck-stamp.right { left:16px; color:#6ee7b7; border-color:#34d399; background:rgba(6,78,59,0.6); transform:rotate(-10deg); }
+    .deck-actions { display:flex; align-items:center; justify-content:center; gap:26px; margin:14px 0 4px; }
+    .deck-btn { width:54px; height:54px; border-radius:50%; font-size:22px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow); }
+    .deck-btn.skip { background:var(--card); border:1.5px solid rgba(248,113,113,0.6); color:#f87171; font-weight:800; }
+    .deck-btn.wear { background:#10b981; border:none; }
+    .deck-btn:active { transform:scale(0.92); }
+    .deck-count { font-size:12.5px; font-weight:700; color:var(--text2); min-width:44px; text-align:center; }
+    .deck-hint { text-align:center; font-size:11.5px; color:var(--text2); opacity:0.7; margin-bottom:6px; }
+    .deck-done { display:flex; flex-direction:column; align-items:center; gap:6px; padding:22px 20px 14px; text-align:center; }
+    .deck-done b { font-size:15px; color:var(--text); }
+    .deck-done span { font-size:13px; color:var(--text2); line-height:1.4; }
+    .deck-done button { margin-top:8px; padding:10px 20px; border-radius:14px; border:1.5px solid var(--purple-border); background:var(--card); color:var(--text); font-size:13.5px; font-weight:700; cursor:pointer; }
     /* Outfit-Board: Teile von Kopf bis Fuß übereinander, ganz sichtbar (contain) auf weichem Verlauf */
     .col-grid-preview {
       position:relative; aspect-ratio:4/5; box-sizing:border-box;
