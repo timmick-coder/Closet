@@ -431,6 +431,11 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
   let weather = '';
   if (!/Wetter:/.test(description || '')) weather = await _weatherIfAllowed();
   const recent = _loadRecentSuggestions();
+  // Schon gespeicherte Outfits nicht nochmal vorschlagen
+  const saved = _savedOutfitPieces();
+  const savedKeys = {};
+  saved.forEach(function(p) { savedKeys[_mainKey(p)] = true; });
+  const savedText = saved.slice(-30).map(function(p) { return '- ' + p.map(function(w) { return w.name; }).join(' + '); }).join('\n');
 
   const prompt = 'Du bist ein erfahrener, ehrlicher Mode-Stylist. Stelle bis zu 3 Outfits AUSSCHLIESSLICH aus dem Schrank des Nutzers zusammen. '
     + 'Jedes Piece hat eine ID (z.B. T1); gib pro Outfit die IDs in "itemIds" an (Reihenfolge: Kopf bis Fuß). Erfinde keine Kleidung.\n\n'
@@ -446,6 +451,7 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
     + 'Verwende, wo der Schrank es erlaubt, zwischen zwei Outfits höchstens ein gemeinsames Piece. '
     + 'Nutze den ganzen Schrank: bevorzuge Pieces mit [lange nicht getragen], und nimm Pieces mit [gestern/heute getragen] nicht als Hauptteil (Oberteil, Hose, Jacke).'
     + (recent.length ? ' Wiederhole keine dieser kürzlich vorgeschlagenen Kombinationen:\n' + recent.map(function(r) { return '- ' + r.join(' + '); }).join('\n') : '')
+    + (savedText ? '\nDiese Outfits hat der Nutzer SCHON GESPEICHERT – schlage sie NICHT nochmal vor, auch nicht nur mit anderer Jacke, anderen Schuhen oder Accessoires:\n' + savedText : '')
     + '\n5. Gib je Outfit eine kurze, konkrete Begründung auf Deutsch (1 Satz, warum Farben/Teile zusammenpassen und zum Anlass/Wetter passen) und eine ehrliche Passgenauigkeit 0–100.\n\n'
     + 'HEUTE: ' + now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) + ' (' + season + ')'
     + (weather ? ', Wetter: ' + weather : '') + '\n\n'
@@ -502,10 +508,10 @@ async function generateOutfitsWithGemini(description, inspoContext, inspoImageBa
   };
 
   // Qualitätskontrolle: reparieren, was geht; Unsinniges aussortieren
-  const qcCtx = { season: season, wardrobe: wardrobe };
+  const qcCtx = { season: season, wardrobe: wardrobe, savedKeys: savedKeys };
   let result = _qualityCheckOutfits(await ask(''), qcCtx);
-  // Zu wenig brauchbare Outfits? Einmal gezielt mit den gefundenen Fehlern nachfragen
-  if (result.valid.length < 2 && result.problems.length) {
+  // Zu wenig brauchbare Outfits (oder Gespeichertes aussortiert)? Einmal gezielt mit den Fehlern nachfragen
+  if ((result.valid.length < 2 || (qcCtx.savedDropped && result.valid.length < 3)) && result.problems.length) {
     const feedback = '\n\nACHTUNG – deine letzten Vorschläge hatten diese Fehler, vermeide sie unbedingt:\n- '
       + result.problems.slice(0, 6).join('\n- ');
     try {
@@ -621,10 +627,32 @@ function _qualityCheckOutfits(list, ctx, existing) {
     var pieces = byRole.acc.concat(byRole.outer, byRole.top, byRole.onepiece, byRole.bottom, byRole.shoes, byRole.other);
     var key = pieces.map(function(w) { return w.id; }).sort().join('|');
     if (seenKeys[key]) { problems.push(label + ': doppelt'); return; }
+    // Schon gespeichertes Outfit (gleiche Oberteile + Hose, evtl. andere Jacke/Schuhe) → aussortieren
+    if (ctx.savedKeys && ctx.savedKeys[_mainKey(pieces)]) {
+      problems.push(label + ': ist schon als Outfit gespeichert – schlage etwas Neues vor');
+      ctx.savedDropped = true;
+      return;
+    }
     seenKeys[key] = true;
     valid.push(Object.assign({}, o, { pieces: pieces }));
   });
   return { valid: valid, problems: problems };
+}
+
+// Kennung eines Outfits nur aus Oberteilen + Unterteil bzw. Kleid – Jacke, Schuhe, Accessoires egal
+function _mainKey(pieces) {
+  return pieces.filter(function(w) { return ['top', 'onepiece', 'bottom'].indexOf(_pieceRole(w)) >= 0; })
+    .map(function(w) { return String(w.id); }).sort().join('|');
+}
+// Gespeicherte Outfits des Nutzers als Schrank-Pieces (für "nicht nochmal vorschlagen")
+function _savedOutfitPieces() {
+  var wardrobe = loadWardrobe();
+  return _loadOutfits().filter(function(o) { return !o.isInspo; }).map(function(o) {
+    return (o.items || []).map(function(i) {
+      var id = _wardrobeIdOf(i, wardrobe);
+      return id && wardrobe.find(function(w) { return String(w.id) === id; });
+    }).filter(Boolean);
+  }).filter(function(p) { return p.length; });
 }
 
 // Verständliche Meldung, wenn sich gar kein vollständiges Outfit bauen lässt
@@ -4164,7 +4192,12 @@ var _previewSuggestionsCache = { key: null, picks: null };
 function _renderPreviewSuggestions(collectionFilter) {
   var container = document.getElementById('ki-preview-suggestions');
   if (!container) return;
+  // Gespeicherte Outfits, die länger nicht getragen wurden (zuletzt Getragenes ausblenden)
+  var recentWorn = {};
+  _loadWorn().forEach(function(e) { if (e.outfitId && _daysSince(e.date) < 14) recentWorn[e.outfitId] = true; });
   var all = _loadOutfits().filter(function(o) { return !o.isInspo; });
+  var rested = all.filter(function(o) { return !recentWorn[o.id]; });
+  if (rested.length) all = rested;
   var pool;
   if (collectionFilter) {
     pool = all.filter(function(o) { return (o.kollektionen || []).indexOf(collectionFilter) >= 0; });
@@ -4252,13 +4285,9 @@ function _autoLoadKiSuggestions(force, customDesc, colContext) {
   var kiScroll = document.getElementById('ki-scroll');
   if (kiScroll) kiScroll.scrollTop = 0;
 
-  var wardrobeDesc = 'Mein Kleiderschrank: ' + wardrobe.slice(0, 12).map(function(item) {
-    var parts = [item.name || item.type || 'Kleidungsstück'];
-    if (item.brand) parts.push('(' + item.brand + ')');
-    if (item.color) parts.push('in ' + item.color);
-    return parts.join(' ');
-  }).join(', ');
-  var description = customDesc ? customDesc + '\n' + wardrobeDesc : wardrobeDesc;
+  // Der ganze Schrank steht schon im Prompt – hier nur der Wunsch (früher hingen hier die
+  // ersten 12 Pieces dran, dadurch kamen immer dieselben Pieces vor)
+  var description = customDesc || '';
 
   generateOutfitsWithGemini(description, colContext || null, null, null).then(function(outfits) {
     _kiSuggestionsLoaded = true;
