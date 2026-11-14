@@ -647,7 +647,7 @@ function _mainKey(pieces) {
 // Gespeicherte Outfits des Nutzers als Schrank-Pieces (für "nicht nochmal vorschlagen")
 function _savedOutfitPieces() {
   var wardrobe = loadWardrobe();
-  return _loadOutfits().filter(function(o) { return !o.isInspo; }).map(function(o) {
+  return _savedOutfitsList().map(function(o) {
     return (o.items || []).map(function(i) {
       var id = _wardrobeIdOf(i, wardrobe);
       return id && wardrobe.find(function(w) { return String(w.id) === id; });
@@ -2429,6 +2429,13 @@ function _loadOutfits() {
 function _storeOutfits(list) {
   localStorage.setItem('stylesync_outfits', JSON.stringify(list));
 }
+// Wirklich gespeicherte Outfits: in mind. einem Ordner, keine Inspo, nicht gerade gelöscht (Rückgängig-Zeit)
+var _outfitsPendingDelete = {};
+function _savedOutfitsList() {
+  return _loadOutfits().filter(function(o) {
+    return !o.isInspo && (o.kollektionen || []).length > 0 && !_outfitsPendingDelete[o.id];
+  });
+}
 
 // Einmalige Migration aus altem Format (stylesync_saved + stylesync_favs)
 function _migrateOldData() {
@@ -2770,6 +2777,36 @@ function _animateDeleteWrapper(wrapper) {
   setTimeout(function() { _swipeDeleteOutfit(wrapper); }, 290);
 }
 
+// Löschen mit 3 s Rückgängig-Zeit; jedes Löschen hat seinen eigenen Abschluss
+var _pendingDeleteCommit = null;
+function _startPendingDelete(outfitId, commitFn) {
+  var commit = function() {
+    delete _outfitsPendingDelete[outfitId];
+    commitFn();
+    _renderPreviewSuggestions(null);
+  };
+  _pendingDeleteCommit = commit;
+  clearTimeout(_swipeUndoTimer);
+  _swipeUndoTimer = setTimeout(function() {
+    if (_pendingDeleteCommit === commit) { _pendingDeleteCommit = null; commit(); }
+    _swipeUndoFn = null;
+    _hideUndoToast();
+  }, 3000);
+  _renderPreviewSuggestions(null); // gleich aus dem Swipe-Stapel nehmen
+}
+function _flushPendingDelete() {
+  if (!_pendingDeleteCommit) return;
+  var c = _pendingDeleteCommit;
+  _pendingDeleteCommit = null;
+  clearTimeout(_swipeUndoTimer);
+  c();
+}
+function _cancelPendingDelete(outfitId) {
+  clearTimeout(_swipeUndoTimer);
+  _pendingDeleteCommit = null;
+  delete _outfitsPendingDelete[outfitId];
+}
+
 function _swipeDeleteOutfit(wrapper) {
   var outfitId  = wrapper.getAttribute('data-swipe-id');
   var type      = wrapper.getAttribute('data-swipe-type');   // 'suggestion' | 'collection'
@@ -2778,9 +2815,15 @@ function _swipeDeleteOutfit(wrapper) {
 
   // Save state for undo
   var undoFn = null;
+  // Noch offenes Löschen (Rückgängig-Zeit läuft) sofort abschließen – sonst ginge es verloren
+  _flushPendingDelete();
   if (type === 'collection' && outfitId && colName) {
     var snapshots = _loadOutfits();
+    var target = snapshots.find(function(x) { return x.id === outfitId; });
+    // Letzter Ordner des Outfits → es verschwindet ganz (auch aus Swipe-Stapel und KI-Liste)
+    if (target && (target.kollektionen || []).filter(function(c) { return c !== colName; }).length === 0) _outfitsPendingDelete[outfitId] = true;
     undoFn = function() {
+      _cancelPendingDelete(outfitId);
       _storeOutfits(snapshots);
       var listEl = document.getElementById('ki-collection-list');
       if (listEl && _currentCollectionName) {
@@ -2788,11 +2831,10 @@ function _swipeDeleteOutfit(wrapper) {
         listEl.innerHTML = fits.map(function(o) { return _renderCollectionCard(o, _currentCollectionName); }).join('');
         _initSwipeToDelete(listEl);
       }
+      _renderPreviewSuggestions(null);
       _hideUndoToast();
     };
-    // Commit delete after 3 seconds
-    clearTimeout(_swipeUndoTimer);
-    _swipeUndoTimer = setTimeout(function() {
+    _startPendingDelete(outfitId, function() {
       var outfits = _loadOutfits();
       var o = outfits.find(function(x) { return x.id === outfitId; });
       if (o) {
@@ -2800,26 +2842,21 @@ function _swipeDeleteOutfit(wrapper) {
         if (o.kollektionen.length === 0) outfits = outfits.filter(function(x) { return x.id !== outfitId; });
       }
       _storeOutfits(outfits);
-      _swipeUndoFn = null;
-      _hideUndoToast();
-    }, 3000);
+    });
   } else if (type === 'saved') {
     var snapshots2 = _loadOutfits();
+    _outfitsPendingDelete[outfitId] = true;
     undoFn = function() {
+      _cancelPendingDelete(outfitId);
       _storeOutfits(snapshots2);
       _renderKiSavedSection();
       _hideUndoToast();
     };
-    clearTimeout(_swipeUndoTimer);
-    _swipeUndoTimer = setTimeout(function() {
-      var outfits2 = _loadOutfits();
-      outfits2 = outfits2.filter(function(x) { return x.id !== outfitId; });
-      _storeOutfits(outfits2);
+    _startPendingDelete(outfitId, function() {
+      _storeOutfits(_loadOutfits().filter(function(x) { return x.id !== outfitId; }));
       _renderKiPills();
       _updateFavoritenCard();
-      _swipeUndoFn = null;
-      _hideUndoToast();
-    }, 3000);
+    });
   } else {
     // KI suggestion — just remove DOM, no undo needed
     clearTimeout(_swipeUndoTimer);
@@ -3643,6 +3680,7 @@ function _storeFolderOrder(keys) {
 
 function _deleteCollection(name) {
   if (!name || name === '__favoriten__') return;
+  _flushPendingDelete(); // offenes Outfit-Löschen nicht durch den neuen Timer verlieren
   var snapshots = _loadOutfits();
   var coverSnapshot = _getCollectionCovers()[name] || null;
   var wasManual = _getManualCollections().indexOf(name) >= 0;
@@ -4194,7 +4232,7 @@ var _previewDeck = { key: null, order: [], pos: 0 };
 function _renderPreviewSuggestions(collectionFilter) {
   var container = document.getElementById('ki-preview-suggestions');
   if (!container) return;
-  var all = _loadOutfits().filter(function(o) { return !o.isInspo; });
+  var all = _savedOutfitsList();
   var pool = all;
   if (collectionFilter) {
     pool = all.filter(function(o) { return (o.kollektionen || []).indexOf(collectionFilter) >= 0; });
@@ -4215,7 +4253,19 @@ function _renderPreviewSuggestions(collectionFilter) {
     // Wetter da und noch nicht geblättert → passend zum Wetter sortieren, sonst zufällig;
     // in den letzten 14 Tagen Getragenes immer nach hinten
     var keepPos = _previewDeck.pos > 0 && _previewDeck.filter === collectionFilter && _previewDeck.key && _previewDeck.key.split('|')[2] === cacheKey.split('|')[2];
-    if (!keepPos) {
+    // Nur Outfits gelöscht? Dann Reihenfolge behalten und die Gelöschten herausnehmen
+    var poolIds = {};
+    pool.forEach(function(o) { poolIds[o.id] = true; });
+    var onlyRemoved = _previewDeck.key && _previewDeck.filter === collectionFilter
+      && _previewDeck.key.split('|')[1] === cacheKey.split('|')[1] // Wetter unverändert
+      && pool.length < _previewDeck.order.length
+      && pool.every(function(o) { return _previewDeck.order.indexOf(o.id) >= 0; });
+    if (!keepPos && onlyRemoved) {
+      var before = _previewDeck.order.slice(0, _previewDeck.pos).filter(function(id) { return poolIds[id]; }).length;
+      _previewDeck.order = _previewDeck.order.filter(function(id) { return poolIds[id]; });
+      _previewDeck.pos = before;
+      _previewDeck.key = cacheKey;
+    } else if (!keepPos) {
       var recentWorn = {};
       _loadWorn().forEach(function(e) { if (e.outfitId && _daysSince(e.date) < 14) recentWorn[e.outfitId] = true; });
       var wardrobe = loadWardrobe();
@@ -8968,7 +9018,7 @@ function _whDelete(idx) {
 function _whPick(iso) {
   var picker = document.getElementById('wh-picker');
   if (!picker) return;
-  var outfits = _loadOutfits().filter(function(o) { return !o.isInspo; }), wardrobe = loadWardrobe();
+  var outfits = _savedOutfitsList(), wardrobe = loadWardrobe();
   picker.innerHTML = '<div class="wh-pick-overlay" onclick="if(event.target===this)this.parentNode.innerHTML=\'\'"><div class="wh-pick-sheet">'
     + '<div class="wh-pick-title">' + _dayLabel(iso) + ' – was hattest du an?</div>'
     + (outfits.length ? outfits.map(function(o) {
